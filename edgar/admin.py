@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental
+from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental, EdgarMetricMapping
 
 
 @admin.register(EdgarCompany)
@@ -39,3 +39,10 @@ class EdgarFundamentalAdmin(admin.ModelAdmin):
     )
     list_filter = ("taxonomy", "tag", "unit", "form")
     search_fields = ("company__ticker", "company__name", "taxonomy", "tag", "accession")
+
+
+@admin.register(EdgarMetricMapping)
+class EdgarMetricMappingAdmin(admin.ModelAdmin):
+    list_display = ("company", "metric_key", "taxonomy", "tag", "source", "confidence", "updated_at")
+    list_filter = ("source", "taxonomy")
+    search_fields = ("company__ticker", "metric_key", "tag")

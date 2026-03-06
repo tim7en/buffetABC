@@ -17,6 +17,7 @@ from edgar.services.fundamentals import (
     save_fundamentals_from_concept,
     save_fundamentals_from_facts,
 )
+from edgar.services.metric_mapping import build_fundamental_table, resolve_and_store_metric_mapping
 from edgar.services.edgar_client import EdgarClient
 
 
@@ -162,6 +163,42 @@ class EdgarCompanyViewSet(viewsets.ReadOnlyModelViewSet):
                 "unit": unit,
                 "count": len(points),
                 "points": points,
+            }
+        )
+
+    @action(detail=True, methods=["get"], url_path="fundamental-table")
+    def fundamental_table(self, request, pk=None):
+        company = self.get_object()
+        period_start = request.query_params.get("period_start")
+        period_end = request.query_params.get("period_end")
+        frequency = request.query_params.get("frequency", "annual")
+        use_ai = request.query_params.get("use_ai", "1").strip() != "0"
+        refresh_mapping = request.query_params.get("refresh_mapping", "0").strip() == "1"
+
+        start_date = date.fromisoformat(period_start) if period_start else None
+        end_date = date.fromisoformat(period_end) if period_end else None
+
+        mapping = resolve_and_store_metric_mapping(
+            company=company,
+            taxonomy="us-gaap",
+            use_ai=use_ai,
+            force_refresh=refresh_mapping,
+        )
+        table = build_fundamental_table(
+            company=company,
+            mapping=mapping,
+            period_start=start_date,
+            period_end=end_date,
+            frequency=frequency,
+        )
+        return Response(
+            {
+                "ticker": company.ticker,
+                "frequency": frequency,
+                "row_count": len(table["rows"]),
+                "metrics": table["metrics"],
+                "mapping": table["mapping"],
+                "rows": table["rows"],
             }
         )
 

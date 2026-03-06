@@ -7,7 +7,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from edgar import sp500
-from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental
+from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental, EdgarMetricMapping
 from edgar.services.edgar_client import EdgarClient, RateLimiter
 
 
@@ -191,3 +191,41 @@ class DrfApiTests(TestCase):
         list_res = self.client.get("/api/edgar/drf/fundamentals/?ticker=AAPL&tag=Assets")
         self.assertEqual(list_res.status_code, 200)
         self.assertGreaterEqual(list_res.json()["count"], 1)
+
+    def test_fundamental_table_endpoint_returns_rows_and_mapping(self):
+        company = EdgarCompany.objects.create(
+            ticker="AAPL", name="Apple Inc.", cik="0000320193", is_sp500=True
+        )
+        EdgarFundamental.objects.create(
+            company=company,
+            taxonomy="us-gaap",
+            tag="Revenues",
+            unit="USD",
+            end_date="2022-12-31",
+            filed_date="2023-01-30",
+            value=1000,
+            form="10-K",
+            fiscal_year=2022,
+            fiscal_period="FY",
+        )
+        EdgarFundamental.objects.create(
+            company=company,
+            taxonomy="us-gaap",
+            tag="NetIncomeLoss",
+            unit="USD",
+            end_date="2022-12-31",
+            filed_date="2023-01-30",
+            value=210,
+            form="10-K",
+            fiscal_year=2022,
+            fiscal_period="FY",
+        )
+        res = self.client.get(
+            f"/api/edgar/drf/companies/{company.id}/fundamental-table/?use_ai=0&frequency=annual"
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertGreaterEqual(payload["row_count"], 1)
+        self.assertIn("revenue", payload["mapping"])
+        self.assertIn("net_income", payload["mapping"])
+        self.assertTrue(EdgarMetricMapping.objects.filter(company=company).exists())

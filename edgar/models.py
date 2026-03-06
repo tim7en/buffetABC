@@ -110,3 +110,38 @@ class EdgarFundamental(models.Model):
 
     def __str__(self) -> str:
         return f"{self.company.ticker}:{self.taxonomy}:{self.tag}:{self.end_date}={self.value}"
+
+
+class EdgarMetricMapping(models.Model):
+    SOURCE_HEURISTIC = "heuristic"
+    SOURCE_OPENAI = "openai"
+    SOURCE_MANUAL = "manual"
+    SOURCE_CHOICES = (
+        (SOURCE_HEURISTIC, "Heuristic"),
+        (SOURCE_OPENAI, "OpenAI"),
+        (SOURCE_MANUAL, "Manual"),
+    )
+
+    company = models.ForeignKey(
+        EdgarCompany,
+        on_delete=models.CASCADE,
+        related_name="metric_mappings",
+    )
+    metric_key = models.CharField(max_length=64, db_index=True)
+    taxonomy = models.CharField(max_length=64, default="us-gaap")
+    tag = models.CharField(max_length=128)
+    source = models.CharField(max_length=16, choices=SOURCE_CHOICES, default=SOURCE_HEURISTIC)
+    confidence = models.FloatField(default=0.0)
+    rationale = models.TextField(blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "metric_key"],
+                name="edgar_unique_company_metric_mapping",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.company.ticker}:{self.metric_key}->{self.taxonomy}:{self.tag}"

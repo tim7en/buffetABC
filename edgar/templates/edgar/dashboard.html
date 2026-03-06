@@ -123,6 +123,15 @@
         <label>To <input id="periodEnd" type="date"></label>
       </div>
       <div class="row">
+        <select id="frequency">
+          <option value="annual">annual</option>
+          <option value="quarterly">quarterly</option>
+          <option value="all">all</option>
+        </select>
+        <label><input id="useAiMapping" type="checkbox" checked> Use AI mapping</label>
+        <label><input id="refreshMapping" type="checkbox"> Refresh mapping</label>
+      </div>
+      <div class="row">
         <button id="fetchSelectedBtn">Fetch Selected (Bulk)</button>
         <button class="secondary" id="fetchOneBtn">Fetch First Selected</button>
       </div>
@@ -136,9 +145,9 @@
       <h2>Results</h2>
       <div id="status">Ready.</div>
 
-      <h2 style="margin-top:12px;">Fundamentals Timeline (latest selected)</h2>
-      <table id="fundTbl">
-        <thead><tr><th>End</th><th>Value</th><th>Form</th><th>FY</th></tr></thead>
+      <h2 style="margin-top:12px;">Fundamentals Table (latest selected)</h2>
+      <table id="fundTable">
+        <thead></thead>
         <tbody></tbody>
       </table>
 
@@ -238,19 +247,25 @@
     }
 
     async function refreshDetails(companyId, ticker) {
-      const tag = document.getElementById("tag").value || "Assets";
+      const frequency = document.getElementById("frequency").value || "annual";
+      const useAi = document.getElementById("useAiMapping").checked ? "1" : "0";
+      const refreshMapping = document.getElementById("refreshMapping").checked ? "1" : "0";
       const s = document.getElementById("periodStart").value;
       const e = document.getElementById("periodEnd").value;
-      const fUrl = `${API}/companies/${companyId}/fundamentals/?tag=${encodeURIComponent(tag)}${s ? `&period_start=${s}` : ""}${e ? `&period_end=${e}` : ""}`;
+      const fUrl = `${API}/companies/${companyId}/fundamental-table/?frequency=${encodeURIComponent(frequency)}&use_ai=${useAi}&refresh_mapping=${refreshMapping}${s ? `&period_start=${s}` : ""}${e ? `&period_end=${e}` : ""}`;
       const fRes = await fetch(fUrl);
       const fData = await fRes.json();
 
-      const ftBody = document.querySelector("#fundTbl tbody");
-      ftBody.innerHTML = "";
-      for (const p of (fData.points || [])) {
+      const table = document.getElementById("fundTable");
+      const head = table.querySelector("thead");
+      const body = table.querySelector("tbody");
+      const metrics = fData.metrics || [];
+      head.innerHTML = `<tr><th>Period End</th><th>Form</th><th>FY</th>${metrics.map(m => `<th>${m}</th>`).join("")}</tr>`;
+      body.innerHTML = "";
+      for (const p of (fData.rows || [])) {
         const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${p.end || ""}</td><td>${p.val ?? ""}</td><td>${p.form || ""}</td><td>${p.fy || ""}</td>`;
-        ftBody.appendChild(tr);
+        tr.innerHTML = `<td>${p.period_end || ""}</td><td>${p.form || ""}</td><td>${p.fiscal_year || ""}</td>${metrics.map(m => `<td>${p[m] ?? ""}</td>`).join("")}`;
+        body.appendChild(tr);
       }
 
       const dRes = await fetch(`${API}/documents/?ticker=${encodeURIComponent(ticker)}`);
