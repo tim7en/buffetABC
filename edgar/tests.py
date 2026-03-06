@@ -1,4 +1,5 @@
 from io import StringIO
+import json
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -107,3 +108,53 @@ class ApiTests(TestCase):
         body = res.json()
         self.assertEqual(len(body["results"]), 1)
         self.assertEqual(body["results"][0]["kind"], EdgarDocument.KIND_FACTS)
+
+
+class DrfApiTests(TestCase):
+    @patch("edgar.drf_views.EdgarClient.company_facts")
+    def test_bulk_ingestion_endpoint(self, mock_company_facts):
+        mock_company_facts.return_value = {"facts": {"us-gaap": {"Assets": {"units": {"USD": []}}}}}
+        body = {
+            "symbols": ["AAPL", "MSFT"],
+            "endpoint": "facts",
+            "persist": True,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/ingestion/fetch/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["requested"], 2)
+        self.assertEqual(len(payload["results"]), 2)
+        self.assertTrue(EdgarDocument.objects.filter(kind=EdgarDocument.KIND_FACTS).exists())
+
+    @patch("edgar.drf_views.EdgarClient.company_concept")
+    def test_single_company_fetch_and_fundamentals_period_filter(self, mock_company_concept):
+        mock_company_concept.return_value = {
+            "units": {
+                "USD": [
+                    {"end": "2021-12-31", "val": 100},
+                    {"end": "2022-12-31", "val": 150},
+                    {"end": "2023-12-31", "val": 180},
+                ]
+            }
+        }
+        company = EdgarCompany.objects.create(
+            ticker="AAPL", name="Apple Inc.", cik="0000320193", is_sp500=True
+        )
+        fetch_body = {"endpoint": "company_concept", "tag": "Assets", "persist": True}
+        fetch_res = self.client.post(
+            f"/api/edgar/drf/companies/{company.id}/fetch/",
+            data=json.dumps(fetch_body),
+            content_type="application/json",
+        )
+        self.assertEqual(fetch_res.status_code, 200)
+
+        res = self.client.get(
+            f"/api/edgar/drf/companies/{company.id}/fundamentals/?tag=Assets&period_start=2022-01-01&period_end=2023-12-31"
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["count"], 2)

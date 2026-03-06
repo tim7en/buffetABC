@@ -64,6 +64,23 @@ This repository is a modular Django project focused on collecting and serving fi
    - `GET /api/edgar/companies/search/?q=apple&limit=10`
    - `GET /api/edgar/companies/AAPL/documents/?kind=facts&include_payload=1`
    - `GET /api/edgar/filings/fulltext/?q=10-K+AI&start=0&size=25`
+   - DRF API root: `GET /api/edgar/drf/`
+   - DRF bulk ingestion: `POST /api/edgar/drf/ingestion/fetch/`
+   - DRF single-company fetch: `POST /api/edgar/drf/companies/{id}/fetch/`
+   - DRF fundamentals over time: `GET /api/edgar/drf/companies/{id}/fundamentals/?tag=Assets&period_start=2020-01-01&period_end=2024-12-31`
+
+   DRF bulk ingestion example:
+   ```json
+   {
+     "symbols": ["AAPL", "MSFT"],
+     "endpoint": "company_concept",
+     "taxonomy": "us-gaap",
+     "tag": "Assets",
+     "persist": true,
+     "period_start": "2020-01-01",
+     "period_end": "2024-12-31"
+   }
+   ```
 
 ## Notes
 
