@@ -3,6 +3,7 @@ from datetime import date
 from django.db.models import Q
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from edgar import sp500
@@ -257,6 +258,9 @@ class EdgarFundamentalViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class EdgarIngestionViewSet(viewsets.ViewSet):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
     @action(detail=False, methods=["post"], url_path="fetch")
     def fetch(self, request):
         serializer = IngestionRequestSerializer(data=request.data)

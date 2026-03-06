@@ -12,6 +12,7 @@
       --muted: #5c6b7a;
       --brand: #0f766e;
       --line: #d7dee5;
+      --brand-dark: #0c5a54;
     }
     * { box-sizing: border-box; }
     body {
@@ -21,12 +22,12 @@
       color: var(--ink);
     }
     .wrap {
-      max-width: 1300px;
+      max-width: 1320px;
       margin: 0 auto;
       padding: 20px;
       display: grid;
       gap: 16px;
-      grid-template-columns: 360px 1fr;
+      grid-template-columns: 390px 1fr;
     }
     .card {
       background: var(--card);
@@ -37,27 +38,33 @@
     }
     h1 { margin: 0 0 10px; font-size: 24px; }
     h2 { margin: 0 0 10px; font-size: 16px; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
     input, select, button {
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 8px;
       font-size: 14px;
       background: #fff;
+      color: var(--ink);
     }
     #companyPicker {
       width: 100%;
-      min-height: 150px;
+      min-height: 280px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     }
     button {
       cursor: pointer;
       background: var(--brand);
       color: #fff;
       border: none;
+      font-weight: 600;
     }
+    button:hover { background: var(--brand-dark); }
     button.secondary {
       background: #334155;
+      color: #fff;
     }
+    button.secondary:hover { background: #1f2937; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -93,8 +100,20 @@
       border-radius: 8px;
       padding: 8px;
     }
+    .helper {
+      margin-top: 2px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
     @media (max-width: 980px) {
       .wrap { grid-template-columns: 1fr; }
+      .split { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -110,24 +129,31 @@
         <button class="secondary" id="searchBtn">Search</button>
       </div>
       <div class="row">
+        <label class="muted">Mode</label>
         <select id="selectionMode">
           <option value="multiple">multiple</option>
           <option value="single">single</option>
         </select>
+        <label class="muted">Page size</label>
+        <select id="pageSize">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+          <option value="250">250</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="secondary" id="prevPageBtn">Prev</button>
+        <button class="secondary" id="nextPageBtn">Next</button>
+        <span class="muted mono" id="pageInfo">Page 1 / 1</span>
       </div>
       <div class="row">
         <select id="companyPicker" multiple></select>
       </div>
+      <p class="muted mono" id="selectedInfo">Selected: 0</p>
       <div class="row">
-        <button class="secondary" id="selectAllBtn">Select All</button>
+        <button class="secondary" id="selectAllBtn">Select Visible</button>
         <button class="secondary" id="clearBtn">Clear</button>
       </div>
-      <table id="companiesTbl">
-        <thead>
-          <tr><th></th><th>Ticker</th><th>Name</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
 
       <h2 style="margin-top:14px;">Fetch Options</h2>
       <div class="row">
@@ -143,11 +169,11 @@
       <div class="row">
         <input id="query" placeholder="full-text query (optional)">
       </div>
-      <div class="row">
+      <div class="split">
         <label>From <input id="periodStart" type="date"></label>
         <label>To <input id="periodEnd" type="date"></label>
       </div>
-      <div class="row">
+      <div class="row" style="margin-top:8px;">
         <select id="frequency">
           <option value="annual">annual</option>
           <option value="quarterly">quarterly</option>
@@ -157,9 +183,10 @@
         <label><input id="refreshMapping" type="checkbox"> Refresh mapping (writes)</label>
       </div>
       <div class="row">
-        <button id="fetchSelectedBtn">Fetch Selected (Bulk)</button>
-        <button class="secondary" id="fetchOneBtn">Fetch First Selected</button>
+        <button id="fetchSelectedBtn">Fetch All Selected (Bulk)</button>
+        <button class="secondary" id="fetchOneBtn">Fetch First Selected Only</button>
       </div>
+      <p class="helper">Bulk fetches every selected ticker. First-selected fetch runs only one ticker.</p>
       <div class="row">
         <label><input id="autoRefresh" type="checkbox"> Auto-refresh</label>
         <input id="refreshSec" type="number" min="5" value="20" style="width:90px;"> sec
@@ -188,8 +215,10 @@
 
   <script>
     const API = "/api/edgar/drf";
-    let companies = [];
+    let universePage = 1;
+    let universePages = 1;
     let refreshTimer = null;
+    let loading = false;
 
     function setSummary(data) {
       const row = document.getElementById("summaryRow");
@@ -210,69 +239,97 @@
       el.textContent = obj ? `${line}\n${JSON.stringify(obj, null, 2)}\n\n${el.textContent}` : `${line}\n${el.textContent}`;
     }
 
+    async function fetchJson(url, options = {}) {
+      const res = await fetch(url, options);
+      const text = await res.text();
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (_) {
+        data = { raw: text };
+      }
+      if (!res.ok) {
+        throw new Error(`${res.status} ${res.statusText}: ${data.detail || data.error || data.raw || "request failed"}`);
+      }
+      return data;
+    }
+
+    function setLoading(isLoading) {
+      loading = isLoading;
+      document.getElementById("fetchSelectedBtn").disabled = isLoading;
+      document.getElementById("fetchOneBtn").disabled = isLoading;
+      if (isLoading) {
+        log("Fetching data...");
+      }
+    }
+
     function selectedRows() {
       const picker = document.getElementById("companyPicker");
-      const selected = Array.from(picker.selectedOptions).map(opt => ({
+      return Array.from(picker.selectedOptions).map(opt => ({
         id: opt.dataset.id ? Number(opt.dataset.id) : null,
         ticker: opt.value
       }));
-      if (selected.length) return selected;
-      return Array.from(document.querySelectorAll(".pick:checked")).map(x => ({
-        id: x.dataset.id ? Number(x.dataset.id) : null,
-        ticker: x.dataset.ticker
-      }));
     }
 
-    function applySingleModeToChecks() {
+    function updateSelectedInfo() {
+      const selected = selectedRows();
+      document.getElementById("selectedInfo").textContent = `Selected: ${selected.length}`;
+    }
+
+    function enforceSingleMode() {
       const mode = document.getElementById("selectionMode").value;
       if (mode !== "single") return;
-      const checks = Array.from(document.querySelectorAll(".pick:checked"));
-      if (checks.length <= 1) return;
-      const keep = checks[checks.length - 1];
-      checks.forEach(c => { if (c !== keep) c.checked = false; });
+      const picker = document.getElementById("companyPicker");
+      const selected = Array.from(picker.selectedOptions);
+      if (selected.length > 1) {
+        Array.from(picker.options).forEach(o => { o.selected = false; });
+        selected[selected.length - 1].selected = true;
+      }
+      updateSelectedInfo();
     }
 
     async function resolveCompanyId(ticker) {
-      const res = await fetch(`${API}/companies/?q=${encodeURIComponent(ticker)}&page=1&page_size=20`);
-      const data = await res.json();
+      const data = await fetchJson(`${API}/companies/?q=${encodeURIComponent(ticker)}&page=1&page_size=20`);
       const exact = (data.results || []).find(c => (c.ticker || "").toUpperCase() === ticker.toUpperCase());
       return exact ? exact.id : null;
     }
 
-    async function loadCompanies() {
+    async function loadCompanies(preferredTickers = []) {
       const q = document.getElementById("q").value.trim();
-      const res = await fetch(`/api/edgar/companies/universe/?limit=500${q ? `&q=${encodeURIComponent(q)}` : ""}`);
-      const data = await res.json();
-      companies = data.results || [];
-      const tbody = document.querySelector("#companiesTbl tbody");
-      const picker = document.getElementById("companyPicker");
-      tbody.innerHTML = "";
-      picker.innerHTML = "";
-      for (const c of companies) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td><input class="pick" type="checkbox" data-id="${c.company_id || ""}" data-ticker="${c.ticker}"></td>
-          <td>${c.ticker}</td>
-          <td>${c.name || ""}${c.persisted ? "" : " (new)"}</td>
-        `;
-        tr.querySelector(".pick").addEventListener("change", applySingleModeToChecks);
-        tbody.appendChild(tr);
+      const pageSize = Number(document.getElementById("pageSize").value || 100);
+      const data = await fetchJson(`/api/edgar/companies/universe/?limit=${pageSize}&page=${universePage}${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+      const rows = data.results || [];
+      universePages = data.num_pages || 1;
+      document.getElementById("pageInfo").textContent = `Page ${data.page || universePage} / ${universePages}`;
 
+      const picker = document.getElementById("companyPicker");
+      picker.innerHTML = "";
+      for (const c of rows) {
         const opt = document.createElement("option");
         opt.value = c.ticker;
         opt.dataset.id = c.company_id || "";
-        opt.textContent = `${c.ticker} - ${c.name || ""}`;
+        opt.textContent = `${c.ticker.padEnd(6, ' ')} ${c.name || ""}${c.persisted ? "" : " (new)"}`;
+        if (preferredTickers.includes(c.ticker)) {
+          opt.selected = true;
+        }
         picker.appendChild(opt);
       }
+
       const mode = document.getElementById("selectionMode").value;
-      if (picker.options.length) {
-        if (mode === "single") {
-          picker.selectedIndex = 0;
-        } else {
+      if (!selectedRows().length && picker.options.length) {
+        picker.options[0].selected = true;
+        if (mode === "multiple") {
           picker.options[0].selected = true;
         }
       }
-      log(`Loaded ${companies.length} companies`);
+      if (mode === "single") {
+        picker.multiple = false;
+        enforceSingleMode();
+      } else {
+        picker.multiple = true;
+      }
+      updateSelectedInfo();
+      log(`Loaded ${rows.length} companies (page ${data.page || universePage}/${universePages})`);
     }
 
     function buildPayload(symbols) {
@@ -291,44 +348,57 @@
       return payload;
     }
 
-    async function fetchSelected(bulk = true) {
+    async function fetchSelected(isBulk) {
       const picks = selectedRows();
       if (!picks.length) {
         log("No companies selected.");
         return;
       }
-      const symbols = bulk ? picks.map(x => x.ticker) : [picks[0].ticker];
-      const payload = buildPayload(symbols);
-      const res = await fetch(`${API}/ingestion/fetch/`, {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      log(`${bulk ? "Bulk" : "Single"} fetch complete (${symbols.length} symbols)`, data);
-      setSummary(data);
+      if (loading) return;
+      try {
+        setLoading(true);
+        const symbols = isBulk ? picks.map(x => x.ticker) : [picks[0].ticker];
+        const payload = buildPayload(symbols);
+        const data = await fetchJson(`${API}/ingestion/fetch/`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        log(`${isBulk ? "Bulk" : "Single"} fetch complete (${symbols.length} symbols)`, data);
+        setSummary(data);
 
-      const last = bulk ? picks[picks.length - 1] : picks[0];
-      const maybeFromResponse = ((data.results || []).find(r => r.symbol === last.ticker) || {}).company_id;
-      const resolvedId = maybeFromResponse || last.id || await resolveCompanyId(last.ticker);
-      await refreshDetails(resolvedId, last.ticker);
-      await loadCompanies();
+        const focus = isBulk ? picks[picks.length - 1] : picks[0];
+        const fromResp = ((data.results || []).find(r => r.symbol === focus.ticker) || {}).company_id;
+        const companyId = fromResp || focus.id || await resolveCompanyId(focus.ticker);
+        await refreshDetails(companyId, focus.ticker);
+        await loadCompanies(symbols);
+      } catch (err) {
+        log("Fetch failed", { error: String(err) });
+      } finally {
+        setLoading(false);
+      }
     }
 
     async function refreshDetails(companyId, ticker) {
       if (!companyId) {
-        log(`No persisted company id for ${ticker} yet. Fetch completed but no detail view available.`);
+        log(`No persisted company id for ${ticker}. It may have failed to fetch.`);
         return;
       }
       document.getElementById("activeCompany").textContent = `Active: ${ticker} (id=${companyId})`;
+
       const frequency = document.getElementById("frequency").value || "annual";
       const useAi = document.getElementById("useAiMapping").checked ? "1" : "0";
       const refreshMapping = document.getElementById("refreshMapping").checked ? "1" : "0";
       const s = document.getElementById("periodStart").value;
       const e = document.getElementById("periodEnd").value;
       const fUrl = `${API}/companies/${companyId}/fundamental-table/?frequency=${encodeURIComponent(frequency)}&use_ai=${useAi}&refresh_mapping=${refreshMapping}${s ? `&period_start=${s}` : ""}${e ? `&period_end=${e}` : ""}`;
-      const fRes = await fetch(fUrl);
-      const fData = await fRes.json();
+      let fData;
+      try {
+        fData = await fetchJson(fUrl);
+      } catch (err) {
+        log("Fundamentals table load failed", { error: String(err), ticker });
+        fData = { metrics: [], rows: [] };
+      }
 
       const table = document.getElementById("fundTable");
       const head = table.querySelector("thead");
@@ -347,8 +417,13 @@
         body.appendChild(tr);
       }
 
-      const dRes = await fetch(`${API}/documents/?ticker=${encodeURIComponent(ticker)}`);
-      const dData = await dRes.json();
+      let dData;
+      try {
+        dData = await fetchJson(`${API}/documents/?ticker=${encodeURIComponent(ticker)}`);
+      } catch (err) {
+        log("Documents load failed", { error: String(err), ticker });
+        dData = { results: [] };
+      }
       const dtBody = document.querySelector("#docsTbl tbody");
       dtBody.innerHTML = "";
       if (!(dData.results || []).length) {
@@ -377,49 +452,64 @@
       log(`Auto-refresh every ${sec}s enabled`);
     }
 
-    document.getElementById("searchBtn").addEventListener("click", loadCompanies);
-    document.getElementById("selectAllBtn").addEventListener("click", () => {
-      const mode = document.getElementById("selectionMode").value;
+    document.getElementById("searchBtn").addEventListener("click", () => {
+      universePage = 1;
+      loadCompanies();
+    });
+
+    document.getElementById("pageSize").addEventListener("change", () => {
+      universePage = 1;
+      loadCompanies();
+    });
+
+    document.getElementById("prevPageBtn").addEventListener("click", () => {
+      if (universePage <= 1) return;
+      universePage -= 1;
+      loadCompanies(selectedRows().map(x => x.ticker));
+    });
+
+    document.getElementById("nextPageBtn").addEventListener("click", () => {
+      if (universePage >= universePages) return;
+      universePage += 1;
+      loadCompanies(selectedRows().map(x => x.ticker));
+    });
+
+    document.getElementById("selectionMode").addEventListener("change", () => {
       const picker = document.getElementById("companyPicker");
+      const mode = document.getElementById("selectionMode").value;
+      picker.multiple = (mode === "multiple");
+      if (mode === "single") enforceSingleMode();
+      updateSelectedInfo();
+    });
+
+    document.getElementById("companyPicker").addEventListener("change", () => {
+      enforceSingleMode();
+      updateSelectedInfo();
+    });
+
+    document.getElementById("selectAllBtn").addEventListener("click", () => {
+      const picker = document.getElementById("companyPicker");
+      const mode = document.getElementById("selectionMode").value;
       if (mode === "single") {
-        picker.selectedIndex = picker.options.length ? 0 : -1;
+        if (picker.options.length) {
+          Array.from(picker.options).forEach(o => { o.selected = false; });
+          picker.options[0].selected = true;
+        }
       } else {
         Array.from(picker.options).forEach(o => { o.selected = true; });
       }
-      document.querySelectorAll(".pick").forEach(c => c.checked = (mode !== "single"));
-      if (mode === "single") applySingleModeToChecks();
+      updateSelectedInfo();
     });
+
     document.getElementById("clearBtn").addEventListener("click", () => {
-      document.querySelectorAll(".pick").forEach(c => c.checked = false);
       Array.from(document.getElementById("companyPicker").options).forEach(o => { o.selected = false; });
+      updateSelectedInfo();
     });
+
     document.getElementById("fetchSelectedBtn").addEventListener("click", () => fetchSelected(true));
     document.getElementById("fetchOneBtn").addEventListener("click", () => fetchSelected(false));
     document.getElementById("autoRefresh").addEventListener("change", setupAutoRefresh);
     document.getElementById("refreshSec").addEventListener("change", setupAutoRefresh);
-    document.getElementById("selectionMode").addEventListener("change", () => {
-      const mode = document.getElementById("selectionMode").value;
-      const picker = document.getElementById("companyPicker");
-      picker.multiple = (mode === "multiple");
-      if (mode === "single") {
-        const selected = Array.from(picker.selectedOptions);
-        if (selected.length > 1) {
-          Array.from(picker.options).forEach(o => { o.selected = false; });
-          selected[0].selected = true;
-        }
-        applySingleModeToChecks();
-      }
-    });
-    document.getElementById("companyPicker").addEventListener("change", () => {
-      const mode = document.getElementById("selectionMode").value;
-      if (mode !== "single") return;
-      const picker = document.getElementById("companyPicker");
-      const selected = Array.from(picker.selectedOptions);
-      if (selected.length > 1) {
-        Array.from(picker.options).forEach(o => { o.selected = false; });
-        selected[selected.length - 1].selected = true;
-      }
-    });
 
     loadCompanies();
   </script>

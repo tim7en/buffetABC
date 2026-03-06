@@ -27,6 +27,7 @@ def company_search(request):
 def company_universe(request):
     query = request.GET.get("q", "").strip().upper()
     limit = min(int(request.GET.get("limit", "500")), 1000)
+    page = max(int(request.GET.get("page", "1")), 1)
 
     rows = sp500.load_sp500()
     if query:
@@ -35,7 +36,10 @@ def company_universe(request):
             for r in rows
             if query in r.get("Symbol", "").upper() or query in r.get("Security", "").upper()
         ]
-    rows = rows[:limit]
+    total = len(rows)
+    start = (page - 1) * limit
+    end = start + limit
+    rows = rows[start:end]
 
     tickers = [r.get("Symbol", "").upper() for r in rows if r.get("Symbol")]
     existing = {
@@ -53,7 +57,16 @@ def company_universe(request):
         for r in rows
         if r.get("Symbol")
     ]
-    return JsonResponse({"count": len(results), "results": results})
+    num_pages = (total + limit - 1) // limit if limit else 1
+    return JsonResponse(
+        {
+            "count": total,
+            "page": page,
+            "page_size": limit,
+            "num_pages": num_pages,
+            "results": results,
+        }
+    )
 
 
 @require_GET

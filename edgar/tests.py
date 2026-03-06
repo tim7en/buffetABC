@@ -3,6 +3,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import requests
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -139,6 +140,20 @@ class DrfApiTests(TestCase):
         self.assertEqual(len(payload["results"]), 2)
         self.assertIn("company_id", payload["results"][0])
         self.assertTrue(EdgarDocument.objects.filter(kind=EdgarDocument.KIND_FACTS).exists())
+
+    @patch("edgar.drf_views.EdgarClient.company_facts")
+    def test_ingestion_endpoint_not_blocked_for_logged_in_session(self, mock_company_facts):
+        mock_company_facts.return_value = {"facts": {"us-gaap": {"Assets": {"units": {"USD": []}}}}}
+        user_model = get_user_model()
+        user = user_model.objects.create_user(username="u1", password="pass12345")
+        self.client.force_login(user)
+        body = {"symbols": ["AAPL"], "endpoint": "facts", "persist": True}
+        res = self.client.post(
+            "/api/edgar/drf/ingestion/fetch/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
 
     @patch("edgar.drf_views.EdgarClient.company_concept")
     def test_single_company_fetch_and_fundamentals_period_filter(self, mock_company_concept):
