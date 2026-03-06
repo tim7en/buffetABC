@@ -221,7 +221,7 @@ class DrfApiTests(TestCase):
             fiscal_period="FY",
         )
         res = self.client.get(
-            f"/api/edgar/drf/companies/{company.id}/fundamental-table/?use_ai=0&frequency=annual"
+            f"/api/edgar/drf/companies/{company.id}/fundamental-table/?use_ai=0&frequency=annual&refresh_mapping=1"
         )
         self.assertEqual(res.status_code, 200)
         payload = res.json()

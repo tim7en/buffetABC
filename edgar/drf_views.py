@@ -181,8 +181,9 @@ class EdgarCompanyViewSet(viewsets.ReadOnlyModelViewSet):
         mapping = resolve_and_store_metric_mapping(
             company=company,
             taxonomy="us-gaap",
-            use_ai=use_ai,
+            use_ai=(use_ai and refresh_mapping),
             force_refresh=refresh_mapping,
+            persist=refresh_mapping,
         )
         table = build_fundamental_table(
             company=company,

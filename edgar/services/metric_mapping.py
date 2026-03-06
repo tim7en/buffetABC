@@ -127,6 +127,7 @@ def resolve_and_store_metric_mapping(
     taxonomy: str = "us-gaap",
     use_ai: bool = True,
     force_refresh: bool = False,
+    persist: bool = True,
 ) -> dict[str, dict]:
     """Build metric mapping for a company and persist mappings."""
     if not force_refresh:
@@ -152,18 +153,19 @@ def resolve_and_store_metric_mapping(
             if not existing or float(info.get("confidence", 0)) >= float(existing.get("confidence", 0)):
                 mapping[metric_key] = info
 
-    for metric_key, info in mapping.items():
-        EdgarMetricMapping.objects.update_or_create(
-            company=company,
-            metric_key=metric_key,
-            defaults={
-                "taxonomy": info["taxonomy"],
-                "tag": info["tag"],
-                "source": info["source"],
-                "confidence": info.get("confidence", 0.0),
-                "rationale": info.get("rationale", ""),
-            },
-        )
+    if persist:
+        for metric_key, info in mapping.items():
+            EdgarMetricMapping.objects.update_or_create(
+                company=company,
+                metric_key=metric_key,
+                defaults={
+                    "taxonomy": info["taxonomy"],
+                    "tag": info["tag"],
+                    "source": info["source"],
+                    "confidence": info.get("confidence", 0.0),
+                    "rationale": info.get("rationale", ""),
+                },
+            )
     return mapping
 
 
