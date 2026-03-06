@@ -70,6 +70,18 @@
       vertical-align: top;
     }
     .muted { color: var(--muted); font-size: 12px; }
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e5f7f4;
+      color: #0f766e;
+      font-size: 12px;
+      font-weight: 600;
+      margin-right: 6px;
+      margin-bottom: 6px;
+    }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
     #status {
       white-space: pre-wrap;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -156,6 +168,8 @@
 
     <section class="card">
       <h2>Results</h2>
+      <div class="row" id="summaryRow"></div>
+      <p class="muted mono" id="activeCompany">Active: none</p>
       <div id="status">Ready.</div>
 
       <h2 style="margin-top:12px;">Fundamentals Table (latest selected)</h2>
@@ -176,6 +190,19 @@
     const API = "/api/edgar/drf";
     let companies = [];
     let refreshTimer = null;
+
+    function setSummary(data) {
+      const row = document.getElementById("summaryRow");
+      if (!data) {
+        row.innerHTML = "";
+        return;
+      }
+      row.innerHTML = `
+        <span class="pill">Requested: ${data.requested ?? "-"}</span>
+        <span class="pill">Saved Docs: ${(data.saved_document_ids || []).length}</span>
+        <span class="pill">Fundamentals: ${data.fundamentals_saved ?? "-"}</span>
+      `;
+    }
 
     function log(msg, obj = null) {
       const el = document.getElementById("status");
@@ -237,6 +264,14 @@
         opt.textContent = `${c.ticker} - ${c.name || ""}`;
         picker.appendChild(opt);
       }
+      const mode = document.getElementById("selectionMode").value;
+      if (picker.options.length) {
+        if (mode === "single") {
+          picker.selectedIndex = 0;
+        } else {
+          picker.options[0].selected = true;
+        }
+      }
       log(`Loaded ${companies.length} companies`);
     }
 
@@ -271,10 +306,13 @@
       });
       const data = await res.json();
       log(`${bulk ? "Bulk" : "Single"} fetch complete (${symbols.length} symbols)`, data);
+      setSummary(data);
 
       const last = bulk ? picks[picks.length - 1] : picks[0];
-      const resolvedId = last.id || await resolveCompanyId(last.ticker);
+      const maybeFromResponse = ((data.results || []).find(r => r.symbol === last.ticker) || {}).company_id;
+      const resolvedId = maybeFromResponse || last.id || await resolveCompanyId(last.ticker);
       await refreshDetails(resolvedId, last.ticker);
+      await loadCompanies();
     }
 
     async function refreshDetails(companyId, ticker) {
@@ -282,6 +320,7 @@
         log(`No persisted company id for ${ticker} yet. Fetch completed but no detail view available.`);
         return;
       }
+      document.getElementById("activeCompany").textContent = `Active: ${ticker} (id=${companyId})`;
       const frequency = document.getElementById("frequency").value || "annual";
       const useAi = document.getElementById("useAiMapping").checked ? "1" : "0";
       const refreshMapping = document.getElementById("refreshMapping").checked ? "1" : "0";
@@ -297,6 +336,11 @@
       const metrics = fData.metrics || [];
       head.innerHTML = `<tr><th>Period End</th><th>Form</th><th>FY</th>${metrics.map(m => `<th>${m}</th>`).join("")}</tr>`;
       body.innerHTML = "";
+      if (!(fData.rows || []).length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="${3 + metrics.length}">No structured fundamentals found for current filters.</td>`;
+        body.appendChild(tr);
+      }
       for (const p of (fData.rows || [])) {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td>${p.period_end || ""}</td><td>${p.form || ""}</td><td>${p.fiscal_year || ""}</td>${metrics.map(m => `<td>${p[m] ?? ""}</td>`).join("")}`;
@@ -307,6 +351,11 @@
       const dData = await dRes.json();
       const dtBody = document.querySelector("#docsTbl tbody");
       dtBody.innerHTML = "";
+      if (!(dData.results || []).length) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td colspan="4">No documents found.</td>`;
+        dtBody.appendChild(tr);
+      }
       for (const d of (dData.results || [])) {
         const tr = document.createElement("tr");
         tr.innerHTML = `<td>${d.id}</td><td>${d.kind}</td><td>${d.success}</td><td>${d.fetched_at}</td>`;

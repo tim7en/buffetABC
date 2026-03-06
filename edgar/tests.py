@@ -137,6 +137,7 @@ class DrfApiTests(TestCase):
         payload = res.json()
         self.assertEqual(payload["requested"], 2)
         self.assertEqual(len(payload["results"]), 2)
+        self.assertIn("company_id", payload["results"][0])
         self.assertTrue(EdgarDocument.objects.filter(kind=EdgarDocument.KIND_FACTS).exists())
 
     @patch("edgar.drf_views.EdgarClient.company_concept")

@@ -337,6 +337,7 @@ def run_ingestion(config):
                 payload = client.full_text_search(effective_query)
 
             doc = None
+            company = None
             if persist:
                 company = _upsert_company(row)
                 doc = _save_document(
@@ -367,6 +368,7 @@ def run_ingestion(config):
             item = {"symbol": symbol, "success": True, "saved": bool(doc)}
             if doc:
                 item["document_id"] = doc.id
+                item["company_id"] = company.id
             if include_payload:
                 item["payload"] = payload
             items.append(item)
@@ -399,6 +401,7 @@ def run_ingestion(config):
                     "error": err_msg,
                     "saved": bool(doc),
                     "document_id": doc.id if doc else None,
+                    "company_id": company.id if doc and company else None,
                 }
             )
 
