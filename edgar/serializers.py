@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from edgar.models import EdgarCompany, EdgarDocument
+from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental
 
 
 class EdgarDocumentSerializer(serializers.ModelSerializer):
@@ -87,3 +87,27 @@ class IngestionRequestSerializer(serializers.Serializer):
             raise serializers.ValidationError("period_start must be <= period_end")
 
         return attrs
+
+
+class EdgarFundamentalSerializer(serializers.ModelSerializer):
+    ticker = serializers.CharField(source="company.ticker", read_only=True)
+
+    class Meta:
+        model = EdgarFundamental
+        fields = [
+            "id",
+            "ticker",
+            "taxonomy",
+            "tag",
+            "unit",
+            "end_date",
+            "filed_date",
+            "value",
+            "form",
+            "fiscal_year",
+            "fiscal_period",
+            "accession",
+            "frame",
+            "source_document",
+            "updated_at",
+        ]

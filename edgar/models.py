@@ -54,3 +54,59 @@ class EdgarDocument(models.Model):
     def __str__(self) -> str:
         state = "ok" if self.success else "failed"
         return f"{self.company.ticker}:{self.kind}:{state}@{self.fetched_at.isoformat()}"
+
+
+class EdgarFundamental(models.Model):
+    company = models.ForeignKey(
+        EdgarCompany,
+        on_delete=models.CASCADE,
+        related_name="fundamentals",
+    )
+    source_document = models.ForeignKey(
+        EdgarDocument,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="fundamental_points",
+    )
+    taxonomy = models.CharField(max_length=64, db_index=True)
+    tag = models.CharField(max_length=128, db_index=True)
+    unit = models.CharField(max_length=32, db_index=True)
+    end_date = models.DateField(db_index=True)
+    filed_date = models.DateField(null=True, blank=True, db_index=True)
+    value = models.FloatField()
+    form = models.CharField(max_length=32, blank=True, db_index=True)
+    fiscal_year = models.IntegerField(null=True, blank=True)
+    fiscal_period = models.CharField(max_length=16, blank=True)
+    accession = models.CharField(max_length=24, blank=True, db_index=True)
+    frame = models.CharField(max_length=64, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["company__ticker", "taxonomy", "tag", "end_date"]
+        indexes = [
+            models.Index(fields=["company", "end_date"]),
+            models.Index(fields=["company", "taxonomy", "tag", "end_date"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "company",
+                    "taxonomy",
+                    "tag",
+                    "unit",
+                    "end_date",
+                    "filed_date",
+                    "form",
+                    "fiscal_year",
+                    "fiscal_period",
+                    "accession",
+                    "frame",
+                ],
+                name="edgar_unique_fundamental_point",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.company.ticker}:{self.taxonomy}:{self.tag}:{self.end_date}={self.value}"

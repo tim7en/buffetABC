@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EDGAR Dashboard</title>
+  <style>
+    :root {
+      --bg: #f4f7f7;
+      --card: #ffffff;
+      --ink: #1f2a37;
+      --muted: #5c6b7a;
+      --brand: #0f766e;
+      --line: #d7dee5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top right, #d8f3e8, var(--bg) 45%);
+      color: var(--ink);
+    }
+    .wrap {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 360px 1fr;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.04);
+    }
+    h1 { margin: 0 0 10px; font-size: 24px; }
+    h2 { margin: 0 0 10px; font-size: 16px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    input, select, button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 14px;
+      background: #fff;
+    }
+    button {
+      cursor: pointer;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+    }
+    button.secondary {
+      background: #334155;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .muted { color: var(--muted); font-size: 12px; }
+    #status {
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      max-height: 220px;
+      overflow: auto;
+      background: #0b1726;
+      color: #c5e3ff;
+      border-radius: 8px;
+      padding: 8px;
+    }
+    @media (max-width: 980px) {
+      .wrap { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="card">
+      <h1>EDGAR UI</h1>
+      <p class="muted">No login needed for this dashboard. Admin panel still requires login.</p>
+
+      <h2>Company Selection</h2>
+      <div class="row">
+        <input id="q" placeholder="Search ticker/name (AAPL, Apple)">
+        <button class="secondary" id="searchBtn">Search</button>
+      </div>
+      <div class="row">
+        <button class="secondary" id="selectAllBtn">Select All</button>
+        <button class="secondary" id="clearBtn">Clear</button>
+      </div>
+      <table id="companiesTbl">
+        <thead>
+          <tr><th></th><th>Ticker</th><th>Name</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <h2 style="margin-top:14px;">Fetch Options</h2>
+      <div class="row">
+        <select id="endpoint">
+          <option value="facts">facts</option>
+          <option value="filings">filings</option>
+          <option value="company_concept">company_concept</option>
+          <option value="full_text_search">full_text_search</option>
+        </select>
+        <input id="taxonomy" value="us-gaap" placeholder="taxonomy">
+        <input id="tag" value="Assets" placeholder="tag">
+      </div>
+      <div class="row">
+        <input id="query" placeholder="full-text query (optional)">
+      </div>
+      <div class="row">
+        <label>From <input id="periodStart" type="date"></label>
+        <label>To <input id="periodEnd" type="date"></label>
+      </div>
+      <div class="row">
+        <button id="fetchSelectedBtn">Fetch Selected (Bulk)</button>
+        <button class="secondary" id="fetchOneBtn">Fetch First Selected</button>
+      </div>
+      <div class="row">
+        <label><input id="autoRefresh" type="checkbox"> Auto-refresh</label>
+        <input id="refreshSec" type="number" min="5" value="20" style="width:90px;"> sec
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Results</h2>
+      <div id="status">Ready.</div>
+
+      <h2 style="margin-top:12px;">Fundamentals Timeline (latest selected)</h2>
+      <table id="fundTbl">
+        <thead><tr><th>End</th><th>Value</th><th>Form</th><th>FY</th></tr></thead>
+        <tbody></tbody>
+      </table>
+
+      <h2 style="margin-top:12px;">Saved Documents (latest selected)</h2>
+      <table id="docsTbl">
+        <thead><tr><th>ID</th><th>Kind</th><th>Success</th><th>Fetched At</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script>
+    const API = "/api/edgar/drf";
+    let companies = [];
+    let refreshTimer = null;
+
+    function log(msg, obj = null) {
+      const el = document.getElementById("status");
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      el.textContent = obj ? `${line}\n${JSON.stringify(obj, null, 2)}\n\n${el.textContent}` : `${line}\n${el.textContent}`;
+    }
+
+    function selectedRows() {
+      return Array.from(document.querySelectorAll(".pick:checked")).map(x => ({
+        id: Number(x.dataset.id),
+        ticker: x.dataset.ticker
+      }));
+    }
+
+    async function loadCompanies() {
+      const q = document.getElementById("q").value.trim();
+      const res = await fetch(`${API}/companies/?page=1&page_size=100${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+      const data = await res.json();
+      companies = data.results || [];
+      const tbody = document.querySelector("#companiesTbl tbody");
+      tbody.innerHTML = "";
+      for (const c of companies) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td><input class="pick" type="checkbox" data-id="${c.id}" data-ticker="${c.ticker}"></td>
+          <td>${c.ticker}</td>
+          <td>${c.name || ""}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+      log(`Loaded ${companies.length} companies`);
+    }
+
+    function buildPayload(symbols) {
+      const payload = {
+        symbols,
+        endpoint: document.getElementById("endpoint").value,
+        taxonomy: document.getElementById("taxonomy").value,
+        tag: document.getElementById("tag").value,
+        query: document.getElementById("query").value,
+        persist: true,
+      };
+      const s = document.getElementById("periodStart").value;
+      const e = document.getElementById("periodEnd").value;
+      if (s) payload.period_start = s;
+      if (e) payload.period_end = e;
+      return payload;
+    }
+
+    async function fetchSelected(bulk = true) {
+      const picks = selectedRows();
+      if (!picks.length) {
+        log("No companies selected.");
+        return;
+      }
+      if (!bulk) {
+        const target = picks[0];
+        const payload = buildPayload([target.ticker]);
+        const res = await fetch(`${API}/companies/${target.id}/fetch/`, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        log(`Fetched one: ${target.ticker}`, data);
+        await refreshDetails(target.id, target.ticker);
+        return;
+      }
+
+      const symbols = picks.map(x => x.ticker);
+      const payload = buildPayload(symbols);
+      const res = await fetch(`${API}/ingestion/fetch/`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      log(`Bulk fetch complete (${symbols.length} symbols)`, data);
+
+      const last = picks[picks.length - 1];
+      await refreshDetails(last.id, last.ticker);
+    }
+
+    async function refreshDetails(companyId, ticker) {
+      const tag = document.getElementById("tag").value || "Assets";
+      const s = document.getElementById("periodStart").value;
+      const e = document.getElementById("periodEnd").value;
+      const fUrl = `${API}/companies/${companyId}/fundamentals/?tag=${encodeURIComponent(tag)}${s ? `&period_start=${s}` : ""}${e ? `&period_end=${e}` : ""}`;
+      const fRes = await fetch(fUrl);
+      const fData = await fRes.json();
+
+      const ftBody = document.querySelector("#fundTbl tbody");
+      ftBody.innerHTML = "";
+      for (const p of (fData.points || [])) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${p.end || ""}</td><td>${p.val ?? ""}</td><td>${p.form || ""}</td><td>${p.fy || ""}</td>`;
+        ftBody.appendChild(tr);
+      }
+
+      const dRes = await fetch(`${API}/documents/?ticker=${encodeURIComponent(ticker)}`);
+      const dData = await dRes.json();
+      const dtBody = document.querySelector("#docsTbl tbody");
+      dtBody.innerHTML = "";
+      for (const d of (dData.results || [])) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${d.id}</td><td>${d.kind}</td><td>${d.success}</td><td>${d.fetched_at}</td>`;
+        dtBody.appendChild(tr);
+      }
+    }
+
+    function setupAutoRefresh() {
+      if (refreshTimer) clearInterval(refreshTimer);
+      const enabled = document.getElementById("autoRefresh").checked;
+      if (!enabled) return;
+      const sec = Math.max(5, Number(document.getElementById("refreshSec").value || 20));
+      refreshTimer = setInterval(async () => {
+        const picks = selectedRows();
+        if (!picks.length) return;
+        await refreshDetails(picks[0].id, picks[0].ticker);
+      }, sec * 1000);
+      log(`Auto-refresh every ${sec}s enabled`);
+    }
+
+    document.getElementById("searchBtn").addEventListener("click", loadCompanies);
+    document.getElementById("selectAllBtn").addEventListener("click", () => {
+      document.querySelectorAll(".pick").forEach(c => c.checked = true);
+    });
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      document.querySelectorAll(".pick").forEach(c => c.checked = false);
+    });
+    document.getElementById("fetchSelectedBtn").addEventListener("click", () => fetchSelected(true));
+    document.getElementById("fetchOneBtn").addEventListener("click", () => fetchSelected(false));
+    document.getElementById("autoRefresh").addEventListener("change", setupAutoRefresh);
+    document.getElementById("refreshSec").addEventListener("change", setupAutoRefresh);
+
+    loadCompanies();
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from edgar.models import EdgarCompany, EdgarDocument
+from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental
 
 
 @admin.register(EdgarCompany)
@@ -24,3 +24,18 @@ class EdgarDocumentAdmin(admin.ModelAdmin):
     list_filter = ("kind", "success", "fetched_at")
     search_fields = ("company__ticker", "company__name", "error_message", "endpoint")
     readonly_fields = ("fetched_at",)
+
+
+@admin.register(EdgarFundamental)
+class EdgarFundamentalAdmin(admin.ModelAdmin):
+    list_display = (
+        "company",
+        "taxonomy",
+        "tag",
+        "unit",
+        "end_date",
+        "value",
+        "form",
+    )
+    list_filter = ("taxonomy", "tag", "unit", "form")
+    search_fields = ("company__ticker", "company__name", "taxonomy", "tag", "accession")

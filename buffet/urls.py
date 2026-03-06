@@ -17,8 +17,10 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import include, path
+from edgar import views as edgar_views
 
 urlpatterns = [
+    path("", edgar_views.dashboard, name="dashboard"),
     path("admin/", admin.site.urls),
     path("api/edgar/", include("edgar.urls")),
     path("api/edgar/drf/", include("edgar.drf_urls")),

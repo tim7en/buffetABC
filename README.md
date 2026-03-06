@@ -82,6 +82,12 @@ This repository is a modular Django project focused on collecting and serving fi
    }
    ```
 
+7. **Web dashboard**
+   - Open `http://127.0.0.1:8000/`
+   - Supports single/bulk company selection, timeline period filters, fetch/save actions, and auto-refresh.
+   - No login is required for dashboard/API by default.
+   - Login is required only for `http://127.0.0.1:8000/admin/`.
+
 ## Notes
 
 - EDGAR API requests are rate-limited (10 req/s default) and retried with backoff.
