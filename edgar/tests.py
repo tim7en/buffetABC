@@ -109,6 +109,15 @@ class ApiTests(TestCase):
         self.assertEqual(len(body["results"]), 1)
         self.assertEqual(body["results"][0]["kind"], EdgarDocument.KIND_FACTS)
 
+    def test_company_universe_endpoint(self):
+        res = self.client.get("/api/edgar/companies/universe/?q=AAPL&limit=10")
+        self.assertEqual(res.status_code, 200)
+        body = res.json()
+        self.assertGreaterEqual(body["count"], 1)
+        first = body["results"][0]
+        self.assertIn("ticker", first)
+        self.assertIn("company_id", first)
+
 
 class DrfApiTests(TestCase):
     @patch("edgar.drf_views.EdgarClient.company_facts")

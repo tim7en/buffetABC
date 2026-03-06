@@ -24,6 +24,39 @@ def company_search(request):
 
 
 @require_GET
+def company_universe(request):
+    query = request.GET.get("q", "").strip().upper()
+    limit = min(int(request.GET.get("limit", "500")), 1000)
+
+    rows = sp500.load_sp500()
+    if query:
+        rows = [
+            r
+            for r in rows
+            if query in r.get("Symbol", "").upper() or query in r.get("Security", "").upper()
+        ]
+    rows = rows[:limit]
+
+    tickers = [r.get("Symbol", "").upper() for r in rows if r.get("Symbol")]
+    existing = {
+        c.ticker: c.id for c in EdgarCompany.objects.filter(ticker__in=tickers).only("id", "ticker")
+    }
+
+    results = [
+        {
+            "ticker": r.get("Symbol", "").upper(),
+            "name": r.get("Security", ""),
+            "cik": str(r.get("CIK", "")),
+            "persisted": r.get("Symbol", "").upper() in existing,
+            "company_id": existing.get(r.get("Symbol", "").upper()),
+        }
+        for r in rows
+        if r.get("Symbol")
+    ]
+    return JsonResponse({"count": len(results), "results": results})
+
+
+@require_GET
 def companies(request):
     query = request.GET.get("q", "").strip()
     page = int(request.GET.get("page", "1"))

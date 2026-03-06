@@ -45,6 +45,10 @@
       font-size: 14px;
       background: #fff;
     }
+    #companyPicker {
+      width: 100%;
+      min-height: 150px;
+    }
     button {
       cursor: pointer;
       background: var(--brand);
@@ -92,6 +96,15 @@
       <div class="row">
         <input id="q" placeholder="Search ticker/name (AAPL, Apple)">
         <button class="secondary" id="searchBtn">Search</button>
+      </div>
+      <div class="row">
+        <select id="selectionMode">
+          <option value="multiple">multiple</option>
+          <option value="single">single</option>
+        </select>
+      </div>
+      <div class="row">
+        <select id="companyPicker" multiple></select>
       </div>
       <div class="row">
         <button class="secondary" id="selectAllBtn">Select All</button>
@@ -171,27 +184,58 @@
     }
 
     function selectedRows() {
+      const picker = document.getElementById("companyPicker");
+      const selected = Array.from(picker.selectedOptions).map(opt => ({
+        id: opt.dataset.id ? Number(opt.dataset.id) : null,
+        ticker: opt.value
+      }));
+      if (selected.length) return selected;
       return Array.from(document.querySelectorAll(".pick:checked")).map(x => ({
-        id: Number(x.dataset.id),
+        id: x.dataset.id ? Number(x.dataset.id) : null,
         ticker: x.dataset.ticker
       }));
     }
 
+    function applySingleModeToChecks() {
+      const mode = document.getElementById("selectionMode").value;
+      if (mode !== "single") return;
+      const checks = Array.from(document.querySelectorAll(".pick:checked"));
+      if (checks.length <= 1) return;
+      const keep = checks[checks.length - 1];
+      checks.forEach(c => { if (c !== keep) c.checked = false; });
+    }
+
+    async function resolveCompanyId(ticker) {
+      const res = await fetch(`${API}/companies/?q=${encodeURIComponent(ticker)}&page=1&page_size=20`);
+      const data = await res.json();
+      const exact = (data.results || []).find(c => (c.ticker || "").toUpperCase() === ticker.toUpperCase());
+      return exact ? exact.id : null;
+    }
+
     async function loadCompanies() {
       const q = document.getElementById("q").value.trim();
-      const res = await fetch(`${API}/companies/?page=1&page_size=100${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+      const res = await fetch(`/api/edgar/companies/universe/?limit=500${q ? `&q=${encodeURIComponent(q)}` : ""}`);
       const data = await res.json();
       companies = data.results || [];
       const tbody = document.querySelector("#companiesTbl tbody");
+      const picker = document.getElementById("companyPicker");
       tbody.innerHTML = "";
+      picker.innerHTML = "";
       for (const c of companies) {
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td><input class="pick" type="checkbox" data-id="${c.id}" data-ticker="${c.ticker}"></td>
+          <td><input class="pick" type="checkbox" data-id="${c.company_id || ""}" data-ticker="${c.ticker}"></td>
           <td>${c.ticker}</td>
-          <td>${c.name || ""}</td>
+          <td>${c.name || ""}${c.persisted ? "" : " (new)"}</td>
         `;
+        tr.querySelector(".pick").addEventListener("change", applySingleModeToChecks);
         tbody.appendChild(tr);
+
+        const opt = document.createElement("option");
+        opt.value = c.ticker;
+        opt.dataset.id = c.company_id || "";
+        opt.textContent = `${c.ticker} - ${c.name || ""}`;
+        picker.appendChild(opt);
       }
       log(`Loaded ${companies.length} companies`);
     }
@@ -218,21 +262,7 @@
         log("No companies selected.");
         return;
       }
-      if (!bulk) {
-        const target = picks[0];
-        const payload = buildPayload([target.ticker]);
-        const res = await fetch(`${API}/companies/${target.id}/fetch/`, {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        log(`Fetched one: ${target.ticker}`, data);
-        await refreshDetails(target.id, target.ticker);
-        return;
-      }
-
-      const symbols = picks.map(x => x.ticker);
+      const symbols = bulk ? picks.map(x => x.ticker) : [picks[0].ticker];
       const payload = buildPayload(symbols);
       const res = await fetch(`${API}/ingestion/fetch/`, {
         method: "POST",
@@ -240,13 +270,18 @@
         body: JSON.stringify(payload)
       });
       const data = await res.json();
-      log(`Bulk fetch complete (${symbols.length} symbols)`, data);
+      log(`${bulk ? "Bulk" : "Single"} fetch complete (${symbols.length} symbols)`, data);
 
-      const last = picks[picks.length - 1];
-      await refreshDetails(last.id, last.ticker);
+      const last = bulk ? picks[picks.length - 1] : picks[0];
+      const resolvedId = last.id || await resolveCompanyId(last.ticker);
+      await refreshDetails(resolvedId, last.ticker);
     }
 
     async function refreshDetails(companyId, ticker) {
+      if (!companyId) {
+        log(`No persisted company id for ${ticker} yet. Fetch completed but no detail view available.`);
+        return;
+      }
       const frequency = document.getElementById("frequency").value || "annual";
       const useAi = document.getElementById("useAiMapping").checked ? "1" : "0";
       const refreshMapping = document.getElementById("refreshMapping").checked ? "1" : "0";
@@ -287,22 +322,55 @@
       refreshTimer = setInterval(async () => {
         const picks = selectedRows();
         if (!picks.length) return;
-        await refreshDetails(picks[0].id, picks[0].ticker);
+        const companyId = picks[0].id || await resolveCompanyId(picks[0].ticker);
+        await refreshDetails(companyId, picks[0].ticker);
       }, sec * 1000);
       log(`Auto-refresh every ${sec}s enabled`);
     }
 
     document.getElementById("searchBtn").addEventListener("click", loadCompanies);
     document.getElementById("selectAllBtn").addEventListener("click", () => {
-      document.querySelectorAll(".pick").forEach(c => c.checked = true);
+      const mode = document.getElementById("selectionMode").value;
+      const picker = document.getElementById("companyPicker");
+      if (mode === "single") {
+        picker.selectedIndex = picker.options.length ? 0 : -1;
+      } else {
+        Array.from(picker.options).forEach(o => { o.selected = true; });
+      }
+      document.querySelectorAll(".pick").forEach(c => c.checked = (mode !== "single"));
+      if (mode === "single") applySingleModeToChecks();
     });
     document.getElementById("clearBtn").addEventListener("click", () => {
       document.querySelectorAll(".pick").forEach(c => c.checked = false);
+      Array.from(document.getElementById("companyPicker").options).forEach(o => { o.selected = false; });
     });
     document.getElementById("fetchSelectedBtn").addEventListener("click", () => fetchSelected(true));
     document.getElementById("fetchOneBtn").addEventListener("click", () => fetchSelected(false));
     document.getElementById("autoRefresh").addEventListener("change", setupAutoRefresh);
     document.getElementById("refreshSec").addEventListener("change", setupAutoRefresh);
+    document.getElementById("selectionMode").addEventListener("change", () => {
+      const mode = document.getElementById("selectionMode").value;
+      const picker = document.getElementById("companyPicker");
+      picker.multiple = (mode === "multiple");
+      if (mode === "single") {
+        const selected = Array.from(picker.selectedOptions);
+        if (selected.length > 1) {
+          Array.from(picker.options).forEach(o => { o.selected = false; });
+          selected[0].selected = true;
+        }
+        applySingleModeToChecks();
+      }
+    });
+    document.getElementById("companyPicker").addEventListener("change", () => {
+      const mode = document.getElementById("selectionMode").value;
+      if (mode !== "single") return;
+      const picker = document.getElementById("companyPicker");
+      const selected = Array.from(picker.selectedOptions);
+      if (selected.length > 1) {
+        Array.from(picker.options).forEach(o => { o.selected = false; });
+        selected[selected.length - 1].selected = true;
+      }
+    });
 
     loadCompanies();
   </script>
