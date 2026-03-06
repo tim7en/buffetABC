@@ -7,7 +7,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from edgar import sp500
-from edgar.models import EdgarCompany, EdgarDocument
+from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental
 from edgar.services.edgar_client import EdgarClient, RateLimiter
 
 
@@ -133,6 +133,8 @@ class DrfApiTests(TestCase):
     @patch("edgar.drf_views.EdgarClient.company_concept")
     def test_single_company_fetch_and_fundamentals_period_filter(self, mock_company_concept):
         mock_company_concept.return_value = {
+            "taxonomy": "us-gaap",
+            "tag": "Assets",
             "units": {
                 "USD": [
                     {"end": "2021-12-31", "val": 100},
@@ -158,3 +160,34 @@ class DrfApiTests(TestCase):
         self.assertEqual(res.status_code, 200)
         payload = res.json()
         self.assertEqual(payload["count"], 2)
+
+    @patch("edgar.drf_views.EdgarClient.company_facts")
+    def test_ingestion_saves_normalized_fundamentals(self, mock_company_facts):
+        mock_company_facts.return_value = {
+            "facts": {
+                "us-gaap": {
+                    "Assets": {
+                        "units": {
+                            "USD": [
+                                {"end": "2022-12-31", "val": 100, "fy": 2022, "fp": "FY", "form": "10-K"}
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+        body = {"symbols": ["AAPL"], "endpoint": "facts", "persist": True}
+        res = self.client.post(
+            "/api/edgar/drf/ingestion/fetch/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(EdgarFundamental.objects.count(), 1)
+        point = EdgarFundamental.objects.first()
+        self.assertEqual(point.tag, "Assets")
+        self.assertEqual(point.taxonomy, "us-gaap")
+
+        list_res = self.client.get("/api/edgar/drf/fundamentals/?ticker=AAPL&tag=Assets")
+        self.assertEqual(list_res.status_code, 200)
+        self.assertGreaterEqual(list_res.json()["count"], 1)

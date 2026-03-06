@@ -1,5 +1,9 @@
 from django.core.management.base import BaseCommand, CommandError
 from edgar.services.edgar_client import EdgarClient
+from edgar.services.fundamentals import (
+    save_fundamentals_from_concept,
+    save_fundamentals_from_facts,
+)
 from edgar import sp500
 from edgar.models import EdgarCompany, EdgarDocument
 import logging
@@ -122,7 +126,7 @@ class Command(BaseCommand):
                 "is_sp500": bool(sp500.by_symbol(ticker)),
             },
         )
-        EdgarDocument.objects.create(
+        doc = EdgarDocument.objects.create(
             company=company,
             kind=kind,
             endpoint=endpoint,
@@ -133,6 +137,7 @@ class Command(BaseCommand):
             success=True,
             params={},
         )
+        return company, doc
 
     def _persist_failure(self, row, kind, endpoint, error_message, attempts=1):
         ticker = row.get("Symbol", "").upper() or "UNKNOWN"
@@ -247,18 +252,42 @@ class Command(BaseCommand):
                     self.stdout.write(f"{sym or 'SEARCH'}: {total} items\n")
 
                 if persist:
-                    self._persist(row, kind=kind, endpoint=endpoint, payload=data, attempts=retries)
+                    company, doc = self._persist(
+                        row, kind=kind, endpoint=endpoint, payload=data, attempts=retries
+                    )
+                    if kind == EdgarDocument.KIND_FACTS:
+                        points = save_fundamentals_from_facts(
+                            company=company,
+                            payload=data,
+                            source_document=doc,
+                            taxonomy_filter=None,
+                            tag_filter=None,
+                        )
+                        self.stdout.write(f"{sym}: persisted {points} fundamentals\n")
+                    elif kind == EdgarDocument.KIND_CONCEPT:
+                        points = save_fundamentals_from_concept(
+                            company=company,
+                            payload=data,
+                            source_document=doc,
+                        )
+                        self.stdout.write(f"{sym}: persisted {points} fundamentals\n")
 
             except Exception as exc:
+                err_msg = str(exc)
+                if do_fulltext and "403" in err_msg:
+                    err_msg = (
+                        "SEC full-text search returned 403. This endpoint is often blocked "
+                        "without approved SEC access profile or when fair-access limits are hit."
+                    )
                 logger.exception("failed fetching %s for %s", kind if 'kind' in locals() else 'unknown', sym)
-                self.stderr.write(f"error {sym}: {exc}\n")
+                self.stderr.write(f"error {sym}: {err_msg}\n")
                 if persist:
                     self._persist_failure(
                         row,
                         kind=kind if "kind" in locals() else EdgarDocument.KIND_FACTS,
                         endpoint=endpoint if "endpoint" in locals() else "",
-                        error_message=str(exc),
+                        error_message=err_msg,
                         attempts=retries,
                     )
                 if symbol:
-                    raise CommandError(str(exc))
+                    raise CommandError(err_msg)

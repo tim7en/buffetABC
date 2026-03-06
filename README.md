@@ -68,6 +68,7 @@ This repository is a modular Django project focused on collecting and serving fi
    - DRF bulk ingestion: `POST /api/edgar/drf/ingestion/fetch/`
    - DRF single-company fetch: `POST /api/edgar/drf/companies/{id}/fetch/`
    - DRF fundamentals over time: `GET /api/edgar/drf/companies/{id}/fundamentals/?tag=Assets&period_start=2020-01-01&period_end=2024-12-31`
+   - DRF fundamentals table: `GET /api/edgar/drf/fundamentals/?ticker=AAPL&taxonomy=us-gaap&tag=Assets&from=2020-01-01&to=2024-12-31`
 
    DRF bulk ingestion example:
    ```json
@@ -93,3 +94,9 @@ This repository is a modular Django project focused on collecting and serving fi
 - EDGAR API requests are rate-limited (10 req/s default) and retried with backoff.
 - Failed downloads are stored with `success=False` and `error_message` for admin monitoring.
 - Raw source payloads are stored as JSON for later analytics/parsing.
+- Normalized point-in-time fundamentals are also stored in `EdgarFundamental`.
+- Set `EDGAR_USER_AGENT` to your real app/contact (SEC fair-access requirement), for example:
+  ```bash
+  export EDGAR_USER_AGENT=\"my-edgar-app/1.0 (contact: you@company.com)\"
+  ```
+- SEC full-text search (`efts.sec.gov`) may return `403` for fair-access / network policy reasons; this is surfaced as a clear error in ingestion responses.

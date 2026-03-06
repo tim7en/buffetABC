@@ -6,11 +6,16 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from edgar import sp500
-from edgar.models import EdgarCompany, EdgarDocument
+from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental
 from edgar.serializers import (
     EdgarCompanySerializer,
     EdgarDocumentSerializer,
+    EdgarFundamentalSerializer,
     IngestionRequestSerializer,
+)
+from edgar.services.fundamentals import (
+    save_fundamentals_from_concept,
+    save_fundamentals_from_facts,
 )
 from edgar.services.edgar_client import EdgarClient
 
@@ -125,36 +130,29 @@ class EdgarCompanyViewSet(viewsets.ReadOnlyModelViewSet):
         start_date = date.fromisoformat(period_start) if period_start else None
         end_date = date.fromisoformat(period_end) if period_end else None
 
-        docs = EdgarDocument.objects.filter(
+        qs = EdgarFundamental.objects.filter(
             company=company,
-            kind=EdgarDocument.KIND_CONCEPT,
-            success=True,
-            params__taxonomy=taxonomy,
-            params__tag=tag,
-        ).order_by("-fetched_at")
-
-        points = []
-        if docs.exists():
-            # Use most recent concept snapshot; it already contains historical values.
-            points = _extract_concept_points(docs.first().payload, unit=unit)
-        else:
-            facts_docs = EdgarDocument.objects.filter(
-                company=company,
-                kind=EdgarDocument.KIND_FACTS,
-                success=True,
-            ).order_by("-fetched_at")
-            if facts_docs.exists():
-                payload = facts_docs.first().payload
-                points = (
-                    payload.get("facts", {})
-                    .get(taxonomy, {})
-                    .get(tag, {})
-                    .get("units", {})
-                    .get(unit, [])
-                )
-
-        points = _filter_points_by_period(points, start_date, end_date)
-        points = sorted(points, key=lambda x: x.get("end", ""))
+            taxonomy=taxonomy,
+            tag=tag,
+            unit=unit,
+        ).order_by("end_date", "filed_date")
+        if start_date:
+            qs = qs.filter(end_date__gte=start_date)
+        if end_date:
+            qs = qs.filter(end_date__lte=end_date)
+        points = [
+            {
+                "end": p.end_date.isoformat(),
+                "filed": p.filed_date.isoformat() if p.filed_date else "",
+                "val": p.value,
+                "form": p.form,
+                "fy": p.fiscal_year,
+                "fp": p.fiscal_period,
+                "accn": p.accession,
+                "frame": p.frame,
+            }
+            for p in qs
+        ]
 
         return Response(
             {
@@ -190,6 +188,33 @@ class EdgarDocumentViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(fetched_at__date__gte=from_date)
         if to_date:
             qs = qs.filter(fetched_at__date__lte=to_date)
+        return qs
+
+
+class EdgarFundamentalViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = EdgarFundamental.objects.select_related("company").all().order_by("-end_date")
+    serializer_class = EdgarFundamentalSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        ticker = self.request.query_params.get("ticker", "").strip().upper()
+        taxonomy = self.request.query_params.get("taxonomy", "").strip()
+        tag = self.request.query_params.get("tag", "").strip()
+        unit = self.request.query_params.get("unit", "").strip()
+        from_date = self.request.query_params.get("from", "").strip()
+        to_date = self.request.query_params.get("to", "").strip()
+        if ticker:
+            qs = qs.filter(company__ticker=ticker)
+        if taxonomy:
+            qs = qs.filter(taxonomy=taxonomy)
+        if tag:
+            qs = qs.filter(tag=tag)
+        if unit:
+            qs = qs.filter(unit=unit)
+        if from_date:
+            qs = qs.filter(end_date__gte=from_date)
+        if to_date:
+            qs = qs.filter(end_date__lte=to_date)
         return qs
 
 
@@ -230,6 +255,7 @@ def run_ingestion(config):
     client = EdgarClient(retries=retries, backoff_seconds=backoff)
     saved_documents = []
     items = []
+    fundamentals_saved = 0
 
     for symbol in symbols:
         row = _row_for_symbol(symbol)
@@ -285,6 +311,20 @@ def run_ingestion(config):
                     success=True,
                 )
                 saved_documents.append(doc.id)
+                if endpoint == EdgarDocument.KIND_FACTS:
+                    fundamentals_saved += save_fundamentals_from_facts(
+                        company=company,
+                        payload=payload,
+                        source_document=doc,
+                        taxonomy_filter=None,
+                        tag_filter=None,
+                    )
+                elif endpoint == EdgarDocument.KIND_CONCEPT:
+                    fundamentals_saved += save_fundamentals_from_concept(
+                        company=company,
+                        payload=payload,
+                        source_document=doc,
+                    )
 
             item = {"symbol": symbol, "success": True, "saved": bool(doc)}
             if doc:
@@ -294,6 +334,12 @@ def run_ingestion(config):
             items.append(item)
 
         except Exception as exc:
+            err_msg = str(exc)
+            if endpoint == EdgarDocument.KIND_FULLTEXT and "403" in err_msg:
+                err_msg = (
+                    "SEC full-text search returned 403. This endpoint is often blocked "
+                    "without approved SEC access profile or when fair-access limits are hit."
+                )
             doc = None
             if persist:
                 company = _upsert_company(row)
@@ -305,14 +351,14 @@ def run_ingestion(config):
                     params=params,
                     attempts=retries,
                     success=False,
-                    error_message=str(exc),
+                    error_message=err_msg,
                 )
                 saved_documents.append(doc.id)
             items.append(
                 {
                     "symbol": symbol,
                     "success": False,
-                    "error": str(exc),
+                    "error": err_msg,
                     "saved": bool(doc),
                     "document_id": doc.id if doc else None,
                 }
@@ -322,5 +368,6 @@ def run_ingestion(config):
         "endpoint": endpoint,
         "requested": len(symbols),
         "saved_document_ids": saved_documents,
+        "fundamentals_saved": fundamentals_saved,
         "results": items,
     }

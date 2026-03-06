@@ -1,11 +1,13 @@
 import requests
 import time
 import logging
+import os
 from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-USER_AGENT = "buffet-edgar/1.0 (contact: you@example.com)"
+DEFAULT_USER_AGENT = "buffet-edgar/1.0 (contact: you@example.com)"
+USER_AGENT = os.getenv("EDGAR_USER_AGENT", DEFAULT_USER_AGENT)
 
 
 class RateLimiter:
@@ -57,6 +59,10 @@ class EdgarClient:
         self.timeout = timeout
         self.session = requests.Session()
         self.session.headers.update({"User-Agent": USER_AGENT})
+        if USER_AGENT == DEFAULT_USER_AGENT:
+            logger.warning(
+                "Using placeholder EDGAR user-agent. Set EDGAR_USER_AGENT with real contact details."
+            )
         self._last_status_code: Optional[int] = None
         self._last_url: str = ""
 
@@ -123,7 +129,13 @@ class EdgarClient:
             "size": str(size),
             "sort": [{"filedAt": {"order": "desc"}}],
         }
-        return self._request("POST", self.FULL_TEXT_SEARCH_URL, json=payload)
+        headers = {
+            "Accept": "application/json,text/plain,*/*",
+            "Content-Type": "application/json",
+            "Origin": "https://www.sec.gov",
+            "Referer": "https://www.sec.gov/edgar/search/",
+        }
+        return self._request("POST", self.FULL_TEXT_SEARCH_URL, json=payload, headers=headers)
 
     # future helpers could parse specific metrics
 def extract_metric(facts: Dict, metric: str, year: Optional[int] = None) -> Optional[float]:
