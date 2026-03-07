@@ -1,8 +1,21 @@
-"""Intraday strategy runner (15m default, 2-year lookback).
+"""Intraday Williams Fractal strategy variants (transcript-aligned).
 
-This service pulls intraday bars from Yahoo Finance in chunks (to handle
-provider window limits) and runs the same price/volume + fractal logic used
-in the daily strategy, with intraday-friendly defaults.
+Supported variants:
+- fractal_breakout_ema200:
+  Trend filter by EMA200, trade breakout of latest confirmed fractal.
+  Long: close > EMA200 and close breaks above latest top fractal.
+  Short: close < EMA200 and close breaks below latest bottom fractal.
+  Stop: signal candle low/high. TP: 1.5R by default.
+
+- alligator_stoch_fractal:
+  Trend filter by alligator-style lines + Stoch RSI + newly confirmed fractal.
+  Long: uptrend + new bottom fractal + Stoch RSI oversold.
+  Short: downtrend + new top fractal + Stoch RSI overbought.
+  Stop: fractal candle low/high. TP: 1.5R fallback, plus alligator mid-line exit.
+
+Implementation is explicitly bias-safe:
+- fractals are used only after confirmation lag (period bars)
+- signals are generated on bar i, entries happen at next bar open (i+1)
 """
 
 from __future__ import annotations
@@ -11,7 +24,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from edgar.services.strategy import _atr, _sma, _stochastic_rsi, _williams_fractals
+from edgar.services.strategy import _sma, _stochastic_rsi, _williams_fractals
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +48,13 @@ def _bars_per_day(interval: str) -> int:
 
 
 def _chunk_days_for_interval(interval: str) -> int:
-    # Yahoo intraday usually supports up to ~60 days per request for <=60m.
     if interval in {"1m", "2m", "5m", "15m", "30m", "60m", "90m"}:
         return 58
     return 365
 
 
 def _max_lookback_days_for_interval(interval: str) -> int | None:
-    # yfinance/yahoo practical limits for intraday intervals.
+    # Practical Yahoo Finance limits for intraday bars.
     if interval == "1m":
         return 7
     if interval in {"2m", "5m", "15m", "30m"}:
@@ -50,6 +62,32 @@ def _max_lookback_days_for_interval(interval: str) -> int | None:
     if interval in {"60m", "90m"}:
         return 730
     return None
+
+
+def _ema(values: list[float], period: int) -> list[float | None]:
+    out: list[float | None] = [None] * len(values)
+    if period <= 0 or len(values) < period:
+        return out
+    alpha = 2.0 / (period + 1.0)
+    ema_val = sum(values[:period]) / period
+    out[period - 1] = ema_val
+    for i in range(period, len(values)):
+        ema_val = (values[i] * alpha) + (ema_val * (1.0 - alpha))
+        out[i] = ema_val
+    return out
+
+
+def _smma(values: list[float], period: int) -> list[float | None]:
+    # Wilder-style smoothed moving average (used for Alligator-like lines).
+    out: list[float | None] = [None] * len(values)
+    if period <= 0 or len(values) < period:
+        return out
+    smma = sum(values[:period]) / period
+    out[period - 1] = smma
+    for i in range(period, len(values)):
+        smma = ((smma * (period - 1)) + values[i]) / period
+        out[i] = smma
+    return out
 
 
 def _fetch_intraday_bars(
@@ -68,7 +106,9 @@ def _fetch_intraday_bars(
     total_days = lookback_days + max(warmup_days, 30)
     max_days = _max_lookback_days_for_interval(interval)
     if max_days is not None:
-        total_days = min(total_days, max_days)
+        # Keep a small safety margin to avoid boundary rejections.
+        total_days = min(total_days, max(max_days - 2, 1))
+
     end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=total_days)
 
@@ -89,7 +129,7 @@ def _fetch_intraday_bars(
             )
         except Exception as exc:
             logger.warning(
-                "intraday chunk failed for %s (%s to %s): %s",
+                "intraday chunk failed for %s (%s -> %s): %s",
                 ticker,
                 cursor.isoformat(),
                 chunk_end.isoformat(),
@@ -115,14 +155,13 @@ def _fetch_intraday_bars(
         bars.append(
             {
                 "timestamp": ts,
-                "open": float(row["Open"]) if row.get("Open") is not None else float(row["Close"]),
-                "high": float(row["High"]) if row.get("High") is not None else float(row["Close"]),
-                "low": float(row["Low"]) if row.get("Low") is not None else float(row["Close"]),
+                "open": float(row.get("Open", row["Close"])),
+                "high": float(row.get("High", row["Close"])),
+                "low": float(row.get("Low", row["Close"])),
                 "close": float(row["Close"]),
                 "volume": float(row.get("Volume", 0) or 0),
             }
         )
-
     return bars
 
 
@@ -136,6 +175,7 @@ class _Trade:
     risk_pct: float
     position_size: float
     shares: float
+    entry_index: int
     exit_ts: datetime | None = None
     exit_price: float | None = None
     pnl: float = 0.0
@@ -149,47 +189,47 @@ class _Trade:
     stop_source: str = ""
     fractal_high: float | None = None
     fractal_low: float | None = None
-    entry_index: int = 0
 
 
 def run_intraday_backtest(
     ticker: str,
     initial_capital: float = 10_000.0,
-    interval: str = "15m",
+    interval: str = "60m",
     lookback_years: float = 2.0,
-    sma_fast_period: int = 130,
-    sma_slow_period: int = 520,
+    strategy_variant: str = "fractal_breakout_ema200",
+    ema_period: int = 200,
+    fractal_window: int = 9,
+    breakout_buffer_bps: float = 0.0,
+    rr_multiple: float = 1.5,
     stoch_rsi_period: int = 14,
     oversold: float = 20.0,
     overbought: float = 80.0,
-    atr_period: int = 14,
-    stop_atr_mult: float = 2.4,
-    fractal_period: int = 2,
-    require_fractal_confirmation: bool = True,
-    require_fractal_breakout: bool = False,
-    fractal_break_buffer_atr: float = 0.1,
-    min_fractal_stop_atr: float = 0.8,
-    max_fractal_stop_atr: float = 5.0,
-    take_profit_rr: float = 2.0,
-    trail_atr_mult: float = 2.2,
+    alligator_jaw_period: int = 13,
+    alligator_teeth_period: int = 8,
+    alligator_lips_period: int = 5,
+    alligator_slope_bars: int = 3,
+    alligator_min_gap_pct: float = 0.001,
     volume_period: int = 40,
+    use_volume_filter: bool = False,
     min_rel_volume: float = 1.0,
-    base_risk_pct: float = 0.008,
-    max_risk_pct: float = 0.015,
-    max_position_pct: float = 0.25,
+    base_risk_pct: float = 0.01,
+    max_risk_pct: float = 0.02,
+    max_position_pct: float = 0.30,
     slippage_bps: float = 4.0,
     commission_bps: float = 1.0,
     allow_longs: bool = True,
     allow_shorts: bool = True,
 ) -> dict:
+    valid_variants = {"fractal_breakout_ema200", "alligator_stoch_fractal"}
+    if strategy_variant not in valid_variants:
+        raise ValueError(f"strategy_variant must be one of {sorted(valid_variants)}")
     if initial_capital <= 0:
         raise ValueError("initial_capital must be positive")
-    if sma_fast_period >= sma_slow_period:
-        raise ValueError("sma_fast_period must be smaller than sma_slow_period")
     if not allow_longs and not allow_shorts:
         raise ValueError("At least one of allow_longs / allow_shorts must be true")
-    if fractal_period < 1:
-        raise ValueError("fractal_period must be >= 1")
+    if fractal_window < 5 or fractal_window % 2 == 0:
+        raise ValueError("fractal_window must be odd and >= 5 (e.g. 5 or 9)")
+
     lookback_days = max(int(365.25 * lookback_years), 1)
     max_days = _max_lookback_days_for_interval(interval)
     if max_days is not None and lookback_days > max_days:
@@ -199,18 +239,25 @@ def run_intraday_backtest(
             "Use a shorter window, or use interval=60m for multi-year runs."
         )
 
+    fractal_period = (fractal_window - 1) // 2
     bars_per_day = max(_bars_per_day(interval), 1)
-    warmup_days = max(int(sma_slow_period / bars_per_day) + 20, 60)
+    warmup_bars = max(
+        ema_period + 5,
+        stoch_rsi_period * 3 + 5,
+        alligator_jaw_period + alligator_slope_bars + 5,
+        volume_period + 5,
+        fractal_period * 4 + 5,
+    )
+    warmup_days = max(int(warmup_bars / bars_per_day) + 15, 45)
+
     bars = _fetch_intraday_bars(
         ticker=ticker,
         interval=interval,
         lookback_years=lookback_years,
         warmup_days=warmup_days,
     )
-    if len(bars) < (sma_slow_period + 200):
-        raise ValueError(
-            f"Insufficient intraday data for {ticker}: {len(bars)} bars (need {sma_slow_period + 200}+)"
-        )
+    if len(bars) < warmup_bars + 30:
+        raise ValueError(f"Insufficient intraday data for {ticker}: {len(bars)} bars")
 
     timestamps = [b["timestamp"] for b in bars]
     opens = [b["open"] for b in bars]
@@ -219,27 +266,29 @@ def run_intraday_backtest(
     closes = [b["close"] for b in bars]
     volumes = [b["volume"] for b in bars]
 
-    lookback_days = max(int(365.25 * lookback_years), 30)
-    period_start = max(timestamps[0], timestamps[-1] - timedelta(days=lookback_days))
+    period_start = max(timestamps[0], timestamps[-1] - timedelta(days=max(int(365.25 * lookback_years), 30)))
     first_period_idx = next((i for i, ts in enumerate(timestamps) if ts >= period_start), len(timestamps) - 1)
-    warmup = max(sma_slow_period + 2, stoch_rsi_period * 3, atr_period + 2, volume_period + 2)
-    start_idx = max(first_period_idx, warmup)
+    start_idx = max(first_period_idx, warmup_bars)
     if start_idx >= len(bars) - 2:
-        raise ValueError("Not enough intraday bars after warmup for backtest window")
+        raise ValueError("Not enough bars after warmup for backtest window")
 
-    sma_fast = _sma(closes, sma_fast_period)
-    sma_slow = _sma(closes, sma_slow_period)
+    ema200 = _ema(closes, ema_period)
     stoch_k, stoch_d = _stochastic_rsi(
         closes,
         rsi_period=stoch_rsi_period,
         stoch_period=stoch_rsi_period,
     )
-    atr_vals = _atr(highs, lows, closes, period=atr_period)
     vol_sma = _sma(volumes, volume_period)
     frac_hi, frac_lo = _williams_fractals(highs, lows, period=fractal_period)
 
+    hl2 = [(h + l) / 2.0 for h, l in zip(highs, lows)]
+    jaw = _smma(hl2, alligator_jaw_period)
+    teeth = _smma(hl2, alligator_teeth_period)
+    lips = _smma(hl2, alligator_lips_period)
+
     commission_rate = max(0.0, commission_bps) / 10_000.0
     slippage_rate = max(0.0, slippage_bps) / 10_000.0
+    breakout_buffer = max(0.0, breakout_buffer_bps) / 10_000.0
 
     capital = float(initial_capital)
     trades: list[_Trade] = []
@@ -254,10 +303,10 @@ def run_intraday_backtest(
     def _close_trade(trade: _Trade, idx: int, raw_exit_price: float, reason: str) -> None:
         nonlocal capital, total_fees
         if trade.direction == "long":
-            exit_price = raw_exit_price * (1 - slippage_rate)
+            exit_price = raw_exit_price * (1.0 - slippage_rate)
             gross_pnl = (exit_price - trade.entry_price) * trade.shares
         else:
-            exit_price = raw_exit_price * (1 + slippage_rate)
+            exit_price = raw_exit_price * (1.0 + slippage_rate)
             gross_pnl = (trade.entry_price - exit_price) * trade.shares
 
         exit_fee = abs(trade.shares * exit_price) * commission_rate
@@ -275,7 +324,6 @@ def run_intraday_backtest(
         total_fees += fee_total
         trades.append(trade)
 
-    slope_lookback = 20
     for i in range(start_idx, len(bars)):
         ts = timestamps[i]
         close_i = closes[i]
@@ -290,12 +338,17 @@ def run_intraday_backtest(
         if open_trade is not None:
             hit_sl = False
             hit_tp = False
+            line_exit = False
             raw_exit: float | None = None
+
             if open_trade.direction == "long":
                 hit_sl = low_i <= open_trade.stop_loss
                 hit_tp = high_i >= open_trade.take_profit
                 if hit_sl:
                     raw_exit = open_trade.stop_loss
+                elif strategy_variant == "alligator_stoch_fractal" and teeth[i] is not None and close_i <= teeth[i]:
+                    line_exit = True
+                    raw_exit = close_i
                 elif hit_tp:
                     raw_exit = open_trade.take_profit
             else:
@@ -303,37 +356,30 @@ def run_intraday_backtest(
                 hit_tp = low_i <= open_trade.take_profit
                 if hit_sl:
                     raw_exit = open_trade.stop_loss
+                elif strategy_variant == "alligator_stoch_fractal" and teeth[i] is not None and close_i >= teeth[i]:
+                    line_exit = True
+                    raw_exit = close_i
                 elif hit_tp:
                     raw_exit = open_trade.take_profit
 
             if raw_exit is not None:
-                _close_trade(
-                    trade=open_trade,
-                    idx=i,
-                    raw_exit_price=raw_exit,
-                    reason="take_profit" if hit_tp and not hit_sl else "stop_loss",
-                )
+                if hit_sl:
+                    reason = "stop_loss"
+                elif line_exit:
+                    reason = "alligator_line_exit"
+                else:
+                    reason = "take_profit"
+                _close_trade(open_trade, i, raw_exit, reason)
                 open_trade = None
-            else:
-                atr_now = atr_vals[i]
-                if atr_now is not None and atr_now > 0:
-                    if open_trade.direction == "long":
-                        tr_stop = close_i - (atr_now * trail_atr_mult)
-                        if tr_stop > open_trade.stop_loss:
-                            open_trade.stop_loss = round(min(tr_stop, open_trade.take_profit - 1e-6), 4)
-                    else:
-                        tr_stop = close_i + (atr_now * trail_atr_mult)
-                        if tr_stop < open_trade.stop_loss:
-                            open_trade.stop_loss = round(max(tr_stop, open_trade.take_profit + 1e-6), 4)
 
         unrealized = 0.0
         if open_trade is not None:
             if open_trade.direction == "long":
-                marked = close_i * (1 - slippage_rate)
-                unrealized = (marked - open_trade.entry_price) * open_trade.shares - open_trade.fees_paid
+                mark = close_i * (1.0 - slippage_rate)
+                unrealized = (mark - open_trade.entry_price) * open_trade.shares - open_trade.fees_paid
             else:
-                marked = close_i * (1 + slippage_rate)
-                unrealized = (open_trade.entry_price - marked) * open_trade.shares - open_trade.fees_paid
+                mark = close_i * (1.0 + slippage_rate)
+                unrealized = (open_trade.entry_price - mark) * open_trade.shares - open_trade.fees_paid
 
         if ts >= period_start:
             equity = capital + unrealized
@@ -350,31 +396,13 @@ def run_intraday_backtest(
 
         if open_trade is not None:
             continue
-        if ts < period_start:
-            continue
-        if i >= len(bars) - 1:
-            continue
-
-        atr_now = atr_vals[i]
-        sf = sma_fast[i]
-        ss = sma_slow[i]
-        vk = stoch_k[i]
-        vd = stoch_d[i]
-        pk = stoch_k[i - 1] if i - 1 >= 0 else None
-        pd = stoch_d[i - 1] if i - 1 >= 0 else None
-        sv = vol_sma[i]
-        if None in (atr_now, sf, ss, vk, vd, pk, pd, sv):
-            continue
-        if atr_now <= 0 or sv <= 0:
-            continue
-
-        ss_prev = sma_slow[i - slope_lookback] if i - slope_lookback >= 0 else None
-        if ss_prev is None:
+        if ts < period_start or i >= len(bars) - 1:
             continue
 
         confirmed_idx = i - fractal_period
         if confirmed_idx < 0:
             continue
+
         last_frac_hi = None
         last_frac_lo = None
         for j in range(confirmed_idx, -1, -1):
@@ -385,108 +413,120 @@ def run_intraday_backtest(
             if last_frac_hi is not None and last_frac_lo is not None:
                 break
 
-        trend_long = close_i > ss and sf > ss and ss > ss_prev
-        trend_short = close_i < ss and sf < ss and ss < ss_prev
-        long_momo = pk <= oversold and vk > oversold and pk <= pd and vk > vd
-        short_momo = pk >= overbought and vk < overbought and pk >= pd and vk < vd
+        rel_volume = 1.0
+        if vol_sma[i] is not None and vol_sma[i] > 0:
+            rel_volume = volumes[i] / vol_sma[i]
+        if use_volume_filter and rel_volume < min_rel_volume:
+            continue
 
-        long_signal = allow_longs and trend_long and long_momo
-        short_signal = allow_shorts and trend_short and short_momo
+        long_signal = False
+        short_signal = False
+        stop_source = ""
+        stop_anchor_low = None
+        stop_anchor_high = None
 
-        if require_fractal_breakout:
-            break_buffer = atr_now * max(fractal_break_buffer_atr, 0.0)
-            if long_signal:
-                long_signal = last_frac_hi is not None and close_i > (last_frac_hi + break_buffer)
-            if short_signal:
-                short_signal = last_frac_lo is not None and close_i < (last_frac_lo - break_buffer)
+        if strategy_variant == "fractal_breakout_ema200":
+            ema_i = ema200[i]
+            if ema_i is None:
+                continue
+            if allow_longs and last_frac_hi is not None:
+                long_signal = close_i > ema_i and close_i > (last_frac_hi * (1.0 + breakout_buffer))
+            if allow_shorts and last_frac_lo is not None:
+                short_signal = close_i < ema_i and close_i < (last_frac_lo * (1.0 - breakout_buffer))
+            stop_source = "signal_candle"
+            stop_anchor_low = low_i
+            stop_anchor_high = high_i
+        else:  # alligator_stoch_fractal
+            if None in (jaw[i], teeth[i], lips[i], stoch_k[i]):
+                continue
+            j_prev = i - alligator_slope_bars
+            if j_prev < 0 or None in (jaw[j_prev], teeth[j_prev], lips[j_prev]):
+                continue
+
+            gap_ok = min(abs(lips[i] - teeth[i]), abs(teeth[i] - jaw[i])) / max(close_i, 1e-9) >= alligator_min_gap_pct
+            uptrend = (
+                lips[i] > teeth[i] > jaw[i]
+                and lips[i] > lips[j_prev]
+                and teeth[i] > teeth[j_prev]
+                and jaw[i] > jaw[j_prev]
+                and gap_ok
+            )
+            downtrend = (
+                lips[i] < teeth[i] < jaw[i]
+                and lips[i] < lips[j_prev]
+                and teeth[i] < teeth[j_prev]
+                and jaw[i] < jaw[j_prev]
+                and gap_ok
+            )
+
+            new_bottom_fractal = frac_lo[confirmed_idx] is not None
+            new_top_fractal = frac_hi[confirmed_idx] is not None
+
+            if allow_longs and uptrend and new_bottom_fractal and stoch_k[i] <= oversold:
+                long_signal = True
+            if allow_shorts and downtrend and new_top_fractal and stoch_k[i] >= overbought:
+                short_signal = True
+
+            stop_source = "fractal_candle"
+            stop_anchor_low = lows[confirmed_idx]
+            stop_anchor_high = highs[confirmed_idx]
+
         if long_signal == short_signal:
             continue
-
-        rel_volume = volumes[i] / sv if sv else 0.0
-        if rel_volume < min_rel_volume:
-            continue
-
-        trend_distance = abs((close_i / ss) - 1.0)
-        if trend_distance < 0.003:
-            continue
-
-        if rel_volume >= 1.8 and trend_distance >= 0.02:
-            tier = "high_conviction"
-            signal_quality = "A"
-            risk_mult = 1.5
-        elif rel_volume >= 1.25 and trend_distance >= 0.01:
-            tier = "standard"
-            signal_quality = "B"
-            risk_mult = 1.0
-        else:
-            tier = "conservative"
-            signal_quality = "C"
-            risk_mult = 0.65
 
         direction = "long" if long_signal else "short"
         next_open = opens[i + 1] if opens[i + 1] > 0 else closes[i + 1]
         if next_open <= 0:
             continue
-        entry_price = next_open * (1 + slippage_rate) if direction == "long" else next_open * (1 - slippage_rate)
-
-        atr_fallback_stop = atr_now * stop_atr_mult
-        if atr_fallback_stop <= 0:
-            continue
-        min_stop = atr_now * max(min_fractal_stop_atr, 0.0)
-        max_stop = atr_now * max(max_fractal_stop_atr, min_fractal_stop_atr)
-        stop_source = "atr"
-        stop_distance = atr_fallback_stop
+        entry_price = next_open * (1.0 + slippage_rate) if direction == "long" else next_open * (1.0 - slippage_rate)
 
         if direction == "long":
-            if last_frac_lo is not None and last_frac_lo < entry_price:
-                fractal_distance = entry_price - last_frac_lo
-                if fractal_distance > max_stop:
-                    if require_fractal_confirmation:
-                        continue
-                elif fractal_distance < min_stop:
-                    stop_distance = min_stop
-                    stop_source = "fractal_floor"
-                else:
-                    stop_distance = fractal_distance
-                    stop_source = "fractal"
-            elif require_fractal_confirmation:
+            if stop_anchor_low is None:
                 continue
-            stop_loss = entry_price - stop_distance
-            take_profit = entry_price + (stop_distance * take_profit_rr)
-            if stop_loss <= 0:
+            stop_loss = float(stop_anchor_low)
+            sl_distance = entry_price - stop_loss
+            if sl_distance <= 0:
                 continue
+            take_profit = entry_price + (sl_distance * rr_multiple)
         else:
-            if last_frac_hi is not None and last_frac_hi > entry_price:
-                fractal_distance = last_frac_hi - entry_price
-                if fractal_distance > max_stop:
-                    if require_fractal_confirmation:
-                        continue
-                elif fractal_distance < min_stop:
-                    stop_distance = min_stop
-                    stop_source = "fractal_floor"
-                else:
-                    stop_distance = fractal_distance
-                    stop_source = "fractal"
-            elif require_fractal_confirmation:
+            if stop_anchor_high is None:
                 continue
-            stop_loss = entry_price + stop_distance
-            take_profit = entry_price - (stop_distance * take_profit_rr)
+            stop_loss = float(stop_anchor_high)
+            sl_distance = stop_loss - entry_price
+            if sl_distance <= 0:
+                continue
+            take_profit = entry_price - (sl_distance * rr_multiple)
             if take_profit <= 0:
                 continue
-        if stop_distance > max_stop:
-            continue
 
-        risk_pct = min(max_risk_pct, max(base_risk_pct * 0.4, base_risk_pct * risk_mult))
+        if use_volume_filter:
+            if rel_volume >= 1.8:
+                risk_pct = min(max_risk_pct, base_risk_pct * 1.5)
+                sizing_tier = "high_conviction"
+                signal_quality = "A"
+            elif rel_volume >= 1.2:
+                risk_pct = min(max_risk_pct, base_risk_pct)
+                sizing_tier = "standard"
+                signal_quality = "B"
+            else:
+                risk_pct = max(base_risk_pct * 0.6, base_risk_pct * 0.4)
+                sizing_tier = "conservative"
+                signal_quality = "C"
+        else:
+            risk_pct = min(max_risk_pct, base_risk_pct)
+            sizing_tier = "standard"
+            signal_quality = "B"
+
         risk_amount = capital * risk_pct
-        shares = risk_amount / stop_distance
+        shares = risk_amount / sl_distance
         position_size = shares * entry_price
         max_notional = capital * max_position_pct
         if position_size > max_notional and entry_price > 0:
             shares = max_notional / entry_price
             position_size = max_notional
-            risk_amount = shares * stop_distance
+            risk_amount = shares * sl_distance
             risk_pct = risk_amount / capital if capital > 0 else 0.0
-            tier = f"{tier}_capped"
+            sizing_tier = f"{sizing_tier}_capped"
 
         if shares <= 0 or position_size <= 0:
             continue
@@ -501,15 +541,15 @@ def run_intraday_backtest(
             risk_pct=round(risk_pct, 6),
             position_size=round(position_size, 4),
             shares=round(shares, 6),
+            entry_index=i + 1,
             fees_paid=round(entry_fee, 4),
             entry_rel_volume=round(rel_volume, 3),
-            volume_confirmed=True,
-            sizing_tier=tier,
+            volume_confirmed=(not use_volume_filter) or rel_volume >= min_rel_volume,
+            sizing_tier=sizing_tier,
             signal_quality=signal_quality,
             stop_source=stop_source,
             fractal_high=round(last_frac_hi, 4) if last_frac_hi is not None else None,
             fractal_low=round(last_frac_lo, 4) if last_frac_lo is not None else None,
-            entry_index=i + 1,
         )
 
     if open_trade is not None:
@@ -540,6 +580,7 @@ def run_intraday_backtest(
         "ticker": ticker.upper(),
         "data_mode": "intraday",
         "interval": interval,
+        "strategy_variant": strategy_variant,
         "lookback_years": lookback_years,
         "bar_count": len(equity_curve),
         "start_date": start_ts.isoformat(),

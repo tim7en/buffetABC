@@ -572,10 +572,9 @@ class StrategyViewSet(viewsets.ViewSet):
         capital = float(request.data.get("initial_capital", 10_000))
         interval = (request.data.get("interval") or "15m").strip()
         lookback_years = float(request.data.get("lookback_years", 2))
+        strategy_variant = (request.data.get("strategy_variant") or "fractal_breakout_ema200").strip()
         allow_shorts = _as_bool(request.data.get("allow_shorts"), True)
         allow_longs = _as_bool(request.data.get("allow_longs"), True)
-        require_fractal_confirmation = _as_bool(request.data.get("require_fractal_confirmation"), True)
-        require_fractal_breakout = _as_bool(request.data.get("require_fractal_breakout"), False)
 
         try:
             payload = run_intraday_backtest(
@@ -583,10 +582,16 @@ class StrategyViewSet(viewsets.ViewSet):
                 initial_capital=capital,
                 interval=interval,
                 lookback_years=lookback_years,
+                strategy_variant=strategy_variant,
                 allow_longs=allow_longs,
                 allow_shorts=allow_shorts,
-                require_fractal_confirmation=require_fractal_confirmation,
-                require_fractal_breakout=require_fractal_breakout,
+                use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
+                min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                oversold=float(request.data.get("oversold", 20.0)),
+                overbought=float(request.data.get("overbought", 80.0)),
+                fractal_window=int(request.data.get("fractal_window", 9)),
+                rr_multiple=float(request.data.get("rr_multiple", 1.5)),
+                breakout_buffer_bps=float(request.data.get("breakout_buffer_bps", 0.0)),
             )
             return Response(payload)
         except Exception as exc:

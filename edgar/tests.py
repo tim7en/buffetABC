@@ -263,6 +263,7 @@ class DrfApiTests(TestCase):
             "ticker": "AAPL",
             "data_mode": "intraday",
             "interval": "15m",
+            "strategy_variant": "fractal_breakout_ema200",
             "start_date": "2024-01-01T00:00:00",
             "end_date": "2026-01-01T00:00:00",
             "initial_capital": 10000,
@@ -289,7 +290,7 @@ class DrfApiTests(TestCase):
             "interval": "15m",
             "lookback_years": 2,
             "allow_shorts": True,
-            "require_fractal_confirmation": True,
+            "strategy_variant": "fractal_breakout_ema200",
         }
         res = self.client.post(
             "/api/edgar/drf/strategy/backtest-intraday/",
@@ -301,8 +302,13 @@ class DrfApiTests(TestCase):
         self.assertEqual(payload["data_mode"], "intraday")
         self.assertEqual(payload["interval"], "15m")
         self.assertEqual(payload["ticker"], "AAPL")
+        self.assertEqual(payload["strategy_variant"], "fractal_breakout_ema200")
         self.assertIn("total_trades", payload)
         mock_intraday.assert_called_once()
+        self.assertEqual(
+            mock_intraday.call_args.kwargs["strategy_variant"],
+            "fractal_breakout_ema200",
+        )
 
     def test_strategy_intraday_endpoint_missing_ticker(self):
         res = self.client.post(
