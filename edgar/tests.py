@@ -318,6 +318,54 @@ class DrfApiTests(TestCase):
         )
         self.assertEqual(res.status_code, 400)
 
+    @patch("edgar.services.manipulation_strategy.run_manipulation_backtest")
+    def test_strategy_intraday_endpoint_manipulation_variant(self, mock_manipulation):
+        mock_manipulation.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "60m",
+            "strategy_variant": "manipulation_ifvg",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10400,
+            "total_return_pct": 4.0,
+            "total_trades": 6,
+            "long_trades": 3,
+            "short_trades": 3,
+            "winning_trades": 4,
+            "losing_trades": 2,
+            "win_rate": 66.7,
+            "max_drawdown_pct": 3.2,
+            "profit_factor": 1.8,
+            "cagr_pct": 2.1,
+            "avg_trade_return_pct": 0.5,
+            "exposure_pct": 8.4,
+            "total_fees": 8.1,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "60m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "manipulation_ifvg",
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "AAPL")
+        self.assertEqual(payload["interval"], "60m")
+        self.assertEqual(payload["strategy_variant"], "manipulation_ifvg")
+        mock_manipulation.assert_called_once()
+        self.assertEqual(mock_manipulation.call_args.kwargs["lookback_years"], 2.0)
+
 
 class StrategySerializationTests(TestCase):
     def test_backtest_payload_uses_volume_fields_not_buffett_fields(self):

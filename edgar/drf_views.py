@@ -556,6 +556,7 @@ class StrategyViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="backtest-intraday")
     def backtest_intraday(self, request):
         from edgar.services.intraday_strategy import run_intraday_backtest
+        from edgar.services.manipulation_strategy import run_manipulation_backtest
 
         def _as_bool(value, default=True):
             if value is None:
@@ -577,22 +578,54 @@ class StrategyViewSet(viewsets.ViewSet):
         allow_longs = _as_bool(request.data.get("allow_longs"), True)
 
         try:
-            payload = run_intraday_backtest(
-                ticker=ticker,
-                initial_capital=capital,
-                interval=interval,
-                lookback_years=lookback_years,
-                strategy_variant=strategy_variant,
-                allow_longs=allow_longs,
-                allow_shorts=allow_shorts,
-                use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
-                min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
-                oversold=float(request.data.get("oversold", 20.0)),
-                overbought=float(request.data.get("overbought", 80.0)),
-                fractal_window=int(request.data.get("fractal_window", 9)),
-                rr_multiple=float(request.data.get("rr_multiple", 1.5)),
-                breakout_buffer_bps=float(request.data.get("breakout_buffer_bps", 0.0)),
-            )
+            if strategy_variant == "manipulation_ifvg":
+                payload = run_manipulation_backtest(
+                    ticker=ticker,
+                    initial_capital=capital,
+                    interval=interval,
+                    lookback_years=lookback_years,
+                    allow_longs=allow_longs,
+                    allow_shorts=allow_shorts,
+                    pivot_window=int(request.data.get("pivot_window", 3)),
+                    liquidity_search_window=int(request.data.get("liquidity_search_window", 240)),
+                    manipulation_max_age_bars=int(request.data.get("manipulation_max_age_bars", 14)),
+                    ifvg_proximity_bars=int(request.data.get("ifvg_proximity_bars", 16)),
+                    sweep_buffer_bps=float(request.data.get("sweep_buffer_bps", 0.0)),
+                    recovery_buffer_bps=float(request.data.get("recovery_buffer_bps", 0.0)),
+                    ifvg_break_buffer_bps=float(
+                        request.data.get(
+                            "ifvg_break_buffer_bps",
+                            request.data.get("breakout_buffer_bps", 0.0),
+                        )
+                    ),
+                    stop_buffer_bps=float(request.data.get("stop_buffer_bps", 3.0)),
+                    rr_multiple=float(request.data.get("rr_multiple", 2.0)),
+                    volume_period=int(request.data.get("volume_period", 40)),
+                    use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
+                    min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                    base_risk_pct=float(request.data.get("base_risk_pct", 0.01)),
+                    max_risk_pct=float(request.data.get("max_risk_pct", 0.02)),
+                    max_position_pct=float(request.data.get("max_position_pct", 0.30)),
+                    slippage_bps=float(request.data.get("slippage_bps", 4.0)),
+                    commission_bps=float(request.data.get("commission_bps", 1.0)),
+                )
+            else:
+                payload = run_intraday_backtest(
+                    ticker=ticker,
+                    initial_capital=capital,
+                    interval=interval,
+                    lookback_years=lookback_years,
+                    strategy_variant=strategy_variant,
+                    allow_longs=allow_longs,
+                    allow_shorts=allow_shorts,
+                    use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
+                    min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                    oversold=float(request.data.get("oversold", 20.0)),
+                    overbought=float(request.data.get("overbought", 80.0)),
+                    fractal_window=int(request.data.get("fractal_window", 9)),
+                    rr_multiple=float(request.data.get("rr_multiple", 1.5)),
+                    breakout_buffer_bps=float(request.data.get("breakout_buffer_bps", 0.0)),
+                )
             return Response(payload)
         except Exception as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)

@@ -200,8 +200,8 @@
   <!-- ===== TAB 4: STRATEGY ===== -->
   <div id="tab-strategy" class="tab-panel">
     <div class="card" style="max-width:600px;margin-bottom:16px">
-      <h2>Price + Momentum + Volume Strategy</h2>
-      <p class="muted">Uses 50/200 SMA regime, Stochastic RSI timing, ATR-based risk management, and relative volume for trend confirmation and position sizing.</p>
+      <h2>Strategy Backtests</h2>
+      <p class="muted">Run daily or intraday variants, including EMA/fractal momentum models and manipulation + inverse FVG price-action setup.</p>
       <div class="row">
         <input id="stratTicker" placeholder="Ticker (e.g. AOS)" style="width:120px" value="AOS">
         <label class="muted">Capital $</label>
@@ -220,6 +220,7 @@
         <select id="stratIntradayVariant">
           <option value="fractal_breakout_ema200" selected>EMA200 fractal breakout</option>
           <option value="alligator_stoch_fractal">Alligator + Stoch fractal</option>
+          <option value="manipulation_ifvg">Manipulation + inverse FVG</option>
         </select>
         <label class="muted">Intraday interval</label>
         <select id="stratIntradayInterval">
@@ -413,8 +414,38 @@ async function runStrategy(){
   try{
     const isIntraday=mode==="intraday_custom";
     const endpoint=isIntraday?`${API}/strategy/backtest-intraday/`:`${API}/strategy/backtest/`;
+    const intradayBody=intradayVariant==="manipulation_ifvg"
+      ? {
+          ticker:tk,
+          initial_capital:capital,
+          interval:intradayInterval,
+          lookback_years:intradayYears,
+          strategy_variant:intradayVariant,
+          allow_shorts:allowShorts,
+          allow_longs:true,
+          rr_multiple:2.0,
+          pivot_window:3,
+          liquidity_search_window:240,
+          manipulation_max_age_bars:14,
+          ifvg_proximity_bars:16,
+          ifvg_break_buffer_bps:fractalBreakout?5:0,
+          use_volume_filter:false,
+          min_rel_volume:1.0
+        }
+      : {
+          ticker:tk,
+          initial_capital:capital,
+          interval:intradayInterval,
+          lookback_years:intradayYears,
+          strategy_variant:intradayVariant,
+          fractal_window:9,
+          rr_multiple:1.5,
+          breakout_buffer_bps:fractalBreakout?5:0,
+          allow_shorts:allowShorts,
+          allow_longs:true
+        };
     const body=isIntraday
-      ? {ticker:tk,initial_capital:capital,interval:intradayInterval,lookback_years:intradayYears,strategy_variant:intradayVariant,fractal_window:9,rr_multiple:1.5,breakout_buffer_bps:fractalBreakout?5:0,allow_shorts:allowShorts,allow_longs:true}
+      ? intradayBody
       : {ticker:tk,initial_capital:capital,fetch_period:period,force_fetch:force,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true};
     const d=await fetchJson(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     document.getElementById("stratResults").style.display="";
