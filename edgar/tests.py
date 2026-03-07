@@ -366,6 +366,54 @@ class DrfApiTests(TestCase):
         mock_manipulation.assert_called_once()
         self.assertEqual(mock_manipulation.call_args.kwargs["lookback_years"], 2.0)
 
+    @patch("edgar.services.market_mechanics_strategy.run_market_mechanics_backtest")
+    def test_strategy_intraday_endpoint_price_action_variant(self, mock_market_mechanics):
+        mock_market_mechanics.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "60m",
+            "strategy_variant": "price_action_3step",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10325,
+            "total_return_pct": 3.25,
+            "total_trades": 5,
+            "long_trades": 3,
+            "short_trades": 2,
+            "winning_trades": 3,
+            "losing_trades": 2,
+            "win_rate": 60.0,
+            "max_drawdown_pct": 2.8,
+            "profit_factor": 1.7,
+            "cagr_pct": 1.8,
+            "avg_trade_return_pct": 0.6,
+            "exposure_pct": 7.5,
+            "total_fees": 6.2,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "60m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "price_action_3step",
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "AAPL")
+        self.assertEqual(payload["interval"], "60m")
+        self.assertEqual(payload["strategy_variant"], "price_action_3step")
+        mock_market_mechanics.assert_called_once()
+        self.assertEqual(mock_market_mechanics.call_args.kwargs["lookback_years"], 2.0)
+
 
 class StrategySerializationTests(TestCase):
     def test_backtest_payload_uses_volume_fields_not_buffett_fields(self):

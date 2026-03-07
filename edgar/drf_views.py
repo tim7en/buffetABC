@@ -556,6 +556,7 @@ class StrategyViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"], url_path="backtest-intraday")
     def backtest_intraday(self, request):
         from edgar.services.intraday_strategy import run_intraday_backtest
+        from edgar.services.market_mechanics_strategy import run_market_mechanics_backtest
         from edgar.services.manipulation_strategy import run_manipulation_backtest
 
         def _as_bool(value, default=True):
@@ -578,7 +579,33 @@ class StrategyViewSet(viewsets.ViewSet):
         allow_longs = _as_bool(request.data.get("allow_longs"), True)
 
         try:
-            if strategy_variant == "manipulation_ifvg":
+            if strategy_variant == "price_action_3step":
+                payload = run_market_mechanics_backtest(
+                    ticker=ticker,
+                    initial_capital=capital,
+                    interval=interval,
+                    lookback_years=lookback_years,
+                    allow_longs=allow_longs,
+                    allow_shorts=allow_shorts,
+                    rr_multiple=float(request.data.get("rr_multiple", 3.0)),
+                    direction_pivot_window=int(request.data.get("direction_pivot_window", 3)),
+                    location_pivot_window=int(request.data.get("location_pivot_window", 2)),
+                    direction_search_window=int(request.data.get("direction_search_window", 320)),
+                    location_search_window=int(request.data.get("location_search_window", 220)),
+                    zone_expiry_bars=int(request.data.get("zone_expiry_bars", 10)),
+                    failure_lookback_bars=int(request.data.get("failure_lookback_bars", 6)),
+                    bos_buffer_bps=float(request.data.get("bos_buffer_bps", 0.0)),
+                    break_buffer_bps=float(request.data.get("break_buffer_bps", 0.0)),
+                    stop_buffer_bps=float(request.data.get("stop_buffer_bps", 5.0)),
+                    volume_period=int(request.data.get("volume_period", 40)),
+                    use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
+                    min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                    base_risk_pct=float(request.data.get("base_risk_pct", 0.01)),
+                    max_position_pct=float(request.data.get("max_position_pct", 0.30)),
+                    slippage_bps=float(request.data.get("slippage_bps", 4.0)),
+                    commission_bps=float(request.data.get("commission_bps", 1.0)),
+                )
+            elif strategy_variant == "manipulation_ifvg":
                 payload = run_manipulation_backtest(
                     ticker=ticker,
                     initial_capital=capital,

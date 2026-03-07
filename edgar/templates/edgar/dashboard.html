@@ -201,7 +201,7 @@
   <div id="tab-strategy" class="tab-panel">
     <div class="card" style="max-width:600px;margin-bottom:16px">
       <h2>Strategy Backtests</h2>
-      <p class="muted">Run daily or intraday variants, including EMA/fractal momentum models and manipulation + inverse FVG price-action setup.</p>
+      <p class="muted">Run daily or intraday variants, including EMA/fractal momentum, manipulation + inverse FVG, and 3-step price action (direction/location/execution).</p>
       <div class="row">
         <input id="stratTicker" placeholder="Ticker (e.g. AOS)" style="width:120px" value="AOS">
         <label class="muted">Capital $</label>
@@ -220,6 +220,7 @@
         <select id="stratIntradayVariant">
           <option value="fractal_breakout_ema200" selected>EMA200 fractal breakout</option>
           <option value="alligator_stoch_fractal">Alligator + Stoch fractal</option>
+          <option value="price_action_3step">3-step price action</option>
           <option value="manipulation_ifvg">Manipulation + inverse FVG</option>
         </select>
         <label class="muted">Intraday interval</label>
@@ -429,6 +430,27 @@ async function runStrategy(){
           manipulation_max_age_bars:14,
           ifvg_proximity_bars:16,
           ifvg_break_buffer_bps:fractalBreakout?5:0,
+          use_volume_filter:false,
+          min_rel_volume:1.0
+        }
+      : intradayVariant==="price_action_3step"
+      ? {
+          ticker:tk,
+          initial_capital:capital,
+          interval:intradayInterval,
+          lookback_years:intradayYears,
+          strategy_variant:intradayVariant,
+          allow_shorts:allowShorts,
+          allow_longs:true,
+          rr_multiple:3.0,
+          direction_pivot_window:3,
+          location_pivot_window:2,
+          direction_search_window:320,
+          location_search_window:220,
+          zone_expiry_bars:10,
+          failure_lookback_bars:6,
+          break_buffer_bps:fractalBreakout?5:0,
+          stop_buffer_bps:5.0,
           use_volume_filter:false,
           min_rel_volume:1.0
         }
