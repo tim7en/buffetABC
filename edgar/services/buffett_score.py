@@ -41,7 +41,19 @@ WEIGHTS = {
 
 
 def _get_annual_metric_series(company: EdgarCompany, mapping: dict, metric_key: str) -> list[tuple[int, float]]:
-    """Return sorted list of (fiscal_year, value) for a mapped metric (annual only)."""
+    """Return sorted list of (calendar_year, value) for a mapped metric.
+
+    SEC XBRL 10-K filings contain both quarterly sub-period values and the
+    annual total, all labelled fp=FY. At the fiscal year-end date (e.g.
+    2020-12-31) there are typically two values: the Q4 quarter (~$800M) and
+    the full-year total (~$3B).
+
+    Strategy: group by end_date. At each end_date, when multiple values
+    exist, the annual total is the largest absolute value. We only keep
+    end_dates that fall at a year boundary (month 12 for Dec fiscal year-end
+    companies, or the latest end_date per calendar year). This gives one
+    clean annual data point per year.
+    """
     info = mapping.get(metric_key)
     if not info:
         return []
@@ -54,14 +66,32 @@ def _get_annual_metric_series(company: EdgarCompany, mapping: dict, metric_key: 
             form__in=["10-K", "20-F", "40-F"],
         )
         .order_by("end_date")
-        .values_list("fiscal_year", "value", "end_date")
+        .values_list("end_date", "value", "fiscal_year")
     )
 
+    # Collect candidates: at each end_date there may be multiple values
+    # (Q4 quarterly vs full-year total). The annual total has the largest
+    # absolute magnitude.  We only keep points where end_date falls at the
+    # fiscal year end (end_date.year matches the calendar year of the data).
+    from collections import defaultdict as _dd
+
+    # Group: (end_date_year) -> list of (end_date, |value|, value, fiscal_year)
+    by_ed_year: dict[int, list[tuple[str, float, float, int | None]]] = _dd(list)
+    for end_date, val, fy in points:
+        if val is None or end_date is None:
+            continue
+        by_ed_year[end_date.year].append(
+            (end_date.isoformat(), abs(val), val, fy)
+        )
+
     by_year: dict[int, float] = {}
-    for fy, val, end_date in points:
-        year = fy or (end_date.year if end_date else None)
-        if year and val is not None:
-            by_year[year] = val
+    for ed_year, entries in by_ed_year.items():
+        # Sort: latest end_date first, then largest |value| first.
+        # The annual total at the fiscal year-end date is what we want.
+        entries.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        best = entries[0]
+        year = ed_year  # use end_date's year as the canonical year
+        by_year[year] = best[2]
 
     return sorted(by_year.items())
 
@@ -155,18 +185,27 @@ def _score_earnings_growth(series_net_income: list) -> tuple[float | None, float
 
 
 def _score_fcf(series_ocf: list, series_capex: list) -> tuple[float | None, float]:
-    """Score free cash flow consistency. Positive FCF in most years = good."""
+    """Score free cash flow consistency. Positive FCF in most years = good.
+
+    When capex data is unavailable, falls back to operating cash flow as a
+    proxy (OCF > 0 is still a strong Buffett signal).
+    """
     ocf_dict = dict(series_ocf)
     capex_dict = dict(series_capex)
-    common = sorted(set(ocf_dict) & set(capex_dict))
+
+    if capex_dict:
+        common = sorted(set(ocf_dict) & set(capex_dict))
+    else:
+        # Fallback: use OCF alone (treat capex as 0)
+        common = sorted(ocf_dict.keys())
 
     if not common:
         return None, 0
 
     fcfs = []
     for y in common:
-        ocf = ocf_dict[y] or 0
-        capex = abs(capex_dict[y] or 0)
+        ocf = ocf_dict.get(y) or 0
+        capex = abs(capex_dict.get(y) or 0)
         fcfs.append(ocf - capex)
 
     if not fcfs:
@@ -248,14 +287,23 @@ def compute_buffett_score(
     latest_price_obj = StockPrice.objects.filter(company=company).order_by("-date").first()
     current_price = latest_price_obj.close if latest_price_obj else None
 
+    # Build FCF series; fall back to OCF if capex unmapped
     ocf_dict = dict(ocf)
     capex_dict = dict(capex)
-    common_years = sorted(set(ocf_dict) & set(capex_dict))
-    fcf_values = [(ocf_dict[y] or 0) - abs(capex_dict[y] or 0) for y in common_years]
+    if capex_dict:
+        fcf_years = sorted(set(ocf_dict) & set(capex_dict))
+    else:
+        fcf_years = sorted(ocf_dict.keys())
+    fcf_values = [(ocf_dict[y] or 0) - abs(capex_dict.get(y) or 0) for y in fcf_years]
+
+    # Get shares outstanding for per-share intrinsic value
+    shares_series = _get_annual_metric_series(company, mapping, "shares_outstanding")
+    shares = dict(shares_series).get(max(dict(shares_series).keys())) if shares_series else None
 
     intrinsic = _estimate_intrinsic_value(
         fcf_values,
         growth_rate=earnings_cagr,
+        shares_outstanding=shares,
     )
     margin_of_safety, val_score = _score_valuation(intrinsic, current_price)
 

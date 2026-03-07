@@ -429,6 +429,8 @@ def run_ingestion(config):
 # ---------------------------------------------------------------------------
 
 class StockPriceViewSet(viewsets.ReadOnlyModelViewSet):
+    authentication_classes = []
+    permission_classes = [AllowAny]
     queryset = StockPrice.objects.select_related("company").all().order_by("-date")
     serializer_class = StockPriceSerializer
 
@@ -464,6 +466,8 @@ class StockPriceViewSet(viewsets.ReadOnlyModelViewSet):
 # ---------------------------------------------------------------------------
 
 class BuffettScoreViewSet(viewsets.ReadOnlyModelViewSet):
+    authentication_classes = []
+    permission_classes = [AllowAny]
     queryset = BuffettScore.objects.select_related("company").all().order_by("-overall_score")
     serializer_class = BuffettScoreSerializer
 

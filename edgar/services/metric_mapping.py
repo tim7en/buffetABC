@@ -27,8 +27,19 @@ STANDARD_METRICS = {
     "equity": ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"],
     "cash": ["CashAndCashEquivalentsAtCarryingValue"],
     "operating_cash_flow": ["NetCashProvidedByUsedInOperatingActivities"],
-    "capex": ["PaymentsToAcquirePropertyPlantAndEquipment"],
+    "capex": [
+        "PaymentsToAcquirePropertyPlantAndEquipment",
+        "CapitalExpendituresIncurredButNotYetPaid",
+        "PaymentsToAcquireProductiveAssets",
+        "CapitalExpenditure",
+    ],
     "free_cash_flow": ["FreeCashFlow"],
+    "shares_outstanding": [
+        "CommonStockSharesOutstanding",
+        "WeightedAverageNumberOfDilutedSharesOutstanding",
+        "WeightedAverageNumberOfShareOutstandingBasicAndDiluted",
+        "EntityCommonStockSharesOutstanding",
+    ],
 }
 
 
