@@ -1,3 +1,4 @@
+from datetime import date
 from io import StringIO
 import json
 from unittest.mock import MagicMock, patch
@@ -10,6 +11,7 @@ from django.test import TestCase
 from edgar import sp500
 from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental, EdgarMetricMapping
 from edgar.services.edgar_client import EdgarClient, RateLimiter
+from edgar.services.strategy import BacktestResult, Trade, backtest_to_dict, _williams_fractals
 
 
 class SP500Tests(TestCase):
@@ -254,3 +256,79 @@ class DrfApiTests(TestCase):
         self.assertIn("revenue", payload["mapping"])
         self.assertIn("net_income", payload["mapping"])
         self.assertTrue(EdgarMetricMapping.objects.filter(company=company).exists())
+
+
+class StrategySerializationTests(TestCase):
+    def test_backtest_payload_uses_volume_fields_not_buffett_fields(self):
+        trade = Trade(
+            direction="long",
+            entry_date=date(2024, 1, 2),
+            entry_price=100.0,
+            stop_loss=95.0,
+            take_profit=110.0,
+            risk_pct=0.01,
+            position_size=1000.0,
+            shares=10.0,
+            exit_date=date(2024, 1, 10),
+            exit_price=108.0,
+            pnl=79.5,
+            exit_reason="take_profit",
+            fees_paid=2.5,
+            entry_rel_volume=1.25,
+            volume_confirmed=True,
+            sizing_tier="standard",
+            signal_quality="B",
+            hold_days=8,
+            stop_source="fractal",
+            fractal_high=112.0,
+            fractal_low=94.0,
+        )
+        result = BacktestResult(
+            ticker="AOS",
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),
+            initial_capital=10_000.0,
+            final_capital=10_750.0,
+            total_return_pct=7.5,
+            total_trades=1,
+            winning_trades=1,
+            losing_trades=0,
+            win_rate=100.0,
+            max_drawdown_pct=2.1,
+            profit_factor=3.2,
+            cagr_pct=7.4,
+            avg_trade_return_pct=7.95,
+            exposure_pct=14.2,
+            total_fees=2.5,
+            long_trades=1,
+            short_trades=0,
+            trades=[trade],
+            equity_curve=[{"date": "2024-01-02", "equity": 10010.0, "capital": 10000.0}],
+        )
+        payload = backtest_to_dict(result)
+        self.assertIn("profit_factor", payload)
+        self.assertIn("cagr_pct", payload)
+        self.assertIn("long_trades", payload)
+        self.assertIn("short_trades", payload)
+        self.assertEqual(len(payload["trades"]), 1)
+        t0 = payload["trades"][0]
+        self.assertIn("entry_rel_volume", t0)
+        self.assertIn("volume_confirmed", t0)
+        self.assertIn("sizing_tier", t0)
+        self.assertIn("signal_quality", t0)
+        self.assertIn("stop_source", t0)
+        self.assertIn("fractal_high", t0)
+        self.assertIn("fractal_low", t0)
+        self.assertNotIn("buffett_direction", t0)
+        self.assertNotIn("confirmation", t0)
+
+
+class StrategyIndicatorTests(TestCase):
+    def test_williams_fractal_detection(self):
+        highs = [10.0, 11.0, 15.0, 12.0, 11.0, 13.0, 12.0]
+        lows = [9.0, 8.0, 7.0, 8.0, 9.0, 8.5, 9.5]
+        frac_hi, frac_lo = _williams_fractals(highs, lows, period=2)
+        self.assertEqual(len(frac_hi), len(highs))
+        self.assertEqual(len(frac_lo), len(lows))
+        self.assertEqual(frac_hi[2], 15.0)
+        self.assertEqual(frac_lo[2], 7.0)

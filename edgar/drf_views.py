@@ -508,6 +508,52 @@ class BuffettScoreViewSet(viewsets.ReadOnlyModelViewSet):
 # Charts / Exploration ViewSet
 # ---------------------------------------------------------------------------
 
+class StrategyViewSet(viewsets.ViewSet):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @action(detail=False, methods=["post"], url_path="backtest")
+    def backtest(self, request):
+        from edgar.services.strategy import backtest_to_dict, run_backtest
+
+        def _as_bool(value, default=True):
+            if value is None:
+                return default
+            if isinstance(value, bool):
+                return value
+            text = str(value).strip().lower()
+            return text not in {"0", "false", "no", "off", ""}
+
+        ticker = (request.data.get("ticker") or "").strip().upper()
+        if not ticker:
+            return Response({"error": "ticker required"}, status=status.HTTP_400_BAD_REQUEST)
+        capital = float(request.data.get("initial_capital", 100))
+        force_fetch = request.data.get("force_fetch", False)
+        fetch_period = request.data.get("fetch_period", "5y")
+        allow_shorts = _as_bool(request.data.get("allow_shorts"), True)
+        allow_longs = _as_bool(request.data.get("allow_longs"), True)
+        require_fractal_confirmation = _as_bool(request.data.get("require_fractal_confirmation"), True)
+        require_fractal_breakout = _as_bool(request.data.get("require_fractal_breakout"), False)
+        lookback_years = int(request.data.get("lookback_years", 5))
+        if isinstance(fetch_period, str) and fetch_period.endswith("y") and fetch_period[:-1].isdigit():
+            lookback_years = int(fetch_period[:-1])
+        try:
+            result = run_backtest(
+                ticker=ticker,
+                initial_capital=capital,
+                allow_longs=allow_longs,
+                allow_shorts=allow_shorts,
+                require_fractal_confirmation=require_fractal_confirmation,
+                require_fractal_breakout=require_fractal_breakout,
+                lookback_years=lookback_years,
+                force_fetch=force_fetch,
+                fetch_period=fetch_period,
+            )
+            return Response(backtest_to_dict(result))
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class ChartsViewSet(viewsets.ViewSet):
     authentication_classes = []
     permission_classes = [AllowAny]

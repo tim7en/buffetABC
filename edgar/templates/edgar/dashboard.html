@@ -60,6 +60,7 @@
     <button class="tab active" data-tab="data">Data Ingestion</button>
     <button class="tab" data-tab="explore">Exploration</button>
     <button class="tab" data-tab="assessment">Assessment</button>
+    <button class="tab" data-tab="strategy">Strategy</button>
   </div>
 
   <!-- ===== TAB 1: DATA INGESTION ===== -->
@@ -195,6 +196,49 @@
       </div>
     </div>
   </div>
+
+  <!-- ===== TAB 4: STRATEGY ===== -->
+  <div id="tab-strategy" class="tab-panel">
+    <div class="card" style="max-width:600px;margin-bottom:16px">
+      <h2>Price + Momentum + Volume Strategy</h2>
+      <p class="muted">Uses 50/200 SMA regime, Stochastic RSI timing, ATR-based risk management, and relative volume for trend confirmation and position sizing.</p>
+      <div class="row">
+        <input id="stratTicker" placeholder="Ticker (e.g. AOS)" style="width:120px" value="AOS">
+        <label class="muted">Capital $</label>
+        <input id="stratCapital" type="number" value="100" style="width:80px">
+        <label class="muted">Period</label>
+        <select id="stratPeriod"><option value="2y">2y</option><option value="5y" selected>5y</option><option value="10y">10y</option><option value="max">max</option></select>
+        <button id="stratRunBtn">Run Backtest</button>
+      </div>
+      <div class="row">
+        <label><input id="stratForceFetch" type="checkbox"> Force re-fetch prices</label>
+        <label><input id="stratUseFractal" type="checkbox" checked> Williams fractal filter</label>
+        <label><input id="stratBreakout" type="checkbox"> Fractal breakout</label>
+        <label><input id="stratAllowShorts" type="checkbox" checked> Allow shorts</label>
+      </div>
+    </div>
+    <div id="stratResults" style="display:none">
+      <div class="grid-2-equal" style="margin-bottom:16px">
+        <div class="card">
+          <h2>Performance Summary</h2>
+          <div class="score-grid" id="stratSummaryGrid"></div>
+        </div>
+        <div class="card">
+          <h2>Equity Curve</h2>
+          <div class="chart-box"><canvas id="chartEquity"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Trade Log</h2>
+        <div style="overflow-x:auto">
+          <table class="top-table" id="stratTradeTable">
+            <thead><tr><th>#</th><th>Dir</th><th>Entry</th><th>Price</th><th>SL</th><th>TP</th><th>Exit</th><th>Exit $</th><th>PnL</th><th>Reason</th><th>RelVol</th><th>Vol</th><th>Sizing</th><th>StopSrc</th><th>FracH</th><th>FracL</th><th>Risk%</th><th>Hold</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -327,6 +371,56 @@ document.getElementById("refreshSec").addEventListener("change",setupAutoRefresh
 document.getElementById("loadTrendBtn").addEventListener("click",loadTrendChart);
 document.getElementById("loadPriceChartBtn").addEventListener("click",loadPriceChart);
 document.getElementById("assessBtn").addEventListener("click",runAssessment);
+
+// ---- Tab 4: Strategy ----
+async function runStrategy(){
+  const tk=document.getElementById("stratTicker").value.trim().toUpperCase();
+  if(!tk)return;
+  const capital=Number(document.getElementById("stratCapital").value||100);
+  const period=document.getElementById("stratPeriod").value;
+  const force=document.getElementById("stratForceFetch").checked;
+  const useFractal=document.getElementById("stratUseFractal").checked;
+  const fractalBreakout=document.getElementById("stratBreakout").checked;
+  const allowShorts=document.getElementById("stratAllowShorts").checked;
+  const btn=document.getElementById("stratRunBtn");
+  btn.disabled=true;btn.textContent="Running...";
+  try{
+    const d=await fetchJson(`${API}/strategy/backtest/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ticker:tk,initial_capital:capital,fetch_period:period,force_fetch:force,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true})});
+    document.getElementById("stratResults").style.display="";
+    const retCls=d.total_return_pct>=0?"var(--green)":"var(--red)";
+    document.getElementById("stratSummaryGrid").innerHTML=`
+      <div class="score-item"><div class="label">Final Capital</div><div class="value">$${d.final_capital.toFixed(2)}</div></div>
+      <div class="score-item"><div class="label">Return</div><div class="value" style="color:${retCls}">${d.total_return_pct.toFixed(1)}%</div></div>
+      <div class="score-item"><div class="label">Trades</div><div class="value">${d.total_trades}</div></div>
+      <div class="score-item"><div class="label">Long / Short</div><div class="value">${d.long_trades??0} / ${d.short_trades??0}</div></div>
+      <div class="score-item"><div class="label">Win Rate</div><div class="value">${d.win_rate.toFixed(1)}%</div></div>
+      <div class="score-item"><div class="label">CAGR</div><div class="value">${(d.cagr_pct??0).toFixed(1)}%</div></div>
+      <div class="score-item"><div class="label">Profit Factor</div><div class="value">${(d.profit_factor??0).toFixed(2)}</div></div>
+      <div class="score-item"><div class="label">Exposure</div><div class="value">${(d.exposure_pct??0).toFixed(1)}%</div></div>
+      <div class="score-item"><div class="label">Avg Trade</div><div class="value">${(d.avg_trade_return_pct??0).toFixed(2)}%</div></div>
+      <div class="score-item"><div class="label">Winners</div><div class="value" style="color:var(--green)">${d.winning_trades}</div></div>
+      <div class="score-item"><div class="label">Losers</div><div class="value" style="color:var(--red)">${d.losing_trades}</div></div>
+      <div class="score-item"><div class="label">Max Drawdown</div><div class="value" style="color:var(--red)">${d.max_drawdown_pct.toFixed(1)}%</div></div>
+      <div class="score-item"><div class="label">Fees</div><div class="value">$${(d.total_fees??0).toFixed(2)}</div></div>
+      <div class="score-item"><div class="label">Period</div><div class="value" style="font-size:13px">${d.start_date}<br>${d.end_date}</div></div>`;
+
+    // Equity curve chart
+    const eqLabels=(d.equity_curve||[]).filter((_,i)=>i%5===0).map(e=>e.date);
+    const eqVals=(d.equity_curve||[]).filter((_,i)=>i%5===0).map(e=>e.equity);
+    destroyChart("equity");
+    charts.equity=new Chart(document.getElementById("chartEquity"),{type:"line",data:{labels:eqLabels,datasets:[{label:"Equity ($)",data:eqVals,borderColor:"#0f766e",backgroundColor:"rgba(15,118,110,.1)",fill:true,tension:.2,pointRadius:0}]},options:{responsive:true,scales:{x:{ticks:{maxTicksLimit:12}},y:{title:{display:true,text:"$"}}},plugins:{legend:{display:false}}}});
+
+    // Trade log
+    const tb=document.querySelector("#stratTradeTable tbody");tb.innerHTML="";
+    (d.trades||[]).forEach((t,i)=>{
+      const pnlCls=t.pnl>=0?"var(--green)":"var(--red)";
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td>${i+1}</td><td><b style="color:${t.direction==="long"?"var(--green)":"var(--red)"}">${t.direction.toUpperCase()}</b></td><td>${t.entry_date}</td><td>$${t.entry_price.toFixed(2)}</td><td>$${t.stop_loss.toFixed(2)}</td><td>$${t.take_profit.toFixed(2)}</td><td>${t.exit_date||"-"}</td><td>${t.exit_price!=null?"$"+t.exit_price.toFixed(2):"-"}</td><td style="color:${pnlCls};font-weight:600">$${t.pnl.toFixed(4)}</td><td>${t.exit_reason}</td><td>${(t.entry_rel_volume??0).toFixed(2)}x</td><td>${t.volume_confirmed?"yes":"no"}</td><td>${t.sizing_tier||"-"}</td><td>${t.stop_source||"-"}</td><td>${t.fractal_high!=null?"$"+Number(t.fractal_high).toFixed(2):"-"}</td><td>${t.fractal_low!=null?"$"+Number(t.fractal_low).toFixed(2):"-"}</td><td>${((t.risk_pct??0)*100).toFixed(2)}%</td><td>${t.hold_days??0}d</td>`;
+      tb.appendChild(tr);
+    });
+  }catch(e){log("Strategy backtest failed: "+String(e))}finally{btn.disabled=false;btn.textContent="Run Backtest"}
+}
+document.getElementById("stratRunBtn").addEventListener("click",runStrategy);
 
 loadCompanies();
 </script>
