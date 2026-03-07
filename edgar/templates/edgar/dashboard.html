@@ -206,9 +206,25 @@
         <input id="stratTicker" placeholder="Ticker (e.g. AOS)" style="width:120px" value="AOS">
         <label class="muted">Capital $</label>
         <input id="stratCapital" type="number" value="100" style="width:80px">
+        <label class="muted">Mode</label>
+        <select id="stratMode">
+          <option value="daily" selected>daily</option>
+          <option value="intraday_15m_2y">15m / 2y</option>
+        </select>
         <label class="muted">Period</label>
         <select id="stratPeriod"><option value="2y">2y</option><option value="5y" selected>5y</option><option value="10y">10y</option><option value="max">max</option></select>
         <button id="stratRunBtn">Run Backtest</button>
+      </div>
+      <div class="row">
+        <label class="muted">Intraday interval</label>
+        <select id="stratIntradayInterval">
+          <option value="15m" selected>15m</option>
+          <option value="30m">30m</option>
+          <option value="60m">60m</option>
+          <option value="90m">90m</option>
+        </select>
+        <label class="muted">Lookback years</label>
+        <input id="stratIntradayYears" type="number" min="0.05" step="0.05" value="2" style="width:90px">
       </div>
       <div class="row">
         <label><input id="stratForceFetch" type="checkbox"> Force re-fetch prices</label>
@@ -377,7 +393,10 @@ async function runStrategy(){
   const tk=document.getElementById("stratTicker").value.trim().toUpperCase();
   if(!tk)return;
   const capital=Number(document.getElementById("stratCapital").value||100);
+  const mode=document.getElementById("stratMode").value;
   const period=document.getElementById("stratPeriod").value;
+  const intradayInterval=document.getElementById("stratIntradayInterval").value;
+  const intradayYears=Number(document.getElementById("stratIntradayYears").value||2);
   const force=document.getElementById("stratForceFetch").checked;
   const useFractal=document.getElementById("stratUseFractal").checked;
   const fractalBreakout=document.getElementById("stratBreakout").checked;
@@ -385,10 +404,16 @@ async function runStrategy(){
   const btn=document.getElementById("stratRunBtn");
   btn.disabled=true;btn.textContent="Running...";
   try{
-    const d=await fetchJson(`${API}/strategy/backtest/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ticker:tk,initial_capital:capital,fetch_period:period,force_fetch:force,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true})});
+    const isIntraday=mode==="intraday_15m_2y";
+    const endpoint=isIntraday?`${API}/strategy/backtest-intraday/`:`${API}/strategy/backtest/`;
+    const body=isIntraday
+      ? {ticker:tk,initial_capital:capital,interval:intradayInterval,lookback_years:intradayYears,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true}
+      : {ticker:tk,initial_capital:capital,fetch_period:period,force_fetch:force,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true};
+    const d=await fetchJson(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     document.getElementById("stratResults").style.display="";
     const retCls=d.total_return_pct>=0?"var(--green)":"var(--red)";
     document.getElementById("stratSummaryGrid").innerHTML=`
+      <div class="score-item"><div class="label">Mode</div><div class="value" style="font-size:13px">${d.data_mode||"daily"}${d.interval?` ${d.interval}`:""}</div></div>
       <div class="score-item"><div class="label">Final Capital</div><div class="value">$${d.final_capital.toFixed(2)}</div></div>
       <div class="score-item"><div class="label">Return</div><div class="value" style="color:${retCls}">${d.total_return_pct.toFixed(1)}%</div></div>
       <div class="score-item"><div class="label">Trades</div><div class="value">${d.total_trades}</div></div>

@@ -553,6 +553,45 @@ class StrategyViewSet(viewsets.ViewSet):
         except Exception as exc:
             return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @action(detail=False, methods=["post"], url_path="backtest-intraday")
+    def backtest_intraday(self, request):
+        from edgar.services.intraday_strategy import run_intraday_backtest
+
+        def _as_bool(value, default=True):
+            if value is None:
+                return default
+            if isinstance(value, bool):
+                return value
+            text = str(value).strip().lower()
+            return text not in {"0", "false", "no", "off", ""}
+
+        ticker = (request.data.get("ticker") or "").strip().upper()
+        if not ticker:
+            return Response({"error": "ticker required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        capital = float(request.data.get("initial_capital", 10_000))
+        interval = (request.data.get("interval") or "15m").strip()
+        lookback_years = float(request.data.get("lookback_years", 2))
+        allow_shorts = _as_bool(request.data.get("allow_shorts"), True)
+        allow_longs = _as_bool(request.data.get("allow_longs"), True)
+        require_fractal_confirmation = _as_bool(request.data.get("require_fractal_confirmation"), True)
+        require_fractal_breakout = _as_bool(request.data.get("require_fractal_breakout"), False)
+
+        try:
+            payload = run_intraday_backtest(
+                ticker=ticker,
+                initial_capital=capital,
+                interval=interval,
+                lookback_years=lookback_years,
+                allow_longs=allow_longs,
+                allow_shorts=allow_shorts,
+                require_fractal_confirmation=require_fractal_confirmation,
+                require_fractal_breakout=require_fractal_breakout,
+            )
+            return Response(payload)
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class ChartsViewSet(viewsets.ViewSet):
     authentication_classes = []

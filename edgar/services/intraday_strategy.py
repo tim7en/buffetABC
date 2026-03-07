@@ -41,6 +41,17 @@ def _chunk_days_for_interval(interval: str) -> int:
     return 365
 
 
+def _max_lookback_days_for_interval(interval: str) -> int | None:
+    # yfinance/yahoo practical limits for intraday intervals.
+    if interval == "1m":
+        return 7
+    if interval in {"2m", "5m", "15m", "30m"}:
+        return 60
+    if interval in {"60m", "90m"}:
+        return 730
+    return None
+
+
 def _fetch_intraday_bars(
     ticker: str,
     interval: str,
@@ -55,6 +66,9 @@ def _fetch_intraday_bars(
 
     lookback_days = max(int(365.25 * lookback_years), 30)
     total_days = lookback_days + max(warmup_days, 30)
+    max_days = _max_lookback_days_for_interval(interval)
+    if max_days is not None:
+        total_days = min(total_days, max_days)
     end_dt = datetime.now(timezone.utc)
     start_dt = end_dt - timedelta(days=total_days)
 
@@ -176,6 +190,14 @@ def run_intraday_backtest(
         raise ValueError("At least one of allow_longs / allow_shorts must be true")
     if fractal_period < 1:
         raise ValueError("fractal_period must be >= 1")
+    lookback_days = max(int(365.25 * lookback_years), 1)
+    max_days = _max_lookback_days_for_interval(interval)
+    if max_days is not None and lookback_days > max_days:
+        raise ValueError(
+            f"Yahoo Finance limit for interval={interval} is about {max_days} days. "
+            f"Requested {lookback_days} days (~{lookback_years}y). "
+            "Use a shorter window, or use interval=60m for multi-year runs."
+        )
 
     bars_per_day = max(_bars_per_day(interval), 1)
     warmup_days = max(int(sma_slow_period / bars_per_day) + 20, 60)

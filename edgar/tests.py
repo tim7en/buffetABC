@@ -257,6 +257,61 @@ class DrfApiTests(TestCase):
         self.assertIn("net_income", payload["mapping"])
         self.assertTrue(EdgarMetricMapping.objects.filter(company=company).exists())
 
+    @patch("edgar.services.intraday_strategy.run_intraday_backtest")
+    def test_strategy_intraday_endpoint(self, mock_intraday):
+        mock_intraday.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "15m",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10100,
+            "total_return_pct": 1.0,
+            "total_trades": 2,
+            "long_trades": 1,
+            "short_trades": 1,
+            "winning_trades": 1,
+            "losing_trades": 1,
+            "win_rate": 50.0,
+            "max_drawdown_pct": 2.0,
+            "profit_factor": 1.2,
+            "cagr_pct": 0.5,
+            "avg_trade_return_pct": 0.2,
+            "exposure_pct": 10.0,
+            "total_fees": 3.5,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "15m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "require_fractal_confirmation": True,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["data_mode"], "intraday")
+        self.assertEqual(payload["interval"], "15m")
+        self.assertEqual(payload["ticker"], "AAPL")
+        self.assertIn("total_trades", payload)
+        mock_intraday.assert_called_once()
+
+    def test_strategy_intraday_endpoint_missing_ticker(self):
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps({"interval": "15m", "lookback_years": 2}),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 400)
+
 
 class StrategySerializationTests(TestCase):
     def test_backtest_payload_uses_volume_fields_not_buffett_fields(self):
