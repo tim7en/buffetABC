@@ -1,3 +1,4 @@
 Django>=6.0
 requests
 djangorestframework>=3.15
+yfinance>=0.2

@@ -5,6 +5,8 @@ class EdgarCompany(models.Model):
     ticker = models.CharField(max_length=16, unique=True, db_index=True)
     name = models.CharField(max_length=255, blank=True)
     cik = models.CharField(max_length=10, db_index=True)
+    sector = models.CharField(max_length=128, blank=True, db_index=True)
+    sub_industry = models.CharField(max_length=128, blank=True)
     is_sp500 = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -145,3 +147,63 @@ class EdgarMetricMapping(models.Model):
 
     def __str__(self) -> str:
         return f"{self.company.ticker}:{self.metric_key}->{self.taxonomy}:{self.tag}"
+
+
+class StockPrice(models.Model):
+    company = models.ForeignKey(
+        EdgarCompany,
+        on_delete=models.CASCADE,
+        related_name="prices",
+    )
+    date = models.DateField(db_index=True)
+    open = models.FloatField(null=True, blank=True)
+    high = models.FloatField(null=True, blank=True)
+    low = models.FloatField(null=True, blank=True)
+    close = models.FloatField()
+    volume = models.BigIntegerField(null=True, blank=True)
+    market_cap = models.FloatField(null=True, blank=True)
+    fetched_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-date"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["company", "date"],
+                name="unique_stock_price_per_day",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.company.ticker} {self.date} close={self.close}"
+
+
+class BuffettScore(models.Model):
+    company = models.ForeignKey(
+        EdgarCompany,
+        on_delete=models.CASCADE,
+        related_name="buffett_scores",
+    )
+    computed_at = models.DateTimeField(auto_now=True)
+    overall_score = models.FloatField()
+    roe_avg = models.FloatField(null=True, blank=True)
+    roe_score = models.FloatField(default=0)
+    debt_to_equity = models.FloatField(null=True, blank=True)
+    debt_score = models.FloatField(default=0)
+    margin_avg = models.FloatField(null=True, blank=True)
+    margin_score = models.FloatField(default=0)
+    earnings_growth = models.FloatField(null=True, blank=True)
+    earnings_growth_score = models.FloatField(default=0)
+    fcf_avg = models.FloatField(null=True, blank=True)
+    fcf_score = models.FloatField(default=0)
+    intrinsic_value = models.FloatField(null=True, blank=True)
+    current_price = models.FloatField(null=True, blank=True)
+    margin_of_safety = models.FloatField(null=True, blank=True)
+    valuation_score = models.FloatField(default=0)
+    detail = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ["-computed_at"]
+        get_latest_by = "computed_at"
+
+    def __str__(self) -> str:
+        return f"{self.company.ticker} score={self.overall_score:.1f} @ {self.computed_at}"

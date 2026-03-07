@@ -1,13 +1,20 @@
 from django.contrib import admin
 
-from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental, EdgarMetricMapping
+from edgar.models import (
+    BuffettScore,
+    EdgarCompany,
+    EdgarDocument,
+    EdgarFundamental,
+    EdgarMetricMapping,
+    StockPrice,
+)
 
 
 @admin.register(EdgarCompany)
 class EdgarCompanyAdmin(admin.ModelAdmin):
-    list_display = ("ticker", "name", "cik", "is_sp500", "updated_at")
-    list_filter = ("is_sp500",)
-    search_fields = ("ticker", "name", "cik")
+    list_display = ("ticker", "name", "cik", "sector", "is_sp500", "updated_at")
+    list_filter = ("is_sp500", "sector")
+    search_fields = ("ticker", "name", "cik", "sector")
 
 
 @admin.register(EdgarDocument)
@@ -46,3 +53,21 @@ class EdgarMetricMappingAdmin(admin.ModelAdmin):
     list_display = ("company", "metric_key", "taxonomy", "tag", "source", "confidence", "updated_at")
     list_filter = ("source", "taxonomy")
     search_fields = ("company__ticker", "metric_key", "tag")
+
+
+@admin.register(StockPrice)
+class StockPriceAdmin(admin.ModelAdmin):
+    list_display = ("company", "date", "close", "volume", "fetched_at")
+    list_filter = ("date",)
+    search_fields = ("company__ticker",)
+
+
+@admin.register(BuffettScore)
+class BuffettScoreAdmin(admin.ModelAdmin):
+    list_display = (
+        "company", "overall_score", "roe_score", "debt_score",
+        "margin_score", "earnings_growth_score", "fcf_score",
+        "valuation_score", "computed_at",
+    )
+    list_filter = ("computed_at",)
+    search_fields = ("company__ticker", "company__name")

@@ -51,6 +51,7 @@ def company_universe(request):
             "ticker": r.get("Symbol", "").upper(),
             "name": r.get("Security", ""),
             "cik": str(r.get("CIK", "")),
+            "sector": r.get("GICS Sector", ""),
             "persisted": r.get("Symbol", "").upper() in existing,
             "company_id": existing.get(r.get("Symbol", "").upper()),
         }

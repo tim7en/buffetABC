@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental
+from edgar.models import BuffettScore, EdgarCompany, EdgarDocument, EdgarFundamental, StockPrice
 
 
 class EdgarDocumentSerializer(serializers.ModelSerializer):
@@ -34,6 +34,8 @@ class EdgarCompanySerializer(serializers.ModelSerializer):
             "ticker",
             "name",
             "cik",
+            "sector",
+            "sub_industry",
             "is_sp500",
             "created_at",
             "updated_at",
@@ -110,4 +112,28 @@ class EdgarFundamentalSerializer(serializers.ModelSerializer):
             "frame",
             "source_document",
             "updated_at",
+        ]
+
+
+class StockPriceSerializer(serializers.ModelSerializer):
+    ticker = serializers.CharField(source="company.ticker", read_only=True)
+
+    class Meta:
+        model = StockPrice
+        fields = ["id", "ticker", "date", "open", "high", "low", "close", "volume", "market_cap", "fetched_at"]
+
+
+class BuffettScoreSerializer(serializers.ModelSerializer):
+    ticker = serializers.CharField(source="company.ticker", read_only=True)
+    name = serializers.CharField(source="company.name", read_only=True)
+    sector = serializers.CharField(source="company.sector", read_only=True)
+
+    class Meta:
+        model = BuffettScore
+        fields = [
+            "id", "ticker", "name", "sector", "computed_at", "overall_score",
+            "roe_avg", "roe_score", "debt_to_equity", "debt_score",
+            "margin_avg", "margin_score", "earnings_growth", "earnings_growth_score",
+            "fcf_avg", "fcf_score", "intrinsic_value", "current_price",
+            "margin_of_safety", "valuation_score", "detail",
         ]

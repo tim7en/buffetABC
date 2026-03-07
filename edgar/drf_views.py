@@ -7,12 +7,14 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
 from edgar import sp500
-from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental
+from edgar.models import BuffettScore, EdgarCompany, EdgarDocument, EdgarFundamental, StockPrice
 from edgar.serializers import (
+    BuffettScoreSerializer,
     EdgarCompanySerializer,
     EdgarDocumentSerializer,
     EdgarFundamentalSerializer,
     IngestionRequestSerializer,
+    StockPriceSerializer,
 )
 from edgar.services.fundamentals import (
     save_fundamentals_from_concept,
@@ -26,18 +28,22 @@ def _row_for_symbol(symbol: str):
     row = sp500.by_symbol(symbol)
     if row:
         return row
-    return {"Symbol": symbol.upper(), "CIK": "", "Security": ""}
+    return {"Symbol": symbol.upper(), "CIK": "", "Security": "", "GICS Sector": "", "GICS Sub-Industry": ""}
 
 
 def _upsert_company(row):
     ticker = (row.get("Symbol") or "").upper()
     cik = str(row.get("CIK") or row.get("cik") or "").zfill(10)
     name = row.get("Security") or row.get("Name") or ""
+    sector = row.get("GICS Sector") or row.get("sector") or ""
+    sub_industry = row.get("GICS Sub-Industry") or row.get("sub_industry") or ""
     company, _ = EdgarCompany.objects.update_or_create(
         ticker=ticker,
         defaults={
             "cik": cik or "0000000000",
             "name": name,
+            "sector": sector,
+            "sub_industry": sub_industry,
             "is_sp500": bool(sp500.by_symbol(ticker)),
         },
     )
@@ -416,3 +422,136 @@ def run_ingestion(config):
         "fundamentals_saved": fundamentals_saved,
         "results": items,
     }
+
+
+# ---------------------------------------------------------------------------
+# Stock Price ViewSet
+# ---------------------------------------------------------------------------
+
+class StockPriceViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = StockPrice.objects.select_related("company").all().order_by("-date")
+    serializer_class = StockPriceSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        ticker = self.request.query_params.get("ticker", "").strip().upper()
+        if ticker:
+            qs = qs.filter(company__ticker=ticker)
+        return qs
+
+    @action(detail=False, methods=["post"], url_path="refresh")
+    def refresh(self, request):
+        from edgar.services.stock_price import bulk_refresh_prices
+        tickers = request.data.get("tickers")
+        period = request.data.get("period", "1y")
+        results = bulk_refresh_prices(tickers=tickers, period=period)
+        return Response({"refreshed": results})
+
+    @action(detail=False, methods=["get"], url_path="quote")
+    def quote(self, request):
+        from edgar.services.stock_price import fetch_current_quote
+        ticker = request.query_params.get("ticker", "").strip().upper()
+        if not ticker:
+            return Response({"error": "ticker required"}, status=status.HTTP_400_BAD_REQUEST)
+        data = fetch_current_quote(ticker)
+        if data is None:
+            return Response({"error": "failed to fetch quote"}, status=status.HTTP_502_BAD_GATEWAY)
+        return Response(data)
+
+
+# ---------------------------------------------------------------------------
+# Buffett Score ViewSet
+# ---------------------------------------------------------------------------
+
+class BuffettScoreViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = BuffettScore.objects.select_related("company").all().order_by("-overall_score")
+    serializer_class = BuffettScoreSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        ticker = self.request.query_params.get("ticker", "").strip().upper()
+        sector = self.request.query_params.get("sector", "").strip()
+        if ticker:
+            qs = qs.filter(company__ticker=ticker)
+        if sector:
+            qs = qs.filter(company__sector__icontains=sector)
+        return qs
+
+    @action(detail=False, methods=["post"], url_path="compute")
+    def compute(self, request):
+        from edgar.services.buffett_score import bulk_compute_scores
+        tickers = request.data.get("tickers")
+        force = request.data.get("force_refresh", False)
+        results = bulk_compute_scores(tickers=tickers, force_refresh=force)
+        return Response({"scores": results})
+
+    @action(detail=False, methods=["post"], url_path="compute-single")
+    def compute_single(self, request):
+        from edgar.services.buffett_score import compute_buffett_score
+        ticker = (request.data.get("ticker") or "").strip().upper()
+        if not ticker:
+            return Response({"error": "ticker required"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            company = EdgarCompany.objects.get(ticker=ticker)
+        except EdgarCompany.DoesNotExist:
+            return Response({"error": f"company {ticker} not found"}, status=status.HTTP_404_NOT_FOUND)
+        force = request.data.get("force_refresh", False)
+        score = compute_buffett_score(company, force_refresh=force)
+        return Response(BuffettScoreSerializer(score).data)
+
+
+# ---------------------------------------------------------------------------
+# Charts / Exploration ViewSet
+# ---------------------------------------------------------------------------
+
+class ChartsViewSet(viewsets.ViewSet):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    @action(detail=False, methods=["get"], url_path="sector-distribution")
+    def sector_distribution(self, request):
+        from edgar.services.charts import sector_distribution
+        sp500_only = request.query_params.get("sp500_only", "1").strip() != "0"
+        return Response(sector_distribution(sp500_only=sp500_only))
+
+    @action(detail=False, methods=["get"], url_path="score-distribution")
+    def score_distribution(self, request):
+        from edgar.services.charts import score_distribution
+        return Response(score_distribution())
+
+    @action(detail=False, methods=["get"], url_path="sector-scores")
+    def sector_scores(self, request):
+        from edgar.services.charts import sector_score_comparison
+        return Response(sector_score_comparison())
+
+    @action(detail=False, methods=["get"], url_path="metric-trend")
+    def metric_trend(self, request):
+        from edgar.services.charts import metric_trend
+        company_id = request.query_params.get("company_id")
+        metric_key = request.query_params.get("metric", "revenue")
+        if not company_id:
+            return Response({"error": "company_id required"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(metric_trend(int(company_id), metric_key))
+
+    @action(detail=False, methods=["get"], url_path="price-history")
+    def price_history(self, request):
+        from edgar.services.charts import price_history
+        company_id = request.query_params.get("company_id")
+        days = int(request.query_params.get("days", "365"))
+        if not company_id:
+            return Response({"error": "company_id required"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(price_history(int(company_id), period_days=days))
+
+    @action(detail=False, methods=["get"], url_path="score-breakdown")
+    def score_breakdown(self, request):
+        from edgar.services.charts import company_score_breakdown
+        company_id = request.query_params.get("company_id")
+        if not company_id:
+            return Response({"error": "company_id required"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(company_score_breakdown(int(company_id)))
+
+    @action(detail=False, methods=["get"], url_path="top-scores")
+    def top_scores(self, request):
+        from edgar.services.charts import top_scored_companies
+        limit = int(request.query_params.get("limit", "20"))
+        return Response(top_scored_companies(limit=limit))
