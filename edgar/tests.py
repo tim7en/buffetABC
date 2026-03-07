@@ -414,6 +414,79 @@ class DrfApiTests(TestCase):
         mock_market_mechanics.assert_called_once()
         self.assertEqual(mock_market_mechanics.call_args.kwargs["lookback_years"], 2.0)
 
+    @patch("edgar.services.mtf_liquidity_flow_strategy.run_mtf_liquidity_flow_backtest")
+    def test_strategy_intraday_endpoint_mtf_liquidity_flow_variant(self, mock_mtf_flow):
+        mock_mtf_flow.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "60m",
+            "strategy_variant": "mtf_liquidity_flow",
+            "entry_model": "hybrid",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10210,
+            "total_return_pct": 2.1,
+            "total_trades": 4,
+            "long_trades": 1,
+            "short_trades": 3,
+            "winning_trades": 2,
+            "losing_trades": 2,
+            "win_rate": 50.0,
+            "max_drawdown_pct": 1.9,
+            "profit_factor": 1.5,
+            "cagr_pct": 1.2,
+            "avg_trade_return_pct": 0.4,
+            "exposure_pct": 6.1,
+            "total_fees": 5.4,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "60m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "mtf_liquidity_flow",
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "AAPL")
+        self.assertEqual(payload["interval"], "60m")
+        self.assertEqual(payload["strategy_variant"], "mtf_liquidity_flow")
+        mock_mtf_flow.assert_called_once()
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["lookback_years"], 2.0)
+        self.assertTrue(mock_mtf_flow.call_args.kwargs["auto_adjust_for_yf_limits"])
+
+
+class MtfIntervalPolicyTests(TestCase):
+    def test_resolve_effective_interval_auto_adjusts_for_long_lookback(self):
+        from edgar.services.mtf_liquidity_flow_strategy import _resolve_effective_interval
+
+        effective, note = _resolve_effective_interval(
+            requested_interval="5m",
+            lookback_years=2.0,
+            auto_adjust_for_yf_limits=True,
+        )
+        self.assertEqual(effective, "60m")
+        self.assertIn("Adjusted interval", note)
+
+    def test_resolve_effective_interval_strict_mode_raises(self):
+        from edgar.services.mtf_liquidity_flow_strategy import _resolve_effective_interval
+
+        with self.assertRaises(ValueError):
+            _resolve_effective_interval(
+                requested_interval="5m",
+                lookback_years=2.0,
+                auto_adjust_for_yf_limits=False,
+            )
+
 
 class StrategySerializationTests(TestCase):
     def test_backtest_payload_uses_volume_fields_not_buffett_fields(self):

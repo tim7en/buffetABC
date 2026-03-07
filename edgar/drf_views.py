@@ -558,6 +558,7 @@ class StrategyViewSet(viewsets.ViewSet):
         from edgar.services.intraday_strategy import run_intraday_backtest
         from edgar.services.market_mechanics_strategy import run_market_mechanics_backtest
         from edgar.services.manipulation_strategy import run_manipulation_backtest
+        from edgar.services.mtf_liquidity_flow_strategy import run_mtf_liquidity_flow_backtest
 
         def _as_bool(value, default=True):
             if value is None:
@@ -579,7 +580,36 @@ class StrategyViewSet(viewsets.ViewSet):
         allow_longs = _as_bool(request.data.get("allow_longs"), True)
 
         try:
-            if strategy_variant == "price_action_3step":
+            if strategy_variant == "mtf_liquidity_flow":
+                payload = run_mtf_liquidity_flow_backtest(
+                    ticker=ticker,
+                    initial_capital=capital,
+                    interval=interval,
+                    lookback_years=lookback_years,
+                    auto_adjust_for_yf_limits=_as_bool(request.data.get("auto_adjust_for_yf_limits"), True),
+                    allow_longs=allow_longs,
+                    allow_shorts=allow_shorts,
+                    entry_model=(request.data.get("entry_model") or "hybrid").strip().lower(),
+                    rr_multiple=float(request.data.get("rr_multiple", 3.0)),
+                    htf_pivot_window=int(request.data.get("htf_pivot_window", 3)),
+                    internal_pivot_window=int(request.data.get("internal_pivot_window", 2)),
+                    structure_search_bars=int(request.data.get("structure_search_bars", 200)),
+                    zone_expiry_bars=int(request.data.get("zone_expiry_bars", 12)),
+                    liquidity_lookback_bars=int(request.data.get("liquidity_lookback_bars", 60)),
+                    equal_level_tolerance_bps=float(request.data.get("equal_level_tolerance_bps", 12.0)),
+                    sweep_buffer_bps=float(request.data.get("sweep_buffer_bps", 3.0)),
+                    break_buffer_bps=float(request.data.get("break_buffer_bps", 0.0)),
+                    trigger_buffer_bps=float(request.data.get("trigger_buffer_bps", 1.0)),
+                    stop_buffer_bps=float(request.data.get("stop_buffer_bps", 5.0)),
+                    volume_period=int(request.data.get("volume_period", 40)),
+                    use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
+                    min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                    base_risk_pct=float(request.data.get("base_risk_pct", 0.01)),
+                    max_position_pct=float(request.data.get("max_position_pct", 0.30)),
+                    slippage_bps=float(request.data.get("slippage_bps", 4.0)),
+                    commission_bps=float(request.data.get("commission_bps", 1.0)),
+                )
+            elif strategy_variant == "price_action_3step":
                 payload = run_market_mechanics_backtest(
                     ticker=ticker,
                     initial_capital=capital,

@@ -201,7 +201,7 @@
   <div id="tab-strategy" class="tab-panel">
     <div class="card" style="max-width:600px;margin-bottom:16px">
       <h2>Strategy Backtests</h2>
-      <p class="muted">Run daily or intraday variants, including EMA/fractal momentum, manipulation + inverse FVG, and 3-step price action (direction/location/execution).</p>
+      <p class="muted">Run daily or intraday variants, including EMA/fractal momentum, manipulation + inverse FVG, 3-step price action, and MTF liquidity flow execution.</p>
       <div class="row">
         <input id="stratTicker" placeholder="Ticker (e.g. AOS)" style="width:120px" value="AOS">
         <label class="muted">Capital $</label>
@@ -221,6 +221,7 @@
           <option value="fractal_breakout_ema200" selected>EMA200 fractal breakout</option>
           <option value="alligator_stoch_fractal">Alligator + Stoch fractal</option>
           <option value="price_action_3step">3-step price action</option>
+          <option value="mtf_liquidity_flow">MTF liquidity flow</option>
           <option value="manipulation_ifvg">Manipulation + inverse FVG</option>
         </select>
         <label class="muted">Intraday interval</label>
@@ -415,7 +416,32 @@ async function runStrategy(){
   try{
     const isIntraday=mode==="intraday_custom";
     const endpoint=isIntraday?`${API}/strategy/backtest-intraday/`:`${API}/strategy/backtest/`;
-    const intradayBody=intradayVariant==="manipulation_ifvg"
+    const intradayBody=intradayVariant==="mtf_liquidity_flow"
+      ? {
+          ticker:tk,
+          initial_capital:capital,
+          interval:intradayInterval,
+          lookback_years:intradayYears,
+          strategy_variant:intradayVariant,
+          auto_adjust_for_yf_limits:true,
+          entry_model:"hybrid",
+          allow_shorts:allowShorts,
+          allow_longs:true,
+          rr_multiple:3.0,
+          htf_pivot_window:3,
+          internal_pivot_window:2,
+          structure_search_bars:200,
+          zone_expiry_bars:12,
+          liquidity_lookback_bars:60,
+          equal_level_tolerance_bps:12,
+          sweep_buffer_bps:3,
+          break_buffer_bps:fractalBreakout?5:0,
+          trigger_buffer_bps:1,
+          stop_buffer_bps:5,
+          use_volume_filter:false,
+          min_rel_volume:1.0
+        }
+      : intradayVariant==="manipulation_ifvg"
       ? {
           ticker:tk,
           initial_capital:capital,
