@@ -3,515 +3,332 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EDGAR Dashboard</title>
+  <title>BuffetABC - Stock Assessment Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
   <style>
-    :root {
-      --bg: #f4f7f7;
-      --card: #ffffff;
-      --ink: #1f2a37;
-      --muted: #5c6b7a;
-      --brand: #0f766e;
-      --line: #d7dee5;
-      --brand-dark: #0c5a54;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Avenir Next", "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top right, #d8f3e8, var(--bg) 45%);
-      color: var(--ink);
-    }
-    .wrap {
-      max-width: 1320px;
-      margin: 0 auto;
-      padding: 20px;
-      display: grid;
-      gap: 16px;
-      grid-template-columns: 390px 1fr;
-    }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 8px 24px rgba(0,0,0,.04);
-    }
-    h1 { margin: 0 0 10px; font-size: 24px; }
-    h2 { margin: 0 0 10px; font-size: 16px; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
-    input, select, button {
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px;
-      font-size: 14px;
-      background: #fff;
-      color: var(--ink);
-    }
-    #companyPicker {
-      width: 100%;
-      min-height: 280px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    }
-    button {
-      cursor: pointer;
-      background: var(--brand);
-      color: #fff;
-      border: none;
-      font-weight: 600;
-    }
-    button:hover { background: var(--brand-dark); }
-    button.secondary {
-      background: #334155;
-      color: #fff;
-    }
-    button.secondary:hover { background: #1f2937; }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    th, td {
-      border-bottom: 1px solid var(--line);
-      padding: 6px;
-      text-align: left;
-      vertical-align: top;
-    }
-    .muted { color: var(--muted); font-size: 12px; }
-    .pill {
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: #e5f7f4;
-      color: #0f766e;
-      font-size: 12px;
-      font-weight: 600;
-      margin-right: 6px;
-      margin-bottom: 6px;
-    }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    #status {
-      white-space: pre-wrap;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px;
-      max-height: 220px;
-      overflow: auto;
-      background: #0b1726;
-      color: #c5e3ff;
-      border-radius: 8px;
-      padding: 8px;
-    }
-    .helper {
-      margin-top: 2px;
-      margin-bottom: 8px;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    @media (max-width: 980px) {
-      .wrap { grid-template-columns: 1fr; }
-      .split { grid-template-columns: 1fr; }
-    }
+    :root{--bg:#f4f7f7;--card:#fff;--ink:#1f2a37;--muted:#5c6b7a;--brand:#0f766e;--line:#d7dee5;--brand-dark:#0c5a54;--green:#16a34a;--red:#dc2626}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:"Avenir Next","Segoe UI",sans-serif;background:radial-gradient(circle at top right,#d8f3e8,var(--bg) 45%);color:var(--ink)}
+    .wrap{max-width:1440px;margin:0 auto;padding:20px}
+    .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    .top-bar h1{margin:0;font-size:24px}
+    .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--line)}
+    .tab{padding:10px 20px;cursor:pointer;border:none;background:none;font-size:14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px}
+    .tab.active{color:var(--brand);border-bottom-color:var(--brand)}
+    .tab:hover{color:var(--brand-dark)}
+    .tab-panel{display:none}.tab-panel.active{display:block}
+    .grid-2{display:grid;grid-template-columns:390px 1fr;gap:16px}
+    .grid-2-equal{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;box-shadow:0 8px 24px rgba(0,0,0,.04)}
+    h2{margin:0 0 10px;font-size:16px}
+    .row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center}
+    input,select,button{border:1px solid var(--line);border-radius:8px;padding:8px;font-size:14px;background:#fff;color:var(--ink)}
+    #companyPicker{width:100%;min-height:260px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    button{cursor:pointer;background:var(--brand);color:#fff;border:none;font-weight:600}
+    button:hover{background:var(--brand-dark)}
+    button.secondary{background:#334155;color:#fff}
+    button.secondary:hover{background:#1f2937}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th,td{border-bottom:1px solid var(--line);padding:6px;text-align:left;vertical-align:top}
+    .muted{color:var(--muted);font-size:12px}
+    .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#e5f7f4;color:#0f766e;font-size:12px;font-weight:600;margin-right:6px;margin-bottom:6px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    #status{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;max-height:180px;overflow:auto;background:#0b1726;color:#c5e3ff;border-radius:8px;padding:8px}
+    .helper{margin-top:2px;margin-bottom:8px;font-size:12px;color:var(--muted)}
+    .split{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .chart-box{position:relative;width:100%;min-height:280px}
+    .chart-box canvas{width:100%!important}
+    .score-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:12px;font-size:18px;font-weight:700}
+    .score-high{background:#dcfce7;color:#166534}.score-mid{background:#fef3c7;color:#92400e}.score-low{background:#fecaca;color:#991b1b}
+    .score-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:10px}
+    .score-item{text-align:center;padding:10px;border-radius:8px;background:var(--bg)}
+    .score-item .label{font-size:11px;color:var(--muted);text-transform:uppercase}
+    .score-item .value{font-size:20px;font-weight:700}
+    .top-table{width:100%}.top-table th{font-size:11px;text-transform:uppercase;color:var(--muted)}
+    @media(max-width:980px){.grid-2,.grid-2-equal{grid-template-columns:1fr}.split{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <section class="card">
-      <h1>EDGAR UI</h1>
-      <p class="muted">No login needed for this dashboard. Admin panel still requires login.</p>
-
-      <h2>Company Selection</h2>
-      <div class="row">
-        <input id="q" placeholder="Search ticker/name (AAPL, Apple)">
-        <button class="secondary" id="searchBtn">Search</button>
-      </div>
-      <div class="row">
-        <label class="muted">Mode</label>
-        <select id="selectionMode">
-          <option value="multiple">multiple</option>
-          <option value="single">single</option>
-        </select>
-        <label class="muted">Page size</label>
-        <select id="pageSize">
-          <option value="50">50</option>
-          <option value="100" selected>100</option>
-          <option value="250">250</option>
-        </select>
-      </div>
-      <div class="row">
-        <button class="secondary" id="prevPageBtn">Prev</button>
-        <button class="secondary" id="nextPageBtn">Next</button>
-        <span class="muted mono" id="pageInfo">Page 1 / 1</span>
-      </div>
-      <div class="row">
-        <select id="companyPicker" multiple></select>
-      </div>
-      <p class="muted mono" id="selectedInfo">Selected: 0</p>
-      <div class="row">
-        <button class="secondary" id="selectAllBtn">Select Visible</button>
-        <button class="secondary" id="clearBtn">Clear</button>
-      </div>
-
-      <h2 style="margin-top:14px;">Fetch Options</h2>
-      <div class="row">
-        <select id="endpoint">
-          <option value="facts">facts</option>
-          <option value="filings">filings</option>
-          <option value="company_concept">company_concept</option>
-          <option value="full_text_search">full_text_search</option>
-        </select>
-        <input id="taxonomy" value="us-gaap" placeholder="taxonomy">
-        <input id="tag" value="Assets" placeholder="tag">
-      </div>
-      <div class="row">
-        <input id="query" placeholder="full-text query (optional)">
-      </div>
-      <div class="split">
-        <label>From <input id="periodStart" type="date"></label>
-        <label>To <input id="periodEnd" type="date"></label>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <select id="frequency">
-          <option value="annual">annual</option>
-          <option value="quarterly">quarterly</option>
-          <option value="all">all</option>
-        </select>
-        <label><input id="useAiMapping" type="checkbox" checked> Use AI mapping</label>
-        <label><input id="refreshMapping" type="checkbox"> Refresh mapping (writes)</label>
-      </div>
-      <div class="row">
-        <button id="fetchSelectedBtn">Fetch All Selected (Bulk)</button>
-        <button class="secondary" id="fetchOneBtn">Fetch First Selected Only</button>
-      </div>
-      <p class="helper">Bulk fetches every selected ticker. First-selected fetch runs only one ticker.</p>
-      <div class="row">
-        <label><input id="autoRefresh" type="checkbox"> Auto-refresh</label>
-        <input id="refreshSec" type="number" min="5" value="20" style="width:90px;"> sec
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Results</h2>
-      <div class="row" id="summaryRow"></div>
-      <p class="muted mono" id="activeCompany">Active: none</p>
-      <div id="status">Ready.</div>
-
-      <h2 style="margin-top:12px;">Fundamentals Table (latest selected)</h2>
-      <table id="fundTable">
-        <thead></thead>
-        <tbody></tbody>
-      </table>
-
-      <h2 style="margin-top:12px;">Saved Documents (latest selected)</h2>
-      <table id="docsTbl">
-        <thead><tr><th>ID</th><th>Kind</th><th>Success</th><th>Fetched At</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </section>
+<div class="wrap">
+  <div class="top-bar">
+    <h1>BuffetABC Dashboard</h1>
+    <span class="muted">Buffett-style stock assessment &amp; exploration</span>
   </div>
 
-  <script>
-    const API = "/api/edgar/drf";
-    let universePage = 1;
-    let universePages = 1;
-    let refreshTimer = null;
-    let loading = false;
+  <div class="tabs">
+    <button class="tab active" data-tab="data">Data Ingestion</button>
+    <button class="tab" data-tab="explore">Exploration</button>
+    <button class="tab" data-tab="assessment">Assessment</button>
+  </div>
 
-    function setSummary(data) {
-      const row = document.getElementById("summaryRow");
-      if (!data) {
-        row.innerHTML = "";
-        return;
-      }
-      row.innerHTML = `
-        <span class="pill">Requested: ${data.requested ?? "-"}</span>
-        <span class="pill">Saved Docs: ${(data.saved_document_ids || []).length}</span>
-        <span class="pill">Fundamentals: ${data.fundamentals_saved ?? "-"}</span>
-      `;
-    }
+  <!-- ===== TAB 1: DATA INGESTION ===== -->
+  <div id="tab-data" class="tab-panel active">
+    <div class="grid-2">
+      <section class="card">
+        <h2>Company Selection</h2>
+        <div class="row">
+          <input id="q" placeholder="Search ticker / name" style="flex:1">
+          <button class="secondary" id="searchBtn">Search</button>
+        </div>
+        <div class="row">
+          <label class="muted">Mode</label>
+          <select id="selectionMode"><option value="multiple">multiple</option><option value="single">single</option></select>
+          <label class="muted">Page</label>
+          <select id="pageSize"><option value="50">50</option><option value="100" selected>100</option><option value="250">250</option></select>
+        </div>
+        <div class="row">
+          <button class="secondary" id="prevPageBtn">Prev</button>
+          <button class="secondary" id="nextPageBtn">Next</button>
+          <span class="muted mono" id="pageInfo">Page 1/1</span>
+        </div>
+        <select id="companyPicker" multiple></select>
+        <p class="muted mono" id="selectedInfo">Selected: 0</p>
+        <div class="row">
+          <button class="secondary" id="selectAllBtn">Select Visible</button>
+          <button class="secondary" id="clearBtn">Clear</button>
+        </div>
 
-    function log(msg, obj = null) {
-      const el = document.getElementById("status");
-      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      el.textContent = obj ? `${line}\n${JSON.stringify(obj, null, 2)}\n\n${el.textContent}` : `${line}\n${el.textContent}`;
-    }
+        <h2 style="margin-top:14px">Fetch Options</h2>
+        <div class="row">
+          <select id="endpoint"><option value="facts">facts</option><option value="filings">filings</option><option value="company_concept">company_concept</option><option value="full_text_search">full_text_search</option></select>
+          <input id="taxonomy" value="us-gaap" placeholder="taxonomy" style="width:90px">
+          <input id="tag" value="Assets" placeholder="tag" style="width:90px">
+        </div>
+        <div class="row"><input id="query" placeholder="full-text query (optional)" style="flex:1"></div>
+        <div class="split">
+          <label>From <input id="periodStart" type="date"></label>
+          <label>To <input id="periodEnd" type="date"></label>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <select id="frequency"><option value="annual">annual</option><option value="quarterly">quarterly</option><option value="all">all</option></select>
+          <label><input id="useAiMapping" type="checkbox" checked> AI map</label>
+          <label><input id="refreshMapping" type="checkbox"> Refresh map</label>
+        </div>
+        <div class="row">
+          <button id="fetchSelectedBtn">Fetch All Selected</button>
+          <button class="secondary" id="fetchOneBtn">Fetch First</button>
+        </div>
+        <div class="row">
+          <button class="secondary" id="fetchPricesBtn">Fetch Prices</button>
+          <button class="secondary" id="computeScoresBtn">Compute Scores</button>
+        </div>
+        <p class="helper">Prices &amp; scores use persisted companies only.</p>
+        <div class="row">
+          <label><input id="autoRefresh" type="checkbox"> Auto-refresh</label>
+          <input id="refreshSec" type="number" min="5" value="20" style="width:80px"> sec
+        </div>
+      </section>
 
-    async function fetchJson(url, options = {}) {
-      const res = await fetch(url, options);
-      const text = await res.text();
-      let data = {};
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (_) {
-        data = { raw: text };
-      }
-      if (!res.ok) {
-        throw new Error(`${res.status} ${res.statusText}: ${data.detail || data.error || data.raw || "request failed"}`);
-      }
-      return data;
-    }
+      <section class="card">
+        <h2>Results</h2>
+        <div class="row" id="summaryRow"></div>
+        <p class="muted mono" id="activeCompany">Active: none</p>
+        <div id="status">Ready.</div>
 
-    function setLoading(isLoading) {
-      loading = isLoading;
-      document.getElementById("fetchSelectedBtn").disabled = isLoading;
-      document.getElementById("fetchOneBtn").disabled = isLoading;
-      if (isLoading) {
-        log("Fetching data...");
-      }
-    }
+        <h2 style="margin-top:12px">Fundamentals Table</h2>
+        <div style="overflow-x:auto"><table id="fundTable"><thead></thead><tbody></tbody></table></div>
 
-    function selectedRows() {
-      const picker = document.getElementById("companyPicker");
-      return Array.from(picker.selectedOptions).map(opt => ({
-        id: opt.dataset.id ? Number(opt.dataset.id) : null,
-        ticker: opt.value
-      }));
-    }
+        <h2 style="margin-top:12px">Saved Documents</h2>
+        <table id="docsTbl"><thead><tr><th>ID</th><th>Kind</th><th>Success</th><th>Fetched</th></tr></thead><tbody></tbody></table>
+      </section>
+    </div>
+  </div>
 
-    function updateSelectedInfo() {
-      const selected = selectedRows();
-      document.getElementById("selectedInfo").textContent = `Selected: ${selected.length}`;
-    }
+  <!-- ===== TAB 2: EXPLORATION ===== -->
+  <div id="tab-explore" class="tab-panel">
+    <div class="grid-2-equal">
+      <div class="card"><h2>Sector Distribution (S&amp;P 500)</h2><div class="chart-box"><canvas id="chartSector"></canvas></div></div>
+      <div class="card"><h2>Buffett Score Distribution</h2><div class="chart-box"><canvas id="chartScoreDist"></canvas></div></div>
+    </div>
+    <div class="grid-2-equal" style="margin-top:16px">
+      <div class="card"><h2>Avg Score by Sector</h2><div class="chart-box"><canvas id="chartSectorScores"></canvas></div></div>
+      <div class="card">
+        <h2>Metric Trend</h2>
+        <div class="row">
+          <input id="trendTicker" placeholder="Ticker" style="width:100px">
+          <select id="trendMetric"><option value="revenue">revenue</option><option value="net_income">net_income</option><option value="assets">assets</option><option value="equity">equity</option><option value="operating_cash_flow">op_cash_flow</option><option value="eps_diluted">eps_diluted</option></select>
+          <button class="secondary" id="loadTrendBtn">Load</button>
+        </div>
+        <div class="chart-box"><canvas id="chartTrend"></canvas></div>
+      </div>
+    </div>
+    <div class="grid-2-equal" style="margin-top:16px">
+      <div class="card">
+        <h2>Price History</h2>
+        <div class="row">
+          <input id="priceTicker" placeholder="Ticker" style="width:100px">
+          <select id="priceDays"><option value="90">3m</option><option value="365" selected>1y</option><option value="1825">5y</option></select>
+          <button class="secondary" id="loadPriceChartBtn">Load</button>
+        </div>
+        <div class="chart-box"><canvas id="chartPrice"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Top Buffett Scores</h2>
+        <table class="top-table" id="topScoresTable"><thead><tr><th>#</th><th>Ticker</th><th>Name</th><th>Sector</th><th>Score</th><th>MoS</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
 
-    function enforceSingleMode() {
-      const mode = document.getElementById("selectionMode").value;
-      if (mode !== "single") return;
-      const picker = document.getElementById("companyPicker");
-      const selected = Array.from(picker.selectedOptions);
-      if (selected.length > 1) {
-        Array.from(picker.options).forEach(o => { o.selected = false; });
-        selected[selected.length - 1].selected = true;
-      }
-      updateSelectedInfo();
-    }
+  <!-- ===== TAB 3: ASSESSMENT ===== -->
+  <div id="tab-assessment" class="tab-panel">
+    <div class="card" style="max-width:500px;margin-bottom:16px">
+      <h2>Buffett Assessment</h2>
+      <div class="row">
+        <input id="assessTicker" placeholder="Ticker (e.g. AAPL)" style="flex:1">
+        <button id="assessBtn">Assess</button>
+        <label><input id="assessForce" type="checkbox"> Force refresh</label>
+      </div>
+    </div>
+    <div class="grid-2-equal" id="assessResults" style="display:none">
+      <div class="card">
+        <h2>Score Breakdown</h2>
+        <div id="assessSummary" style="margin-bottom:12px"></div>
+        <div class="score-grid" id="scoreGrid"></div>
+        <div class="chart-box" style="margin-top:16px"><canvas id="chartRadar"></canvas></div>
+      </div>
+      <div class="card">
+        <h2>Valuation</h2>
+        <div id="valuationInfo"></div>
+        <h2 style="margin-top:16px">Price Chart</h2>
+        <div class="chart-box"><canvas id="chartAssessPrice"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-    async function resolveCompanyId(ticker) {
-      const data = await fetchJson(`${API}/companies/?q=${encodeURIComponent(ticker)}&page=1&page_size=20`);
-      const exact = (data.results || []).find(c => (c.ticker || "").toUpperCase() === ticker.toUpperCase());
-      return exact ? exact.id : null;
-    }
+<script>
+const API="/api/edgar/drf";
+let universePage=1,universePages=1,refreshTimer=null,loading=false;
+const charts={};
+function destroyChart(k){if(charts[k]){charts[k].destroy();charts[k]=null}}
+const COLORS=['#0f766e','#0ea5e9','#8b5cf6','#ec4899','#f59e0b','#10b981','#6366f1','#ef4444','#14b8a6','#a855f7','#f97316','#06b6d4','#84cc16','#e11d48','#3b82f6'];
 
-    async function loadCompanies(preferredTickers = []) {
-      const q = document.getElementById("q").value.trim();
-      const pageSize = Number(document.getElementById("pageSize").value || 100);
-      const data = await fetchJson(`/api/edgar/companies/universe/?limit=${pageSize}&page=${universePage}${q ? `&q=${encodeURIComponent(q)}` : ""}`);
-      const rows = data.results || [];
-      universePages = data.num_pages || 1;
-      document.getElementById("pageInfo").textContent = `Page ${data.page || universePage} / ${universePages}`;
+function setSummary(d){const r=document.getElementById("summaryRow");if(!d){r.innerHTML="";return}r.innerHTML=`<span class="pill">Requested: ${d.requested??"-"}</span><span class="pill">Docs: ${(d.saved_document_ids||[]).length}</span><span class="pill">Fundamentals: ${d.fundamentals_saved??"-"}</span>`}
+function log(msg,obj=null){const el=document.getElementById("status");const l=`[${new Date().toLocaleTimeString()}] ${msg}`;el.textContent=obj?`${l}\n${JSON.stringify(obj,null,2)}\n\n${el.textContent}`:`${l}\n${el.textContent}`}
+async function fetchJson(url,o={}){const r=await fetch(url,o);const t=await r.text();let d={};try{d=t?JSON.parse(t):{}}catch(_){d={raw:t}}if(!r.ok)throw new Error(`${r.status}: ${d.detail||d.error||d.raw||"fail"}`);return d}
+function setLoading(v){loading=v;document.getElementById("fetchSelectedBtn").disabled=v;document.getElementById("fetchOneBtn").disabled=v;if(v)log("Fetching...")}
+function selectedRows(){return Array.from(document.getElementById("companyPicker").selectedOptions).map(o=>({id:o.dataset.id?Number(o.dataset.id):null,ticker:o.value}))}
+function updateSelectedInfo(){document.getElementById("selectedInfo").textContent=`Selected: ${selectedRows().length}`}
+function enforceSingleMode(){if(document.getElementById("selectionMode").value!=="single")return;const p=document.getElementById("companyPicker"),s=Array.from(p.selectedOptions);if(s.length>1){Array.from(p.options).forEach(o=>o.selected=false);s[s.length-1].selected=true}updateSelectedInfo()}
+async function resolveCompanyId(ticker){const d=await fetchJson(`${API}/companies/?q=${encodeURIComponent(ticker)}&page=1&page_size=20`);const e=(d.results||[]).find(c=>(c.ticker||"").toUpperCase()===ticker.toUpperCase());return e?e.id:null}
 
-      const picker = document.getElementById("companyPicker");
-      picker.innerHTML = "";
-      for (const c of rows) {
-        const opt = document.createElement("option");
-        opt.value = c.ticker;
-        opt.dataset.id = c.company_id || "";
-        opt.textContent = `${c.ticker.padEnd(6, ' ')} ${c.name || ""}${c.persisted ? "" : " (new)"}`;
-        if (preferredTickers.includes(c.ticker)) {
-          opt.selected = true;
-        }
-        picker.appendChild(opt);
-      }
+// ---- Tab 1: Data ----
+async function loadCompanies(pref=[]){
+  const q=document.getElementById("q").value.trim(),ps=Number(document.getElementById("pageSize").value||100);
+  const d=await fetchJson(`/api/edgar/companies/universe/?limit=${ps}&page=${universePage}${q?`&q=${encodeURIComponent(q)}`:""}`);
+  const rows=d.results||[];universePages=d.num_pages||1;
+  document.getElementById("pageInfo").textContent=`Page ${d.page||universePage}/${universePages}`;
+  const pk=document.getElementById("companyPicker");pk.innerHTML="";
+  for(const c of rows){const o=document.createElement("option");o.value=c.ticker;o.dataset.id=c.company_id||"";o.textContent=`${c.ticker.padEnd(6)} ${(c.sector||"").padEnd(16)} ${c.name||""}${c.persisted?"":" (new)"}`;if(pref.includes(c.ticker))o.selected=true;pk.appendChild(o)}
+  const mode=document.getElementById("selectionMode").value;
+  if(!selectedRows().length&&pk.options.length)pk.options[0].selected=true;
+  pk.multiple=(mode==="multiple");if(mode==="single")enforceSingleMode();updateSelectedInfo();
+  log(`Loaded ${rows.length} companies (page ${d.page||universePage}/${universePages})`);
+}
+function buildPayload(syms){const p={symbols:syms,endpoint:document.getElementById("endpoint").value,taxonomy:document.getElementById("taxonomy").value,tag:document.getElementById("tag").value,query:document.getElementById("query").value,persist:true};const s=document.getElementById("periodStart").value,e=document.getElementById("periodEnd").value;if(s)p.period_start=s;if(e)p.period_end=e;return p}
 
-      const mode = document.getElementById("selectionMode").value;
-      if (!selectedRows().length && picker.options.length) {
-        picker.options[0].selected = true;
-        if (mode === "multiple") {
-          picker.options[0].selected = true;
-        }
-      }
-      if (mode === "single") {
-        picker.multiple = false;
-        enforceSingleMode();
-      } else {
-        picker.multiple = true;
-      }
-      updateSelectedInfo();
-      log(`Loaded ${rows.length} companies (page ${data.page || universePage}/${universePages})`);
-    }
+async function fetchSelected(bulk){
+  const picks=selectedRows();if(!picks.length){log("No companies selected.");return}if(loading)return;
+  try{setLoading(true);const syms=bulk?picks.map(x=>x.ticker):[picks[0].ticker];
+  const d=await fetchJson(`${API}/ingestion/fetch/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(buildPayload(syms))});
+  log(`${bulk?"Bulk":"Single"} fetch done (${syms.length})`,d);setSummary(d);
+  const f=bulk?picks[picks.length-1]:picks[0];
+  const cid=((d.results||[]).find(r=>r.symbol===f.ticker)||{}).company_id||f.id||await resolveCompanyId(f.ticker);
+  await refreshDetails(cid,f.ticker);await loadCompanies(syms);
+  }catch(e){log("Fetch failed",{error:String(e)})}finally{setLoading(false)}
+}
 
-    function buildPayload(symbols) {
-      const payload = {
-        symbols,
-        endpoint: document.getElementById("endpoint").value,
-        taxonomy: document.getElementById("taxonomy").value,
-        tag: document.getElementById("tag").value,
-        query: document.getElementById("query").value,
-        persist: true,
-      };
-      const s = document.getElementById("periodStart").value;
-      const e = document.getElementById("periodEnd").value;
-      if (s) payload.period_start = s;
-      if (e) payload.period_end = e;
-      return payload;
-    }
+async function refreshDetails(cid,ticker){
+  if(!cid){log(`No id for ${ticker}`);return}
+  document.getElementById("activeCompany").textContent=`Active: ${ticker} (id=${cid})`;
+  const freq=document.getElementById("frequency").value||"annual",ai=document.getElementById("useAiMapping").checked?"1":"0",rm=document.getElementById("refreshMapping").checked?"1":"0";
+  const s=document.getElementById("periodStart").value,e=document.getElementById("periodEnd").value;
+  let fData;try{fData=await fetchJson(`${API}/companies/${cid}/fundamental-table/?frequency=${freq}&use_ai=${ai}&refresh_mapping=${rm}${s?`&period_start=${s}`:""}${e?`&period_end=${e}`:""}`)}catch(err){log("Fund table fail",{error:String(err)});fData={metrics:[],rows:[]}}
+  const tbl=document.getElementById("fundTable"),hd=tbl.querySelector("thead"),bd=tbl.querySelector("tbody"),m=fData.metrics||[];
+  hd.innerHTML=`<tr><th>Period</th><th>Form</th><th>FY</th>${m.map(x=>`<th>${x}</th>`).join("")}</tr>`;bd.innerHTML="";
+  if(!(fData.rows||[]).length)bd.innerHTML=`<tr><td colspan="${3+m.length}">No fundamentals.</td></tr>`;
+  for(const p of(fData.rows||[])){const tr=document.createElement("tr");tr.innerHTML=`<td>${p.period_end||""}</td><td>${p.form||""}</td><td>${p.fiscal_year||""}</td>${m.map(k=>`<td>${p[k]!=null?Number(p[k]).toLocaleString():""}</td>`).join("")}`;bd.appendChild(tr)}
+  let dd;try{dd=await fetchJson(`${API}/documents/?ticker=${encodeURIComponent(ticker)}`)}catch(_){dd={results:[]}}
+  const db=document.querySelector("#docsTbl tbody");db.innerHTML="";
+  if(!(dd.results||[]).length)db.innerHTML=`<tr><td colspan="4">No documents.</td></tr>`;
+  for(const x of(dd.results||[])){const tr=document.createElement("tr");tr.innerHTML=`<td>${x.id}</td><td>${x.kind}</td><td>${x.success}</td><td>${x.fetched_at}</td>`;db.appendChild(tr)}
+}
 
-    async function fetchSelected(isBulk) {
-      const picks = selectedRows();
-      if (!picks.length) {
-        log("No companies selected.");
-        return;
-      }
-      if (loading) return;
-      try {
-        setLoading(true);
-        const symbols = isBulk ? picks.map(x => x.ticker) : [picks[0].ticker];
-        const payload = buildPayload(symbols);
-        const data = await fetchJson(`${API}/ingestion/fetch/`, {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(payload)
-        });
-        log(`${isBulk ? "Bulk" : "Single"} fetch complete (${symbols.length} symbols)`, data);
-        setSummary(data);
+async function fetchPricesForSelected(){const p=selectedRows();if(!p.length)return;log(`Fetching prices for ${p.length} tickers...`);try{const d=await fetchJson(`${API}/prices/refresh/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tickers:p.map(x=>x.ticker),period:"1y"})});log("Prices fetched",d)}catch(e){log("Price fetch failed",{error:String(e)})}}
+async function computeScoresForSelected(){const p=selectedRows();if(!p.length)return;log(`Computing scores for ${p.length} tickers...`);try{const d=await fetchJson(`${API}/scores/compute/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tickers:p.map(x=>x.ticker),force_refresh:true})});log("Scores computed",d)}catch(e){log("Score compute failed",{error:String(e)})}}
 
-        const focus = isBulk ? picks[picks.length - 1] : picks[0];
-        const fromResp = ((data.results || []).find(r => r.symbol === focus.ticker) || {}).company_id;
-        const companyId = fromResp || focus.id || await resolveCompanyId(focus.ticker);
-        await refreshDetails(companyId, focus.ticker);
-        await loadCompanies(symbols);
-      } catch (err) {
-        log("Fetch failed", { error: String(err) });
-      } finally {
-        setLoading(false);
-      }
-    }
+function setupAutoRefresh(){if(refreshTimer)clearInterval(refreshTimer);if(!document.getElementById("autoRefresh").checked)return;const s=Math.max(5,Number(document.getElementById("refreshSec").value||20));refreshTimer=setInterval(async()=>{const p=selectedRows();if(!p.length)return;const c=p[0].id||await resolveCompanyId(p[0].ticker);await refreshDetails(c,p[0].ticker)},s*1000);log(`Auto-refresh every ${s}s`)}
 
-    async function refreshDetails(companyId, ticker) {
-      if (!companyId) {
-        log(`No persisted company id for ${ticker}. It may have failed to fetch.`);
-        return;
-      }
-      document.getElementById("activeCompany").textContent = `Active: ${ticker} (id=${companyId})`;
+// ---- Tab 2: Exploration ----
+async function loadSectorChart(){try{const d=await fetchJson(`${API}/charts/sector-distribution/`);destroyChart("sector");charts.sector=new Chart(document.getElementById("chartSector"),{type:"doughnut",data:{labels:d.labels,datasets:[{data:d.values,backgroundColor:COLORS}]},options:{responsive:true,plugins:{legend:{position:"right",labels:{boxWidth:12,font:{size:11}}}}}})}catch(e){console.warn("Sector chart:",e)}}
+async function loadScoreDistChart(){try{const d=await fetchJson(`${API}/charts/score-distribution/`);destroyChart("scoreDist");charts.scoreDist=new Chart(document.getElementById("chartScoreDist"),{type:"bar",data:{labels:d.labels,datasets:[{label:"Companies",data:d.values,backgroundColor:"#0f766e"}]},options:{responsive:true,scales:{y:{beginAtZero:true,title:{display:true,text:"Count"}}},plugins:{legend:{display:false}}}})}catch(e){console.warn("Score dist:",e)}}
+async function loadSectorScoresChart(){try{const d=await fetchJson(`${API}/charts/sector-scores/`);destroyChart("sectorScores");charts.sectorScores=new Chart(document.getElementById("chartSectorScores"),{type:"bar",data:{labels:d.labels,datasets:[{label:"Avg Score",data:d.values,backgroundColor:COLORS}]},options:{indexAxis:"y",responsive:true,scales:{x:{beginAtZero:true,max:100}},plugins:{legend:{display:false}}}})}catch(e){console.warn("Sector scores:",e)}}
 
-      const frequency = document.getElementById("frequency").value || "annual";
-      const useAi = document.getElementById("useAiMapping").checked ? "1" : "0";
-      const refreshMapping = document.getElementById("refreshMapping").checked ? "1" : "0";
-      const s = document.getElementById("periodStart").value;
-      const e = document.getElementById("periodEnd").value;
-      const fUrl = `${API}/companies/${companyId}/fundamental-table/?frequency=${encodeURIComponent(frequency)}&use_ai=${useAi}&refresh_mapping=${refreshMapping}${s ? `&period_start=${s}` : ""}${e ? `&period_end=${e}` : ""}`;
-      let fData;
-      try {
-        fData = await fetchJson(fUrl);
-      } catch (err) {
-        log("Fundamentals table load failed", { error: String(err), ticker });
-        fData = { metrics: [], rows: [] };
-      }
+async function loadTrendChart(){
+  const tk=document.getElementById("trendTicker").value.trim().toUpperCase(),mt=document.getElementById("trendMetric").value;
+  if(!tk)return;const cid=await resolveCompanyId(tk);if(!cid){log(`${tk} not in DB`);return}
+  try{const d=await fetchJson(`${API}/charts/metric-trend/?company_id=${cid}&metric=${mt}`);destroyChart("trend");
+  charts.trend=new Chart(document.getElementById("chartTrend"),{type:"line",data:{labels:d.labels.map(x=>x.substring(0,4)),datasets:[{label:`${tk} ${mt}`,data:d.values,borderColor:"#0f766e",backgroundColor:"rgba(15,118,110,.1)",fill:true,tension:.3}]},options:{responsive:true}})}catch(e){log("Trend fail",{error:String(e)})}
+}
+async function loadPriceChart(){
+  const tk=document.getElementById("priceTicker").value.trim().toUpperCase(),days=document.getElementById("priceDays").value;
+  if(!tk)return;const cid=await resolveCompanyId(tk);if(!cid){log(`${tk} not in DB`);return}
+  try{const d=await fetchJson(`${API}/charts/price-history/?company_id=${cid}&days=${days}`);destroyChart("price");
+  charts.price=new Chart(document.getElementById("chartPrice"),{type:"line",data:{labels:d.labels,datasets:[{label:`${tk}`,data:d.values,borderColor:"#3b82f6",backgroundColor:"rgba(59,130,246,.08)",fill:true,tension:.2,pointRadius:0}]},options:{responsive:true,scales:{x:{ticks:{maxTicksLimit:12}}},plugins:{legend:{display:false}}}})}catch(e){log("Price chart fail",{error:String(e)})}
+}
+async function loadTopScores(){try{const d=await fetchJson(`${API}/charts/top-scores/?limit=20`);const tb=document.querySelector("#topScoresTable tbody");tb.innerHTML="";(d.companies||[]).forEach((c,i)=>{const mos=c.margin_of_safety!=null?`${(c.margin_of_safety*100).toFixed(0)}%`:"-";const tr=document.createElement("tr");tr.innerHTML=`<td>${i+1}</td><td><b>${c.ticker}</b></td><td>${c.name||""}</td><td>${c.sector||""}</td><td>${c.overall_score?.toFixed(1)}</td><td>${mos}</td>`;tb.appendChild(tr)})}catch(e){console.warn("Top scores:",e)}}
 
-      const table = document.getElementById("fundTable");
-      const head = table.querySelector("thead");
-      const body = table.querySelector("tbody");
-      const metrics = fData.metrics || [];
-      head.innerHTML = `<tr><th>Period End</th><th>Form</th><th>FY</th>${metrics.map(m => `<th>${m}</th>`).join("")}</tr>`;
-      body.innerHTML = "";
-      if (!(fData.rows || []).length) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="${3 + metrics.length}">No structured fundamentals found for current filters.</td>`;
-        body.appendChild(tr);
-      }
-      for (const p of (fData.rows || [])) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${p.period_end || ""}</td><td>${p.form || ""}</td><td>${p.fiscal_year || ""}</td>${metrics.map(m => `<td>${p[m] ?? ""}</td>`).join("")}`;
-        body.appendChild(tr);
-      }
+// ---- Tab 3: Assessment ----
+async function runAssessment(){
+  const tk=document.getElementById("assessTicker").value.trim().toUpperCase();if(!tk)return;
+  const force=document.getElementById("assessForce").checked;
+  try{
+    const s=await fetchJson(`${API}/scores/compute-single/`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ticker:tk,force_refresh:force})});
+    document.getElementById("assessResults").style.display="";
+    const cls=s.overall_score>=65?"score-high":s.overall_score>=40?"score-mid":"score-low";
+    document.getElementById("assessSummary").innerHTML=`<span class="score-badge ${cls}">${s.overall_score?.toFixed(1)} / 100</span> <b style="margin-left:10px">${s.ticker} - ${s.name||""}</b> <span class="muted" style="margin-left:8px">${s.sector||""}</span>`;
+    const items=[{l:"ROE",v:s.roe_score},{l:"Debt",v:s.debt_score},{l:"Margin",v:s.margin_score},{l:"EPS Growth",v:s.earnings_growth_score},{l:"FCF",v:s.fcf_score},{l:"Valuation",v:s.valuation_score}];
+    document.getElementById("scoreGrid").innerHTML=items.map(x=>`<div class="score-item"><div class="label">${x.l}</div><div class="value">${x.v!=null?x.v.toFixed(1):"-"}</div></div>`).join("");
+    destroyChart("radar");charts.radar=new Chart(document.getElementById("chartRadar"),{type:"radar",data:{labels:items.map(x=>x.l),datasets:[{label:tk,data:items.map(x=>x.v||0),borderColor:"#0f766e",backgroundColor:"rgba(15,118,110,.2)",pointBackgroundColor:"#0f766e"}]},options:{responsive:true,scales:{r:{beginAtZero:true,max:100}},plugins:{legend:{display:false}}}});
+    const fmt=(v,pct)=>v!=null?(pct?(v*100).toFixed(1)+"%":v.toFixed(2)):"-";
+    document.getElementById("valuationInfo").innerHTML=`<div class="score-grid">
+      <div class="score-item"><div class="label">Price</div><div class="value">$${fmt(s.current_price)}</div></div>
+      <div class="score-item"><div class="label">Intrinsic</div><div class="value">$${fmt(s.intrinsic_value)}</div></div>
+      <div class="score-item"><div class="label">Margin of Safety</div><div class="value" style="color:${s.margin_of_safety>0?"var(--green)":"var(--red)"}">${fmt(s.margin_of_safety,true)}</div></div>
+      <div class="score-item"><div class="label">ROE Avg</div><div class="value">${fmt(s.roe_avg,true)}</div></div>
+      <div class="score-item"><div class="label">D/E Ratio</div><div class="value">${fmt(s.debt_to_equity)}</div></div>
+      <div class="score-item"><div class="label">Net Margin</div><div class="value">${fmt(s.margin_avg,true)}</div></div>
+      <div class="score-item"><div class="label">Earnings CAGR</div><div class="value">${fmt(s.earnings_growth,true)}</div></div>
+    </div>`;
+    const cid=await resolveCompanyId(tk);
+    if(cid){try{const pd=await fetchJson(`${API}/charts/price-history/?company_id=${cid}&days=365`);destroyChart("assessPrice");charts.assessPrice=new Chart(document.getElementById("chartAssessPrice"),{type:"line",data:{labels:pd.labels,datasets:[{label:tk,data:pd.values,borderColor:"#3b82f6",backgroundColor:"rgba(59,130,246,.08)",fill:true,tension:.2,pointRadius:0}]},options:{responsive:true,scales:{x:{ticks:{maxTicksLimit:12}}},plugins:{legend:{display:false}}}})}catch(_){}}
+  }catch(e){log("Assessment failed",{error:String(e)})}
+}
 
-      let dData;
-      try {
-        dData = await fetchJson(`${API}/documents/?ticker=${encodeURIComponent(ticker)}`);
-      } catch (err) {
-        log("Documents load failed", { error: String(err), ticker });
-        dData = { results: [] };
-      }
-      const dtBody = document.querySelector("#docsTbl tbody");
-      dtBody.innerHTML = "";
-      if (!(dData.results || []).length) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td colspan="4">No documents found.</td>`;
-        dtBody.appendChild(tr);
-      }
-      for (const d of (dData.results || [])) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${d.id}</td><td>${d.kind}</td><td>${d.success}</td><td>${d.fetched_at}</td>`;
-        dtBody.appendChild(tr);
-      }
-    }
+// ---- Tab switching ----
+document.querySelectorAll(".tab").forEach(t=>{t.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.remove("active"));t.classList.add("active");document.getElementById(`tab-${t.dataset.tab}`).classList.add("active");if(t.dataset.tab==="explore"){loadSectorChart();loadScoreDistChart();loadSectorScoresChart();loadTopScores()}})});
 
-    function setupAutoRefresh() {
-      if (refreshTimer) clearInterval(refreshTimer);
-      const enabled = document.getElementById("autoRefresh").checked;
-      if (!enabled) return;
-      const sec = Math.max(5, Number(document.getElementById("refreshSec").value || 20));
-      refreshTimer = setInterval(async () => {
-        const picks = selectedRows();
-        if (!picks.length) return;
-        const companyId = picks[0].id || await resolveCompanyId(picks[0].ticker);
-        await refreshDetails(companyId, picks[0].ticker);
-      }, sec * 1000);
-      log(`Auto-refresh every ${sec}s enabled`);
-    }
+// ---- Events ----
+document.getElementById("searchBtn").addEventListener("click",()=>{universePage=1;loadCompanies()});
+document.getElementById("pageSize").addEventListener("change",()=>{universePage=1;loadCompanies()});
+document.getElementById("prevPageBtn").addEventListener("click",()=>{if(universePage>1){universePage--;loadCompanies(selectedRows().map(x=>x.ticker))}});
+document.getElementById("nextPageBtn").addEventListener("click",()=>{if(universePage<universePages){universePage++;loadCompanies(selectedRows().map(x=>x.ticker))}});
+document.getElementById("selectionMode").addEventListener("change",()=>{const p=document.getElementById("companyPicker");p.multiple=(document.getElementById("selectionMode").value==="multiple");if(!p.multiple)enforceSingleMode();updateSelectedInfo()});
+document.getElementById("companyPicker").addEventListener("change",()=>{enforceSingleMode();updateSelectedInfo()});
+document.getElementById("selectAllBtn").addEventListener("click",()=>{const p=document.getElementById("companyPicker");if(document.getElementById("selectionMode").value==="single"){if(p.options.length){Array.from(p.options).forEach(o=>o.selected=false);p.options[0].selected=true}}else Array.from(p.options).forEach(o=>o.selected=true);updateSelectedInfo()});
+document.getElementById("clearBtn").addEventListener("click",()=>{Array.from(document.getElementById("companyPicker").options).forEach(o=>o.selected=false);updateSelectedInfo()});
+document.getElementById("fetchSelectedBtn").addEventListener("click",()=>fetchSelected(true));
+document.getElementById("fetchOneBtn").addEventListener("click",()=>fetchSelected(false));
+document.getElementById("fetchPricesBtn").addEventListener("click",fetchPricesForSelected);
+document.getElementById("computeScoresBtn").addEventListener("click",computeScoresForSelected);
+document.getElementById("autoRefresh").addEventListener("change",setupAutoRefresh);
+document.getElementById("refreshSec").addEventListener("change",setupAutoRefresh);
+document.getElementById("loadTrendBtn").addEventListener("click",loadTrendChart);
+document.getElementById("loadPriceChartBtn").addEventListener("click",loadPriceChart);
+document.getElementById("assessBtn").addEventListener("click",runAssessment);
 
-    document.getElementById("searchBtn").addEventListener("click", () => {
-      universePage = 1;
-      loadCompanies();
-    });
-
-    document.getElementById("pageSize").addEventListener("change", () => {
-      universePage = 1;
-      loadCompanies();
-    });
-
-    document.getElementById("prevPageBtn").addEventListener("click", () => {
-      if (universePage <= 1) return;
-      universePage -= 1;
-      loadCompanies(selectedRows().map(x => x.ticker));
-    });
-
-    document.getElementById("nextPageBtn").addEventListener("click", () => {
-      if (universePage >= universePages) return;
-      universePage += 1;
-      loadCompanies(selectedRows().map(x => x.ticker));
-    });
-
-    document.getElementById("selectionMode").addEventListener("change", () => {
-      const picker = document.getElementById("companyPicker");
-      const mode = document.getElementById("selectionMode").value;
-      picker.multiple = (mode === "multiple");
-      if (mode === "single") enforceSingleMode();
-      updateSelectedInfo();
-    });
-
-    document.getElementById("companyPicker").addEventListener("change", () => {
-      enforceSingleMode();
-      updateSelectedInfo();
-    });
-
-    document.getElementById("selectAllBtn").addEventListener("click", () => {
-      const picker = document.getElementById("companyPicker");
-      const mode = document.getElementById("selectionMode").value;
-      if (mode === "single") {
-        if (picker.options.length) {
-          Array.from(picker.options).forEach(o => { o.selected = false; });
-          picker.options[0].selected = true;
-        }
-      } else {
-        Array.from(picker.options).forEach(o => { o.selected = true; });
-      }
-      updateSelectedInfo();
-    });
-
-    document.getElementById("clearBtn").addEventListener("click", () => {
-      Array.from(document.getElementById("companyPicker").options).forEach(o => { o.selected = false; });
-      updateSelectedInfo();
-    });
-
-    document.getElementById("fetchSelectedBtn").addEventListener("click", () => fetchSelected(true));
-    document.getElementById("fetchOneBtn").addEventListener("click", () => fetchSelected(false));
-    document.getElementById("autoRefresh").addEventListener("change", setupAutoRefresh);
-    document.getElementById("refreshSec").addEventListener("change", setupAutoRefresh);
-
-    loadCompanies();
-  </script>
+loadCompanies();
+</script>
 </body>
 </html>
