@@ -46,6 +46,30 @@
     .score-item .label{font-size:11px;color:var(--muted);text-transform:uppercase}
     .score-item .value{font-size:20px;font-weight:700}
     .top-table{width:100%}.top-table th{font-size:11px;text-transform:uppercase;color:var(--muted)}
+    .strategy-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,.9fr);gap:16px;margin-bottom:16px}
+    .panel-group{border:1px solid var(--line);border-radius:12px;padding:12px;background:linear-gradient(180deg,#fcfefe 0%,#f7fbfb 100%);margin-bottom:12px}
+    .section-kicker{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
+    .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field input,.field select{width:100%}
+    .field .muted{font-size:11px}
+    .toggle-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
+    .toggle-card{padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+    .toggle-card label{display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px}
+    .toggle-card .muted{margin-top:6px;line-height:1.45}
+    .guide-card{position:sticky;top:16px}
+    .guide-title{margin:0 0 6px;font-size:18px}
+    .guide-summary{margin:0 0 10px;color:var(--muted);font-size:13px;line-height:1.5}
+    .guide-list{margin:0;padding-left:18px;font-size:13px;line-height:1.5}
+    .guide-list li{margin-bottom:6px}
+    .glossary{display:grid;gap:8px;margin-top:12px}
+    .term{border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--bg)}
+    .term strong{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;color:var(--brand-dark)}
+    .mode-note{padding:10px 12px;border-radius:10px;background:#e7f5f3;border:1px solid #c7e8e2;font-size:12px;line-height:1.5;color:#0c5a54}
+    .inline-chip{display:inline-flex;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--ink)}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+    .subtle-divider{height:1px;background:var(--line);margin:12px 0}
+    @media(max-width:1100px){.strategy-layout{grid-template-columns:1fr}.guide-card{position:static}}
     @media(max-width:980px){.grid-2,.grid-2-equal{grid-template-columns:1fr}.split{grid-template-columns:1fr}}
   </style>
 </head>
@@ -200,69 +224,185 @@
 
   <!-- ===== TAB 4: STRATEGY ===== -->
   <div id="tab-strategy" class="tab-panel">
-    <div class="card" style="max-width:600px;margin-bottom:16px">
-      <h2>Strategy Backtests</h2>
-      <p class="muted">Run daily or intraday variants, including EMA/fractal momentum, manipulation + inverse FVG, 3-step price action, and MTF liquidity flow execution.</p>
-      <div class="row">
-        <input id="stratTicker" placeholder="Ticker (e.g. AOS)" style="width:120px" value="AOS">
-        <label class="muted">Capital $</label>
-        <input id="stratCapital" type="number" value="100" style="width:80px">
-        <label class="muted">Mode</label>
-        <select id="stratMode">
-          <option value="daily" selected>daily</option>
-          <option value="intraday_custom">intraday</option>
-        </select>
-        <label class="muted">Period</label>
-        <select id="stratPeriod"><option value="2y">2y</option><option value="5y" selected>5y</option><option value="10y">10y</option><option value="max">max</option></select>
-        <button id="stratRunBtn">Run Backtest</button>
+    <div class="strategy-layout">
+      <div class="card">
+        <h2>Strategy Backtests</h2>
+        <p class="muted">Choose the market, choose the model, then choose the risk rules. Daily and intraday controls are separated so you only see what matters for the current mode.</p>
+        <div class="chips">
+          <span class="inline-chip">Bias-safe entries</span>
+          <span class="inline-chip">Next-bar fills</span>
+          <span class="inline-chip">Wick-based invalidation</span>
+          <span class="inline-chip">Replay without lookahead</span>
+        </div>
+
+        <div class="panel-group">
+          <div class="section-kicker">1. Market</div>
+          <div class="field-grid">
+            <div class="field">
+              <label class="muted" for="stratTicker">Ticker</label>
+              <input id="stratTicker" placeholder="Ticker (e.g. AOS)" value="AOS">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratCapital">Capital $</label>
+              <input id="stratCapital" type="number" value="100">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratMode">Backtest mode</label>
+              <select id="stratMode">
+                <option value="daily" selected>Daily swing</option>
+                <option value="intraday_custom">Intraday / MTF</option>
+              </select>
+            </div>
+          </div>
+          <div class="mode-note" id="stratModeSummary"></div>
+        </div>
+
+        <div class="panel-group" id="strategyDailyControls">
+          <div class="section-kicker">2. Daily Setup</div>
+          <div class="field-grid">
+            <div class="field">
+              <label class="muted" for="stratPeriod">History window</label>
+              <select id="stratPeriod"><option value="2y">2y</option><option value="5y" selected>5y</option><option value="10y">10y</option><option value="max">max</option></select>
+            </div>
+            <div class="field">
+              <label class="muted">Price data</label>
+              <div class="toggle-card">
+                <label><input id="stratForceFetch" type="checkbox"> Force re-fetch prices</label>
+                <div class="muted">Pull fresh daily prices before the backtest instead of relying on cached data.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-group" id="strategyIntradayControls">
+          <div class="section-kicker">2. Intraday Setup</div>
+          <div class="field-grid">
+            <div class="field">
+              <label class="muted" for="stratIntradayVariant">Strategy family</label>
+              <select id="stratIntradayVariant">
+                <option value="fractal_breakout_ema200" selected>EMA200 + fractal breakout</option>
+                <option value="alligator_stoch_fractal">Alligator + Stoch fractal</option>
+                <option value="price_action_3step">3-step price action</option>
+                <option value="mtf_liquidity_flow">MTF liquidity flow</option>
+                <option value="manipulation_ifvg">Manipulation + inverse FVG</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="muted" for="stratIntradayInterval">Execution interval</label>
+              <select id="stratIntradayInterval">
+                <option value="60m" selected>60m</option>
+                <option value="5m">5m</option>
+                <option value="90m">90m</option>
+                <option value="30m">30m</option>
+                <option value="15m">15m</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="muted" for="stratIntradayYears">Lookback years</label>
+              <input id="stratIntradayYears" type="number" min="0.05" step="0.05" value="2">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratDataSource">Market data source</label>
+              <select id="stratDataSource">
+                <option value="auto" selected>auto</option>
+                <option value="binance">binance</option>
+                <option value="yfinance">yfinance</option>
+              </select>
+            </div>
+          </div>
+          <p class="muted" style="margin:10px 0 0">Yahoo supports only short lower-timeframe windows. Binance supports multi-year crypto intraday history for supported pairs like `BTCUSDT`, `ETHUSDT`, and `PAXGUSDT`.</p>
+        </div>
+
+        <div class="panel-group">
+          <div class="section-kicker">3. Signal Rules</div>
+          <div class="toggle-grid">
+            <div class="toggle-card" id="strategyFractalCard">
+              <label><input id="stratUseFractal" type="checkbox" checked> Williams fractal confirmation</label>
+              <div class="muted">A Williams fractal is a confirmed swing high or swing low. The signal is only valid after the candles to the right have closed.</div>
+            </div>
+            <div class="toggle-card">
+              <label><input id="stratBreakout" type="checkbox"> <span id="stratBreakoutLabelText">Require fractal breakout</span></label>
+              <div class="muted" id="stratBreakoutHelp">Only enter once price breaks through the confirmed swing level instead of reacting at the level itself.</div>
+            </div>
+            <div class="toggle-card">
+              <label><input id="stratAllowShorts" type="checkbox" checked> Allow shorts</label>
+              <div class="muted">Enable bearish trades. Turn this off if you want long-only testing.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-group">
+          <div class="section-kicker">4. Risk And Exit Rules</div>
+          <div class="toggle-grid">
+            <div class="toggle-card">
+              <label><input id="stratUseBreakEven" type="checkbox" checked> Move stop to entry</label>
+              <div class="muted">After the trade reaches the trigger multiple in your favor, the active stop moves to break-even.</div>
+              <div class="field" style="margin-top:8px">
+                <label class="muted" for="stratBreakEvenR">Trigger (R multiple)</label>
+                <input id="stratBreakEvenR" type="number" min="0.25" step="0.25" value="1.0">
+              </div>
+            </div>
+            <div class="toggle-card">
+              <label><input id="stratUseChandelier" type="checkbox"> Chandelier trailing stop</label>
+              <div class="muted">A trend-following trailing stop based on highest high / lowest low and ATR. It can tighten the stop after break-even.</div>
+              <div class="field-grid" style="margin-top:8px">
+                <div class="field">
+                  <label class="muted" for="stratChandelierPeriod">Lookback bars</label>
+                  <input id="stratChandelierPeriod" type="number" min="2" step="1" value="22">
+                </div>
+                <div class="field">
+                  <label class="muted" for="stratChandelierAtrPeriod">ATR bars</label>
+                  <input id="stratChandelierAtrPeriod" type="number" min="2" step="1" value="22">
+                </div>
+                <div class="field">
+                  <label class="muted" for="stratChandelierAtrMult">ATR multiplier</label>
+                  <input id="stratChandelierAtrMult" type="number" min="0.5" step="0.1" value="3.0">
+                </div>
+              </div>
+            </div>
+            <div class="toggle-card">
+              <label for="stratExitFillPolicy">Same-bar fill rule</label>
+              <div class="muted">If a candle touches both stop and target, the exact intrabar order is unknown in OHLC data. This setting controls the assumption.</div>
+              <div class="field" style="margin-top:8px">
+                <select id="stratExitFillPolicy">
+                  <option value="stop_first" selected>Conservative: stop first</option>
+                  <option value="target_first">Optimistic: target first</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="justify-content:flex-end;margin-bottom:0">
+          <button id="stratRunBtn">Run Backtest</button>
+        </div>
       </div>
-      <div class="row">
-        <label class="muted">Intraday strategy</label>
-        <select id="stratIntradayVariant">
-          <option value="fractal_breakout_ema200" selected>EMA200 fractal breakout</option>
-          <option value="alligator_stoch_fractal">Alligator + Stoch fractal</option>
-          <option value="price_action_3step">3-step price action</option>
-          <option value="mtf_liquidity_flow">MTF liquidity flow</option>
-          <option value="manipulation_ifvg">Manipulation + inverse FVG</option>
-        </select>
-        <label class="muted">Intraday interval</label>
-        <select id="stratIntradayInterval">
-          <option value="60m" selected>60m</option>
-          <option value="5m">5m</option>
-          <option value="90m">90m</option>
-          <option value="30m">30m</option>
-          <option value="15m">15m</option>
-        </select>
-        <label class="muted">Lookback years</label>
-        <input id="stratIntradayYears" type="number" min="0.05" step="0.05" value="2" style="width:90px">
-        <label class="muted">Data source</label>
-        <select id="stratDataSource">
-          <option value="auto" selected>auto</option>
-          <option value="binance">binance</option>
-          <option value="yfinance">yfinance</option>
-        </select>
-      </div>
-      <p class="muted">Yahoo limit: 15m/30m intraday supports about 60 days, while 60m/90m can run multi-year windows. Binance supports multi-year 5m/15m/30m/60m on supported symbols (e.g., BTCUSDT, ETHUSDT, PAXGUSDT).</p>
-      <div class="row">
-        <label><input id="stratForceFetch" type="checkbox"> Force re-fetch prices</label>
-        <label><input id="stratUseFractal" type="checkbox" checked> Williams fractal filter</label>
-        <label><input id="stratBreakout" type="checkbox"> Fractal breakout</label>
-        <label><input id="stratAllowShorts" type="checkbox" checked> Allow shorts</label>
-      </div>
-      <div class="row">
-        <label><input id="stratUseChandelier" type="checkbox"> Chandelier trailing stop</label>
-        <label class="muted">Chandelier bars</label>
-        <input id="stratChandelierPeriod" type="number" min="2" step="1" value="22" style="width:70px">
-        <label class="muted">ATR bars</label>
-        <input id="stratChandelierAtrPeriod" type="number" min="2" step="1" value="22" style="width:70px">
-        <label class="muted">ATR x</label>
-        <input id="stratChandelierAtrMult" type="number" min="0.5" step="0.1" value="3.0" style="width:70px">
-        <label class="muted">Same-bar fill</label>
-        <select id="stratExitFillPolicy">
-          <option value="stop_first" selected>stop first</option>
-          <option value="target_first">target first</option>
-        </select>
-      </div>
+
+      <aside class="card guide-card">
+        <div class="section-kicker">Model Guide</div>
+        <h3 class="guide-title" id="stratGuideTitle">Daily technical model</h3>
+        <p class="guide-summary" id="stratGuideSummary"></p>
+        <ul class="guide-list" id="stratGuideBullets"></ul>
+
+        <div class="glossary">
+          <div class="term">
+            <strong>Williams Fractal</strong>
+            A local swing pattern. A high fractal forms when the middle candle has the highest high versus candles on both sides. A low fractal is the opposite.
+          </div>
+          <div class="term">
+            <strong>Fractal Breakout</strong>
+            Price must close through a confirmed fractal level before the strategy acts. This reduces early entries, but also reduces trade count.
+          </div>
+          <div class="term">
+            <strong>Break-Even Stop</strong>
+            Once the trade moves far enough in your favor, the active stop is pulled up to the entry price to remove initial downside.
+          </div>
+          <div class="term">
+            <strong>Chandelier Exit</strong>
+            A volatility-adjusted trailing stop that follows trend by referencing recent extremes and ATR.
+          </div>
+        </div>
+      </aside>
     </div>
     <div id="stratResults" style="display:none">
       <div class="grid-2-equal" style="margin-bottom:16px">
@@ -277,7 +417,7 @@
       </div>
       <div class="card" id="tradeReplayCard" style="display:none;margin-bottom:16px">
         <h2>Trade Replay (No Lookahead)</h2>
-        <p class="muted">Each replay starts at the trade entry with fixed stop-loss and take-profit from that moment. Bars are revealed forward only.</p>
+        <p class="muted">Each replay starts at the trade entry. Bars are revealed forward only, and the active stop can tighten later from break-even or trailing logic.</p>
         <div class="row">
           <button class="secondary" id="replayPrevBtn">Prev Trade</button>
           <button class="secondary" id="replayNextBtn">Next Trade</button>
@@ -716,23 +856,40 @@ function rollingMin(values, period){
   for(let i=period-1;i<values.length;i++)out[i]=Math.min(...values.slice(i-period+1,i+1));
   return out;
 }
-function computeChandelierPath(bars, trade, config, startIdx, endIdx){
+function computeActiveStopPath(bars, trade, config, startIdx, endIdx){
   const path=Array(Math.max(endIdx-startIdx+1,0)).fill(null);
-  if(!config.use_chandelier_exit)return path;
+  if(!config.use_chandelier_exit&&!config.use_break_even_stop)return path;
   const period=Math.max(2,Number(config.chandelier_period||22));
   const atrPeriod=Math.max(2,Number(config.chandelier_atr_period||22));
   const atrMult=Math.max(0.1,Number(config.chandelier_atr_mult||3));
   const highs=bars.map(b=>b.high),lows=bars.map(b=>b.low),atr=computeAtrSeries(bars,atrPeriod);
   const hh=rollingMax(highs,period),ll=rollingMin(lows,period);
   let current=Number(trade.stopLoss);
+  const initialRisk=Math.abs(Number(trade.entryPrice)-Number(trade.stopLoss));
+  const triggerR=Math.max(0,Number(config.break_even_trigger_r||1));
   const lastStopIdx=trade.exitIdx!=null?trade.exitIdx:endIdx;
   for(let i=startIdx;i<=endIdx;i++){
     const rel=i-startIdx;
     if(i>=trade.entryIdx&&i<=lastStopIdx)path[rel]=current;
     if(i<trade.entryIdx)continue;
+    if(config.use_break_even_stop&&initialRisk>0&&triggerR>0){
+      const triggerDistance=initialRisk*triggerR;
+      const beReached=trade.direction==="long"
+        ? bars[i].high>=Number(trade.entryPrice)+triggerDistance
+        : bars[i].low<=Number(trade.entryPrice)-triggerDistance;
+      if(beReached){
+        if(trade.direction==="long"){
+          current=Math.max(current,Number(trade.entryPrice));
+          current=Math.min(current,Number(trade.takeProfit)-1e-6);
+        }else{
+          current=Math.min(current,Number(trade.entryPrice));
+          current=Math.max(current,Number(trade.takeProfit)+1e-6);
+        }
+      }
+    }
     const atrNow=atr[i];
     let candidate=null;
-    if(Number.isFinite(atrNow)){
+    if(config.use_chandelier_exit&&Number.isFinite(atrNow)){
       candidate=trade.direction==="long"?(hh[i]!=null?hh[i]-(atrNow*atrMult):null):(ll[i]!=null?ll[i]+(atrNow*atrMult):null);
     }
     if(Number.isFinite(candidate)){
@@ -831,14 +988,14 @@ function renderReplay(){
     lines.push({value:tr.ctx15m.support,color:"#2563eb",dash:[4,4],label:"15m Support"});
     lines.push({value:tr.ctx15m.resistance,color:"#2563eb",dash:[4,4],label:"15m Resistance"});
   }
-  const chandelierPath=computeChandelierPath(replayState.bars,tr,replayState.config,s,e);
+  const activeStopPath=computeActiveStopPath(replayState.bars,tr,replayState.config,s,e);
   drawCandlestickCanvas("chartReplay",{
     bars:visibleBars,
     bands:[tradeRange,executionBand].filter(Boolean),
     lines,
     series:[
-      replayState.config.use_chandelier_exit
-        ? {values:chandelierPath,color:"#7c3aed",width:1.8,dash:[8,4]}
+      replayState.config.use_chandelier_exit||replayState.config.use_break_even_stop
+        ? {values:activeStopPath,color:"#7c3aed",width:1.8,dash:[8,4]}
         : null
     ].filter(Boolean),
     markers:[
@@ -906,6 +1063,8 @@ function setupReplay(result){
   replayState.trades=mapped;
   replayState.config={
     strategy_variant:String(result.strategy_variant||""),
+    use_break_even_stop:Boolean(result.use_break_even_stop),
+    break_even_trigger_r:Number(result.break_even_trigger_r||1),
     use_chandelier_exit:Boolean(result.use_chandelier_exit),
     chandelier_period:Number(result.chandelier_period||22),
     chandelier_atr_period:Number(result.chandelier_atr_period||22),
@@ -979,6 +1138,7 @@ function useBinanceInStrategy(){
   document.getElementById("stratMode").value="intraday_custom";
   document.getElementById("stratDataSource").value="binance";
   document.getElementById("stratIntradayInterval").value=document.getElementById("binanceInterval").value;
+  renderStrategyGuide();
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach(x=>x.classList.remove("active"));
   document.querySelector('.tab[data-tab="strategy"]').classList.add("active");
@@ -1002,6 +1162,97 @@ function resolveStrategyDataSource(choice, ticker){
   return "yfinance";
 }
 
+const DAILY_STRATEGY_GUIDE={
+  title:"Daily technical model",
+  summary:"Daily swing model with trend filters, Stoch RSI timing, and optional Williams fractal confirmation on multi-year history.",
+  bullets:[
+    "Use this when you want slower swing testing on end-of-day candles.",
+    "Williams fractals are confirmed swing highs and lows, not predictive arrows.",
+    "Fractal breakout reduces false starts, but it also reduces trade count."
+  ]
+};
+const INTRADAY_STRATEGY_GUIDES={
+  fractal_breakout_ema200:{
+    title:"EMA200 + fractal breakout",
+    summary:"Trend-following breakout model that only trades in the EMA200 direction after price closes through a confirmed fractal swing.",
+    bullets:[
+      "Most mechanical intraday model.",
+      "Good if you want a simple trend + breakout structure.",
+      "Usually lower frequency than reversal-style engines."
+    ]
+  },
+  alligator_stoch_fractal:{
+    title:"Alligator + Stoch fractal",
+    summary:"Trend-pullback model that waits for aligned alligator lines plus a fresh fractal and an overbought / oversold Stoch RSI condition.",
+    bullets:[
+      "More selective than plain EMA breakout.",
+      "Designed to catch pullbacks rather than pure momentum continuation.",
+      "Can exit earlier on alligator line failure."
+    ]
+  },
+  price_action_3step:{
+    title:"3-step price action",
+    summary:"Context-first model: direction, then location, then execution. It enters only after rejection and break/close confirmation.",
+    bullets:[
+      "Best if you care about structure and location more than indicator signals.",
+      "Filters out 'middle of nowhere' trades.",
+      "Uses higher-timeframe narrative with lower-timeframe execution."
+    ]
+  },
+  mtf_liquidity_flow:{
+    title:"MTF liquidity flow",
+    summary:"Multi-timeframe liquidity-sweep framework. It maps higher-timeframe bias, refines the internal range, then executes on liquidation or shift signals.",
+    bullets:[
+      "Designed for support / resistance sweeps and reversals.",
+      "Most context-heavy intraday strategy in the app.",
+      "Useful when you want 4h / 15m / execution alignment."
+    ]
+  },
+  manipulation_ifvg:{
+    title:"Manipulation + inverse FVG",
+    summary:"Reversal model that waits for a liquidity sweep, then an inverse fair value gap confirmation before entering.",
+    bullets:[
+      "Focused on stop hunts and reclaim behavior.",
+      "Initial stop is anchored to the sweep wick.",
+      "Usually works better as a reversal engine than as a trend follower."
+    ]
+  }
+};
+
+function renderStrategyGuide(){
+  const mode=document.getElementById("stratMode").value;
+  const variant=document.getElementById("stratIntradayVariant").value;
+  const isIntraday=mode==="intraday_custom";
+  const guide=isIntraday?(INTRADAY_STRATEGY_GUIDES[variant]||INTRADAY_STRATEGY_GUIDES.fractal_breakout_ema200):DAILY_STRATEGY_GUIDE;
+  let breakoutLabel="Require fractal breakout";
+  let breakoutHelp="Only enter once price breaks through the confirmed fractal swing level instead of reacting at the level itself.";
+  if(isIntraday){
+    breakoutLabel=variant==="fractal_breakout_ema200"?"Require fractal breakout":"Use tighter breakout trigger";
+    if(variant==="fractal_breakout_ema200"){
+      breakoutHelp="Require a cleaner close through the last confirmed fractal swing before the entry is accepted.";
+    }else if(variant==="manipulation_ifvg"){
+      breakoutHelp="Adds a stricter reclaim of the inverse FVG boundary so the reversal must prove itself more clearly.";
+    }else if(variant==="mtf_liquidity_flow"){
+      breakoutHelp="Adds a small confirmation buffer to the breakout or structure-shift condition before the trade is allowed.";
+    }else if(variant==="price_action_3step"){
+      breakoutHelp="Requires a slightly cleaner break/close through the execution trigger before the entry is accepted.";
+    }else{
+      breakoutHelp="Adds a stricter breakout buffer so the intraday signal needs a cleaner confirmation.";
+    }
+  }
+  document.getElementById("strategyDailyControls").style.display=isIntraday?"none":"";
+  document.getElementById("strategyIntradayControls").style.display=isIntraday?"":"none";
+  document.getElementById("strategyFractalCard").style.display=isIntraday?"none":"";
+  document.getElementById("stratModeSummary").textContent=isIntraday
+    ? "Intraday / MTF mode uses bar-based logic. Use Binance when you need multi-year crypto history on 5m, 15m, or 60m bars."
+    : "Daily swing mode uses end-of-day candles and longer history windows. Fractal controls here refer to confirmed daily swing highs and lows.";
+  document.getElementById("stratBreakoutLabelText").textContent=breakoutLabel;
+  document.getElementById("stratBreakoutHelp").textContent=breakoutHelp;
+  document.getElementById("stratGuideTitle").textContent=guide.title;
+  document.getElementById("stratGuideSummary").textContent=guide.summary;
+  document.getElementById("stratGuideBullets").innerHTML=(guide.bullets||[]).map(item=>`<li>${item}</li>`).join("");
+}
+
 // ---- Tab 4: Strategy ----
 async function runStrategy(){
   const tk=document.getElementById("stratTicker").value.trim().toUpperCase();
@@ -1017,6 +1268,8 @@ async function runStrategy(){
   const fractalBreakout=document.getElementById("stratBreakout").checked;
   const allowShorts=document.getElementById("stratAllowShorts").checked;
   const dataSourceChoice=document.getElementById("stratDataSource").value;
+  const useBreakEven=document.getElementById("stratUseBreakEven").checked;
+  const breakEvenTriggerR=Number(document.getElementById("stratBreakEvenR").value||1);
   const useChandelier=document.getElementById("stratUseChandelier").checked;
   const chandelierPeriod=Number(document.getElementById("stratChandelierPeriod").value||22);
   const chandelierAtrPeriod=Number(document.getElementById("stratChandelierAtrPeriod").value||22);
@@ -1054,6 +1307,8 @@ async function runStrategy(){
           break_buffer_bps:fractalBreakout?5:0,
           trigger_buffer_bps:1,
           stop_buffer_bps:5,
+          use_break_even_stop:useBreakEven,
+          break_even_trigger_r:breakEvenTriggerR,
           use_volume_filter:false,
           min_rel_volume:1.0
           ,use_chandelier_exit:useChandelier
@@ -1080,6 +1335,9 @@ async function runStrategy(){
           manipulation_max_age_bars:14,
           ifvg_proximity_bars:16,
           ifvg_break_buffer_bps:fractalBreakout?5:0,
+          stop_buffer_bps:5,
+          use_break_even_stop:useBreakEven,
+          break_even_trigger_r:breakEvenTriggerR,
           use_volume_filter:false,
           min_rel_volume:1.0,
           use_chandelier_exit:useChandelier,
@@ -1109,6 +1367,8 @@ async function runStrategy(){
           failure_lookback_bars:6,
           break_buffer_bps:fractalBreakout?5:0,
           stop_buffer_bps:5.0,
+          use_break_even_stop:useBreakEven,
+          break_even_trigger_r:breakEvenTriggerR,
           use_volume_filter:false,
           min_rel_volume:1.0,
           use_chandelier_exit:useChandelier,
@@ -1129,6 +1389,9 @@ async function runStrategy(){
           fractal_window:9,
           rr_multiple:1.5,
           breakout_buffer_bps:fractalBreakout?5:0,
+          stop_buffer_bps:5,
+          use_break_even_stop:useBreakEven,
+          break_even_trigger_r:breakEvenTriggerR,
           allow_shorts:allowShorts,
           allow_longs:true,
           use_chandelier_exit:useChandelier,
@@ -1139,7 +1402,7 @@ async function runStrategy(){
         };
     const body=isIntraday
       ? intradayBody
-      : {ticker:tk,initial_capital:capital,fetch_period:period,force_fetch:force,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true,use_chandelier_exit:useChandelier,chandelier_period:chandelierPeriod,chandelier_atr_period:chandelierAtrPeriod,chandelier_atr_mult:chandelierAtrMult,exit_fill_policy:exitFillPolicy};
+      : {ticker:tk,initial_capital:capital,fetch_period:period,force_fetch:force,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true,use_break_even_stop:useBreakEven,break_even_trigger_r:breakEvenTriggerR,use_chandelier_exit:useChandelier,chandelier_period:chandelierPeriod,chandelier_atr_period:chandelierAtrPeriod,chandelier_atr_mult:chandelierAtrMult,exit_fill_policy:exitFillPolicy};
     const d=await fetchJson(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     document.getElementById("stratResults").style.display="";
     const retCls=d.total_return_pct>=0?"var(--green)":"var(--red)";
@@ -1173,6 +1436,7 @@ async function runStrategy(){
       <div class="score-item"><div class="label">Clean Trades</div><div class="value">${cleanTrades.length}</div></div>
       <div class="score-item"><div class="label">Clean Win Rate</div><div class="value">${cleanWinRate.toFixed(1)}%</div></div>
       <div class="score-item"><div class="label">Clean PF</div><div class="value">${cleanPf.toFixed(2)}</div></div>
+      <div class="score-item"><div class="label">Break-Even</div><div class="value" style="font-size:12px">${d.use_break_even_stop?`enabled<br>${(d.break_even_trigger_r??1).toFixed(2)}R`:"off"}</div></div>
       <div class="score-item"><div class="label">Trailing Exit</div><div class="value" style="font-size:12px">${d.use_chandelier_exit?"chandelier":"default"}${d.use_chandelier_exit?`<br>${d.chandelier_period}/${d.chandelier_atr_period} x ${d.chandelier_atr_mult}`:""}</div></div>
       <div class="score-item"><div class="label">Fill Policy</div><div class="value" style="font-size:12px">${d.exit_fill_policy||"stop_first"}</div></div>
       <div class="score-item"><div class="label">Period</div><div class="value" style="font-size:13px">${d.start_date}<br>${d.end_date}</div></div>`;
@@ -1197,6 +1461,8 @@ async function runStrategy(){
   }catch(e){stopReplay();document.getElementById("tradeReplayCard").style.display="none";destroyChart("replay");log("Strategy backtest failed: "+String(e))}finally{btn.disabled=false;btn.textContent="Run Backtest"}
 }
 document.getElementById("stratRunBtn").addEventListener("click",runStrategy);
+document.getElementById("stratMode").addEventListener("change",renderStrategyGuide);
+document.getElementById("stratIntradayVariant").addEventListener("change",renderStrategyGuide);
 document.getElementById("replayPrevBtn").addEventListener("click",()=>selectReplayTrade(replayState.tradeIndex-1));
 document.getElementById("replayNextBtn").addEventListener("click",()=>selectReplayTrade(replayState.tradeIndex+1));
 document.getElementById("replayPlayBtn").addEventListener("click",replayToggle);
@@ -1207,6 +1473,7 @@ document.getElementById("binanceUseInStrategyBtn").addEventListener("click",useB
 document.querySelectorAll(".binance-preset-btn").forEach(btn=>btn.addEventListener("click",()=>{document.getElementById("binanceTicker").value=btn.dataset.ticker||"BTC-USD"}));
 window.addEventListener("resize",()=>{if(replayState.trades.length)renderReplay();if(binanceState.data)renderBinanceChart()});
 
+renderStrategyGuide();
 loadCompanies();
 </script>
 </body>

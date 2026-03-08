@@ -14,8 +14,10 @@ from edgar.services.edgar_client import EdgarClient, RateLimiter
 from edgar.services.strategy import (
     BacktestResult,
     Trade,
+    _break_even_stop_candidate,
     _chandelier_stop_candidate,
     _resolve_bar_bracket_exit,
+    _stop_is_break_even_or_better,
     _williams_fractals,
     backtest_to_dict,
 )
@@ -167,6 +169,38 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_backtest.call_args.kwargs["chandelier_atr_period"], 14)
         self.assertEqual(mock_backtest.call_args.kwargs["chandelier_atr_mult"], 2.5)
         self.assertEqual(mock_backtest.call_args.kwargs["exit_fill_policy"], "target_first")
+
+    @patch("edgar.services.strategy.run_backtest")
+    def test_strategy_daily_endpoint_passes_break_even_options(self, mock_backtest):
+        mock_backtest.return_value = BacktestResult(
+            ticker="AAPL",
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),
+            initial_capital=10000.0,
+            final_capital=10100.0,
+            total_return_pct=1.0,
+            total_trades=0,
+            winning_trades=0,
+            losing_trades=0,
+            win_rate=0.0,
+            max_drawdown_pct=0.0,
+        )
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "fetch_period": "5y",
+            "use_break_even_stop": True,
+            "break_even_trigger_r": 1.25,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_backtest.assert_called_once()
+        self.assertTrue(mock_backtest.call_args.kwargs["use_break_even_stop"])
+        self.assertEqual(mock_backtest.call_args.kwargs["break_even_trigger_r"], 1.25)
 
     @patch("edgar.drf_views.EdgarClient.company_facts")
     def test_bulk_ingestion_endpoint(self, mock_company_facts):
@@ -412,6 +446,96 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_intraday.call_args.kwargs["chandelier_atr_mult"], 2.7)
         self.assertEqual(mock_intraday.call_args.kwargs["exit_fill_policy"], "target_first")
 
+    @patch("edgar.services.intraday_strategy.run_intraday_backtest")
+    def test_strategy_intraday_endpoint_passes_break_even_options(self, mock_intraday):
+        mock_intraday.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "15m",
+            "strategy_variant": "fractal_breakout_ema200",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10100,
+            "total_return_pct": 1.0,
+            "total_trades": 2,
+            "long_trades": 1,
+            "short_trades": 1,
+            "winning_trades": 1,
+            "losing_trades": 1,
+            "win_rate": 50.0,
+            "max_drawdown_pct": 2.0,
+            "profit_factor": 1.2,
+            "cagr_pct": 0.5,
+            "avg_trade_return_pct": 0.2,
+            "exposure_pct": 10.0,
+            "total_fees": 3.5,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "15m",
+            "lookback_years": 2,
+            "strategy_variant": "fractal_breakout_ema200",
+            "use_break_even_stop": True,
+            "break_even_trigger_r": 1.5,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_intraday.assert_called_once()
+        self.assertTrue(mock_intraday.call_args.kwargs["use_break_even_stop"])
+        self.assertEqual(mock_intraday.call_args.kwargs["break_even_trigger_r"], 1.5)
+
+    @patch("edgar.services.intraday_strategy.run_intraday_backtest")
+    def test_strategy_intraday_endpoint_passes_stop_buffer(self, mock_intraday):
+        mock_intraday.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "15m",
+            "strategy_variant": "fractal_breakout_ema200",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10100,
+            "total_return_pct": 1.0,
+            "total_trades": 2,
+            "long_trades": 1,
+            "short_trades": 1,
+            "winning_trades": 1,
+            "losing_trades": 1,
+            "win_rate": 50.0,
+            "max_drawdown_pct": 2.0,
+            "profit_factor": 1.2,
+            "cagr_pct": 0.5,
+            "avg_trade_return_pct": 0.2,
+            "exposure_pct": 10.0,
+            "total_fees": 3.5,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "15m",
+            "lookback_years": 2,
+            "strategy_variant": "fractal_breakout_ema200",
+            "stop_buffer_bps": 9.0,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_intraday.assert_called_once()
+        self.assertEqual(mock_intraday.call_args.kwargs["stop_buffer_bps"], 9.0)
+
     def test_strategy_intraday_endpoint_missing_ticker(self):
         res = self.client.post(
             "/api/edgar/drf/strategy/backtest-intraday/",
@@ -469,6 +593,50 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_manipulation.call_args.kwargs["lookback_years"], 2.0)
         self.assertEqual(mock_manipulation.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_manipulation.call_args.kwargs["auto_adjust_for_yf_limits"])
+
+    @patch("edgar.services.manipulation_strategy.run_manipulation_backtest")
+    def test_strategy_intraday_endpoint_manipulation_passes_stop_buffer(self, mock_manipulation):
+        mock_manipulation.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "60m",
+            "strategy_variant": "manipulation_ifvg",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10400,
+            "total_return_pct": 4.0,
+            "total_trades": 6,
+            "long_trades": 3,
+            "short_trades": 3,
+            "winning_trades": 4,
+            "losing_trades": 2,
+            "win_rate": 66.7,
+            "max_drawdown_pct": 3.2,
+            "profit_factor": 1.8,
+            "cagr_pct": 2.1,
+            "avg_trade_return_pct": 0.5,
+            "exposure_pct": 8.4,
+            "total_fees": 8.1,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "60m",
+            "lookback_years": 2,
+            "strategy_variant": "manipulation_ifvg",
+            "stop_buffer_bps": 11.0,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_manipulation.assert_called_once()
+        self.assertEqual(mock_manipulation.call_args.kwargs["stop_buffer_bps"], 11.0)
 
     @patch("edgar.services.market_mechanics_strategy.run_market_mechanics_backtest")
     def test_strategy_intraday_endpoint_price_action_variant(self, mock_market_mechanics):
@@ -788,7 +956,55 @@ class BinanceDataTests(TestCase):
         mock_yf_fetch.assert_not_called()
 
 
+class ManipulationStopLogicTests(TestCase):
+    def test_initial_long_stop_uses_sweep_wick_not_ifvg_edge(self):
+        from edgar.services.manipulation_strategy import _FVG, _initial_stop_from_event
+
+        stop_loss, stop_source = _initial_stop_from_event(
+            direction="long",
+            ifvg=_FVG(kind="bearish", idx=10, zone_low=98.0, zone_high=99.0),
+            event={"idx": 12, "level": 100.0, "sweep_low": 96.0},
+            stop_buffer=0.001,
+        )
+
+        self.assertEqual(stop_source, "sweep_wick")
+        self.assertAlmostEqual(stop_loss, 95.904, places=6)
+
+    def test_initial_short_stop_uses_sweep_wick_not_ifvg_edge(self):
+        from edgar.services.manipulation_strategy import _FVG, _initial_stop_from_event
+
+        stop_loss, stop_source = _initial_stop_from_event(
+            direction="short",
+            ifvg=_FVG(kind="bullish", idx=10, zone_low=101.0, zone_high=102.0),
+            event={"idx": 12, "level": 100.0, "sweep_high": 104.0},
+            stop_buffer=0.001,
+        )
+
+        self.assertEqual(stop_source, "sweep_wick")
+        self.assertAlmostEqual(stop_loss, 104.104, places=6)
+
+
 class StrategySerializationTests(TestCase):
+    def test_break_even_helpers(self):
+        self.assertEqual(
+            _break_even_stop_candidate(
+                direction="long",
+                entry_price=100.0,
+                initial_stop=95.0,
+                bar_high=105.0,
+                bar_low=99.0,
+                trigger_r=1.0,
+            ),
+            100.0,
+        )
+        self.assertTrue(
+            _stop_is_break_even_or_better(
+                direction="long",
+                entry_price=100.0,
+                active_stop=100.0,
+            )
+        )
+
     def test_backtest_payload_uses_volume_fields_not_buffett_fields(self):
         trade = Trade(
             direction="long",
@@ -832,12 +1048,16 @@ class StrategySerializationTests(TestCase):
             total_fees=2.5,
             long_trades=1,
             short_trades=0,
+            use_break_even_stop=True,
+            break_even_trigger_r=1.0,
             trades=[trade],
             equity_curve=[{"date": "2024-01-02", "equity": 10010.0, "capital": 10000.0}],
         )
         payload = backtest_to_dict(result)
         self.assertIn("profit_factor", payload)
         self.assertIn("cagr_pct", payload)
+        self.assertIn("use_break_even_stop", payload)
+        self.assertIn("break_even_trigger_r", payload)
         self.assertIn("long_trades", payload)
         self.assertIn("short_trades", payload)
         self.assertIn("use_chandelier_exit", payload)

@@ -534,6 +534,8 @@ class StrategyViewSet(viewsets.ViewSet):
         allow_longs = _as_bool(request.data.get("allow_longs"), True)
         require_fractal_confirmation = _as_bool(request.data.get("require_fractal_confirmation"), True)
         require_fractal_breakout = _as_bool(request.data.get("require_fractal_breakout"), False)
+        use_break_even_stop = _as_bool(request.data.get("use_break_even_stop"), False)
+        break_even_trigger_r = float(request.data.get("break_even_trigger_r", 1.0))
         use_chandelier_exit = _as_bool(request.data.get("use_chandelier_exit"), False)
         chandelier_period = int(request.data.get("chandelier_period", 22))
         chandelier_atr_period = int(request.data.get("chandelier_atr_period", 22))
@@ -553,6 +555,8 @@ class StrategyViewSet(viewsets.ViewSet):
                 lookback_years=lookback_years,
                 force_fetch=force_fetch,
                 fetch_period=fetch_period,
+                use_break_even_stop=use_break_even_stop,
+                break_even_trigger_r=break_even_trigger_r,
                 use_chandelier_exit=use_chandelier_exit,
                 chandelier_period=chandelier_period,
                 chandelier_atr_period=chandelier_atr_period,
@@ -588,6 +592,8 @@ class StrategyViewSet(viewsets.ViewSet):
         strategy_variant = (request.data.get("strategy_variant") or "fractal_breakout_ema200").strip()
         allow_shorts = _as_bool(request.data.get("allow_shorts"), True)
         allow_longs = _as_bool(request.data.get("allow_longs"), True)
+        use_break_even_stop = _as_bool(request.data.get("use_break_even_stop"), False)
+        break_even_trigger_r = float(request.data.get("break_even_trigger_r", 1.0))
         use_chandelier_exit = _as_bool(request.data.get("use_chandelier_exit"), False)
         chandelier_period = int(request.data.get("chandelier_period", 22))
         chandelier_atr_period = int(request.data.get("chandelier_atr_period", 22))
@@ -625,6 +631,8 @@ class StrategyViewSet(viewsets.ViewSet):
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),
                     slippage_bps=float(request.data.get("slippage_bps", 4.0)),
                     commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    use_break_even_stop=use_break_even_stop,
+                    break_even_trigger_r=break_even_trigger_r,
                     use_chandelier_exit=use_chandelier_exit,
                     chandelier_period=chandelier_period,
                     chandelier_atr_period=chandelier_atr_period,
@@ -659,6 +667,8 @@ class StrategyViewSet(viewsets.ViewSet):
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),
                     slippage_bps=float(request.data.get("slippage_bps", 4.0)),
                     commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    use_break_even_stop=use_break_even_stop,
+                    break_even_trigger_r=break_even_trigger_r,
                     use_chandelier_exit=use_chandelier_exit,
                     chandelier_period=chandelier_period,
                     chandelier_atr_period=chandelier_atr_period,
@@ -688,7 +698,7 @@ class StrategyViewSet(viewsets.ViewSet):
                             request.data.get("breakout_buffer_bps", 0.0),
                         )
                     ),
-                    stop_buffer_bps=float(request.data.get("stop_buffer_bps", 3.0)),
+                    stop_buffer_bps=float(request.data.get("stop_buffer_bps", 5.0)),
                     rr_multiple=float(request.data.get("rr_multiple", 2.0)),
                     volume_period=int(request.data.get("volume_period", 40)),
                     use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
@@ -698,6 +708,8 @@ class StrategyViewSet(viewsets.ViewSet):
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),
                     slippage_bps=float(request.data.get("slippage_bps", 4.0)),
                     commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    use_break_even_stop=use_break_even_stop,
+                    break_even_trigger_r=break_even_trigger_r,
                     use_chandelier_exit=use_chandelier_exit,
                     chandelier_period=chandelier_period,
                     chandelier_atr_period=chandelier_atr_period,
@@ -723,6 +735,9 @@ class StrategyViewSet(viewsets.ViewSet):
                     fractal_window=int(request.data.get("fractal_window", 9)),
                     rr_multiple=float(request.data.get("rr_multiple", 1.5)),
                     breakout_buffer_bps=float(request.data.get("breakout_buffer_bps", 0.0)),
+                    stop_buffer_bps=float(request.data.get("stop_buffer_bps", 5.0)),
+                    use_break_even_stop=use_break_even_stop,
+                    break_even_trigger_r=break_even_trigger_r,
                     use_chandelier_exit=use_chandelier_exit,
                     chandelier_period=chandelier_period,
                     chandelier_atr_period=chandelier_atr_period,

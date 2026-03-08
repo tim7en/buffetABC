@@ -27,11 +27,13 @@ from datetime import datetime, timedelta, timezone
 from edgar.services.binance_data import fetch_binance_klines
 from edgar.services.strategy import (
     _atr,
+    _break_even_stop_candidate,
     _chandelier_stop_candidate,
     _resolve_bar_bracket_exit,
     _rolling_highest,
     _rolling_lowest,
     _sma,
+    _stop_is_break_even_or_better,
     _stop_is_trailed,
     _stochastic_rsi,
     _tighten_stop,
@@ -277,6 +279,7 @@ def run_intraday_backtest(
     ema_period: int = 200,
     fractal_window: int = 9,
     breakout_buffer_bps: float = 0.0,
+    stop_buffer_bps: float = 5.0,
     rr_multiple: float = 1.5,
     stoch_rsi_period: int = 14,
     oversold: float = 20.0,
@@ -296,6 +299,8 @@ def run_intraday_backtest(
     commission_bps: float = 1.0,
     allow_longs: bool = True,
     allow_shorts: bool = True,
+    use_break_even_stop: bool = False,
+    break_even_trigger_r: float = 1.0,
     use_chandelier_exit: bool = False,
     chandelier_period: int = 22,
     chandelier_atr_period: int = 22,
@@ -405,6 +410,7 @@ def run_intraday_backtest(
     commission_rate = max(0.0, commission_bps) / 10_000.0
     slippage_rate = max(0.0, slippage_bps) / 10_000.0
     breakout_buffer = max(0.0, breakout_buffer_bps) / 10_000.0
+    stop_buffer = max(0.0, stop_buffer_bps) / 10_000.0
 
     capital = float(initial_capital)
     trades: list[_Trade] = []
@@ -476,11 +482,17 @@ def run_intraday_backtest(
 
             if raw_exit is not None:
                 open_trade.intrabar_conflict = intrabar_conflict
+                trailed_stop = _stop_is_trailed(open_trade.direction, open_trade.stop_loss, current_stop)
+                break_even_stop = use_break_even_stop and trailed_stop and _stop_is_break_even_or_better(
+                    direction=open_trade.direction,
+                    entry_price=open_trade.entry_price,
+                    active_stop=current_stop,
+                )
                 if hit_sl:
                     reason = (
-                        "chandelier_stop"
-                        if use_chandelier_exit and _stop_is_trailed(open_trade.direction, open_trade.stop_loss, current_stop)
-                        else "stop_loss"
+                        "break_even_stop"
+                        if break_even_stop
+                        else ("chandelier_stop" if use_chandelier_exit and trailed_stop else "stop_loss")
                     )
                 elif line_exit:
                     reason = "alligator_line_exit"
@@ -488,19 +500,36 @@ def run_intraday_backtest(
                     reason = "take_profit"
                 _close_trade(open_trade, i, raw_exit, reason)
                 open_trade = None
-            elif use_chandelier_exit:
-                tr_stop = _chandelier_stop_candidate(
-                    direction=open_trade.direction,
-                    idx=i,
-                    rolling_highs=chandelier_highs,
-                    rolling_lows=chandelier_lows,
-                    atr_values=chandelier_atr_vals,
-                    atr_mult=chandelier_atr_mult,
-                )
+            else:
+                next_stop = current_stop
+                if use_break_even_stop:
+                    next_stop = _tighten_stop(
+                        direction=open_trade.direction,
+                        current_stop=next_stop,
+                        candidate_stop=_break_even_stop_candidate(
+                            direction=open_trade.direction,
+                            entry_price=open_trade.entry_price,
+                            initial_stop=open_trade.stop_loss,
+                            bar_high=high_i,
+                            bar_low=low_i,
+                            trigger_r=break_even_trigger_r,
+                        ),
+                        take_profit=open_trade.take_profit,
+                    )
+                tr_stop = None
+                if use_chandelier_exit:
+                    tr_stop = _chandelier_stop_candidate(
+                        direction=open_trade.direction,
+                        idx=i,
+                        rolling_highs=chandelier_highs,
+                        rolling_lows=chandelier_lows,
+                        atr_values=chandelier_atr_vals,
+                        atr_mult=chandelier_atr_mult,
+                    )
                 open_trade.active_stop_loss = round(
                     _tighten_stop(
                         direction=open_trade.direction,
-                        current_stop=current_stop,
+                        current_stop=next_stop,
                         candidate_stop=tr_stop,
                         take_profit=open_trade.take_profit,
                     ),
@@ -618,7 +647,7 @@ def run_intraday_backtest(
         if direction == "long":
             if stop_anchor_low is None:
                 continue
-            stop_loss = float(stop_anchor_low)
+            stop_loss = float(stop_anchor_low) * (1.0 - stop_buffer)
             sl_distance = entry_price - stop_loss
             if sl_distance <= 0:
                 continue
@@ -626,7 +655,7 @@ def run_intraday_backtest(
         else:
             if stop_anchor_high is None:
                 continue
-            stop_loss = float(stop_anchor_high)
+            stop_loss = float(stop_anchor_high) * (1.0 + stop_buffer)
             sl_distance = stop_loss - entry_price
             if sl_distance <= 0:
                 continue
@@ -724,6 +753,8 @@ def run_intraday_backtest(
         "market_data_symbol": resolved_symbol,
         "strategy_variant": strategy_variant,
         "use_chandelier_exit": use_chandelier_exit,
+        "use_break_even_stop": use_break_even_stop,
+        "break_even_trigger_r": break_even_trigger_r,
         "chandelier_period": chandelier_period,
         "chandelier_atr_period": chandelier_atr_period,
         "chandelier_atr_mult": chandelier_atr_mult,

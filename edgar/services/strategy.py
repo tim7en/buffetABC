@@ -203,10 +203,40 @@ def _tighten_stop(
     return new_stop
 
 
+def _break_even_stop_candidate(
+    direction: str,
+    entry_price: float,
+    initial_stop: float,
+    bar_high: float,
+    bar_low: float,
+    trigger_r: float,
+) -> float | None:
+    if trigger_r <= 0:
+        return None
+    initial_risk = abs(entry_price - initial_stop)
+    if initial_risk <= 0:
+        return None
+    trigger_distance = initial_risk * trigger_r
+    if direction == "long":
+        return entry_price if bar_high >= (entry_price + trigger_distance) else None
+    return entry_price if bar_low <= (entry_price - trigger_distance) else None
+
+
 def _stop_is_trailed(direction: str, initial_stop: float, active_stop: float, tolerance: float = 1e-8) -> bool:
     if direction == "long":
         return active_stop > (initial_stop + tolerance)
     return active_stop < (initial_stop - tolerance)
+
+
+def _stop_is_break_even_or_better(
+    direction: str,
+    entry_price: float,
+    active_stop: float,
+    tolerance: float = 1e-8,
+) -> bool:
+    if direction == "long":
+        return active_stop >= (entry_price - tolerance)
+    return active_stop <= (entry_price + tolerance)
 
 
 def _resolve_bar_bracket_exit(
@@ -325,6 +355,8 @@ class BacktestResult:
     long_trades: int = 0
     short_trades: int = 0
     use_chandelier_exit: bool = False
+    use_break_even_stop: bool = False
+    break_even_trigger_r: float = 1.0
     chandelier_period: int = 22
     chandelier_atr_period: int = 22
     chandelier_atr_mult: float = 3.0
@@ -374,6 +406,8 @@ def run_backtest(
     max_fractal_stop_atr: float = 5.0,
     take_profit_rr: float = 2.0,
     trail_atr_mult: float = 2.2,
+    use_break_even_stop: bool = False,
+    break_even_trigger_r: float = 1.0,
     use_chandelier_exit: bool = False,
     chandelier_period: int = 22,
     chandelier_atr_period: int = 22,
@@ -533,6 +567,12 @@ def run_backtest(
 
             if raw_exit is not None:
                 open_trade.intrabar_conflict = intrabar_conflict
+                trailed_stop = _stop_is_trailed(open_trade.direction, open_trade.stop_loss, current_stop)
+                break_even_stop = use_break_even_stop and trailed_stop and _stop_is_break_even_or_better(
+                    direction=open_trade.direction,
+                    entry_price=open_trade.entry_price,
+                    active_stop=current_stop,
+                )
                 close_trade(
                     trade=open_trade,
                     exit_day=today,
@@ -541,18 +581,37 @@ def run_backtest(
                         "take_profit"
                         if hit_tp and not hit_sl
                         else (
-                            "chandelier_stop"
-                            if use_chandelier_exit and _stop_is_trailed(open_trade.direction, open_trade.stop_loss, current_stop)
+                            "break_even_stop"
+                            if break_even_stop
                             else (
-                                "atr_trailing_stop"
-                                if not use_chandelier_exit and _stop_is_trailed(open_trade.direction, open_trade.stop_loss, current_stop)
-                                else "stop_loss"
+                                "chandelier_stop"
+                                if use_chandelier_exit and trailed_stop
+                                else (
+                                    "atr_trailing_stop"
+                                    if not use_chandelier_exit and trailed_stop
+                                    else "stop_loss"
+                                )
                             )
                         )
                     ),
                 )
                 open_trade = None
             else:
+                next_stop = current_stop
+                if use_break_even_stop:
+                    next_stop = _tighten_stop(
+                        direction=open_trade.direction,
+                        current_stop=next_stop,
+                        candidate_stop=_break_even_stop_candidate(
+                            direction=open_trade.direction,
+                            entry_price=open_trade.entry_price,
+                            initial_stop=open_trade.stop_loss,
+                            bar_high=today_high,
+                            bar_low=today_low,
+                            trigger_r=break_even_trigger_r,
+                        ),
+                        take_profit=open_trade.take_profit,
+                    )
                 if use_chandelier_exit:
                     tr_stop = _chandelier_stop_candidate(
                         direction=open_trade.direction,
@@ -573,7 +632,7 @@ def run_backtest(
                 open_trade.active_stop_loss = round(
                     _tighten_stop(
                         direction=open_trade.direction,
-                        current_stop=current_stop,
+                        current_stop=next_stop,
                         candidate_stop=tr_stop,
                         take_profit=open_trade.take_profit,
                     ),
@@ -829,6 +888,8 @@ def run_backtest(
         long_trades=len(long_trades),
         short_trades=len(short_trades),
         use_chandelier_exit=use_chandelier_exit,
+        use_break_even_stop=use_break_even_stop,
+        break_even_trigger_r=break_even_trigger_r,
         chandelier_period=chandelier_period,
         chandelier_atr_period=chandelier_atr_period,
         chandelier_atr_mult=chandelier_atr_mult,
@@ -861,6 +922,8 @@ def backtest_to_dict(result: BacktestResult) -> dict:
         "long_trades": result.long_trades,
         "short_trades": result.short_trades,
         "use_chandelier_exit": result.use_chandelier_exit,
+        "use_break_even_stop": result.use_break_even_stop,
+        "break_even_trigger_r": result.break_even_trigger_r,
         "chandelier_period": result.chandelier_period,
         "chandelier_atr_period": result.chandelier_atr_period,
         "chandelier_atr_mult": result.chandelier_atr_mult,
