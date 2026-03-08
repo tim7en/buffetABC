@@ -18,6 +18,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from edgar.services.binance_data import fetch_binance_klines
 from edgar.services.strategy import _sma
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,25 @@ def _resolve_effective_interval(
         f"Requested lookback {lookback_days} days exceeds supported intraday history. "
         "Use <=730 days with 60m/90m, or reduce lookback."
     )
+
+
+def _bars_per_day_24x7(interval: str) -> int:
+    minutes = max(_interval_to_minutes(interval), 1)
+    return max(int((24 * 60) / minutes), 1)
+
+
+def _resolve_market_data_source(market_data_source: str, ticker: str) -> str:
+    source = (market_data_source or "auto").strip().lower()
+    if source in {"yfinance", "yf"}:
+        return "yfinance"
+    if source in {"binance", "binance_spot"}:
+        return "binance"
+    if source == "auto":
+        text = (ticker or "").strip().upper()
+        if text.startswith("BTC") or text.startswith("PAXG"):
+            return "binance"
+        return "yfinance"
+    raise ValueError("market_data_source must be one of ['auto', 'yfinance', 'binance']")
 
 
 def _fetch_intraday_bars(
@@ -437,6 +457,8 @@ def run_market_mechanics_backtest(
     initial_capital: float = 10_000.0,
     interval: str = "60m",
     lookback_years: float = 2.0,
+    market_data_source: str = "auto",
+    market_data_symbol: str | None = None,
     auto_adjust_for_yf_limits: bool = True,
     rr_multiple: float = 3.0,
     direction_pivot_window: int = 3,
@@ -465,21 +487,27 @@ def run_market_mechanics_backtest(
     if not allow_longs and not allow_shorts:
         raise ValueError("At least one of allow_longs / allow_shorts must be true")
 
-    requested_interval = interval
-    effective_interval, interval_adjustment = _resolve_effective_interval(
-        requested_interval=requested_interval,
-        lookback_years=lookback_years,
-        auto_adjust_for_yf_limits=auto_adjust_for_yf_limits,
-    )
+    resolved_source = _resolve_market_data_source(market_data_source=market_data_source, ticker=ticker)
 
-    lookback_days = max(int(365.25 * lookback_years), 1)
-    max_days = _max_lookback_days_for_interval(effective_interval)
-    if max_days is not None and lookback_days > max_days:
-        raise ValueError(
-            f"Yahoo Finance limit for interval={effective_interval} is about {max_days} days. "
-            f"Requested {lookback_days} days (~{lookback_years}y). "
-            "Use a shorter window, or allow auto-adjust with 60m/90m."
+    requested_interval = interval
+    interval_adjustment = None
+    if resolved_source == "yfinance":
+        effective_interval, interval_adjustment = _resolve_effective_interval(
+            requested_interval=requested_interval,
+            lookback_years=lookback_years,
+            auto_adjust_for_yf_limits=auto_adjust_for_yf_limits,
         )
+
+        lookback_days = max(int(365.25 * lookback_years), 1)
+        max_days = _max_lookback_days_for_interval(effective_interval)
+        if max_days is not None and lookback_days > max_days:
+            raise ValueError(
+                f"Yahoo Finance limit for interval={effective_interval} is about {max_days} days. "
+                f"Requested {lookback_days} days (~{lookback_years}y). "
+                "Use a shorter window, or allow auto-adjust with 60m/90m."
+            )
+    else:
+        effective_interval = requested_interval
 
     base_minutes = max(_interval_to_minutes(effective_interval), 1)
     htf_factor = max(1, int(round(240 / base_minutes)))  # 4h proxy
@@ -487,16 +515,30 @@ def run_market_mechanics_backtest(
 
     dir_window = max(2, direction_pivot_window * htf_factor)
     loc_window = max(2, location_pivot_window * mtf_factor)
-    bars_per_day = max(_bars_per_day(effective_interval), 1)
+    bars_per_day = (
+        max(_bars_per_day(effective_interval), 1)
+        if resolved_source == "yfinance"
+        else _bars_per_day_24x7(effective_interval)
+    )
     warmup_bars = max(dir_window * 8, loc_window * 6, volume_period + 20, 140)
     warmup_days = max(int(warmup_bars / bars_per_day) + 20, 45)
 
-    bars = _fetch_intraday_bars(
-        ticker=ticker,
-        interval=effective_interval,
-        lookback_years=lookback_years,
-        warmup_days=warmup_days,
-    )
+    resolved_symbol = ticker.upper()
+    if resolved_source == "binance":
+        bars, resolved_symbol = fetch_binance_klines(
+            ticker=ticker,
+            interval=effective_interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+    else:
+        bars = _fetch_intraday_bars(
+            ticker=ticker,
+            interval=effective_interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+        )
     if len(bars) < warmup_bars + 30:
         raise ValueError(f"Insufficient intraday data for {ticker}: {len(bars)} bars")
 
@@ -862,6 +904,8 @@ def run_market_mechanics_backtest(
         "requested_interval": requested_interval,
         "effective_interval": effective_interval,
         "interval_adjustment": interval_adjustment,
+        "market_data_source": resolved_source,
+        "market_data_symbol": resolved_symbol,
         "strategy_variant": "price_action_3step",
         "lookback_years": lookback_years,
         "bar_count": len(equity_curve),

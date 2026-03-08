@@ -309,6 +309,7 @@ class DrfApiTests(TestCase):
             mock_intraday.call_args.kwargs["strategy_variant"],
             "fractal_breakout_ema200",
         )
+        self.assertEqual(mock_intraday.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_intraday.call_args.kwargs["auto_adjust_for_yf_limits"])
 
     def test_strategy_intraday_endpoint_missing_ticker(self):
@@ -366,6 +367,7 @@ class DrfApiTests(TestCase):
         self.assertEqual(payload["strategy_variant"], "manipulation_ifvg")
         mock_manipulation.assert_called_once()
         self.assertEqual(mock_manipulation.call_args.kwargs["lookback_years"], 2.0)
+        self.assertEqual(mock_manipulation.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_manipulation.call_args.kwargs["auto_adjust_for_yf_limits"])
 
     @patch("edgar.services.market_mechanics_strategy.run_market_mechanics_backtest")
@@ -415,6 +417,7 @@ class DrfApiTests(TestCase):
         self.assertEqual(payload["strategy_variant"], "price_action_3step")
         mock_market_mechanics.assert_called_once()
         self.assertEqual(mock_market_mechanics.call_args.kwargs["lookback_years"], 2.0)
+        self.assertEqual(mock_market_mechanics.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_market_mechanics.call_args.kwargs["auto_adjust_for_yf_limits"])
 
     @patch("edgar.services.mtf_liquidity_flow_strategy.run_mtf_liquidity_flow_backtest")
@@ -467,6 +470,53 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_mtf_flow.call_args.kwargs["lookback_years"], 2.0)
         self.assertEqual(mock_mtf_flow.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_mtf_flow.call_args.kwargs["auto_adjust_for_yf_limits"])
+
+    @patch("edgar.services.market_mechanics_strategy.run_market_mechanics_backtest")
+    def test_strategy_intraday_endpoint_price_action_explicit_binance_source(self, mock_market_mechanics):
+        mock_market_mechanics.return_value = {
+            "ticker": "BTC-USD",
+            "data_mode": "intraday",
+            "interval": "5m",
+            "strategy_variant": "price_action_3step",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10325,
+            "total_return_pct": 3.25,
+            "total_trades": 5,
+            "long_trades": 3,
+            "short_trades": 2,
+            "winning_trades": 3,
+            "losing_trades": 2,
+            "win_rate": 60.0,
+            "max_drawdown_pct": 2.8,
+            "profit_factor": 1.7,
+            "cagr_pct": 1.8,
+            "avg_trade_return_pct": 0.6,
+            "exposure_pct": 7.5,
+            "total_fees": 6.2,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "BTC-USD",
+            "initial_capital": 10000,
+            "interval": "5m",
+            "lookback_years": 0.2,
+            "allow_shorts": True,
+            "strategy_variant": "price_action_3step",
+            "market_data_source": "binance",
+            "market_data_symbol": "BTCUSDT",
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_market_mechanics.assert_called_once()
+        self.assertEqual(mock_market_mechanics.call_args.kwargs["market_data_source"], "binance")
+        self.assertEqual(mock_market_mechanics.call_args.kwargs["market_data_symbol"], "BTCUSDT")
 
 
 class MtfIntervalPolicyTests(TestCase):
@@ -554,6 +604,43 @@ class BinanceDataTests(TestCase):
 
         mock_binance_fetch.return_value = (bars, "BTCUSDT")
         payload = run_mtf_liquidity_flow_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=0.1,
+            market_data_source="binance",
+            auto_adjust_for_yf_limits=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "binance")
+        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
+        self.assertEqual(payload["effective_interval"], "5m")
+        self.assertGreater(payload["bar_count"], 0)
+        mock_binance_fetch.assert_called_once()
+        mock_yf_fetch.assert_not_called()
+
+    @patch("edgar.services.intraday_strategy._fetch_intraday_bars")
+    @patch("edgar.services.intraday_strategy.fetch_binance_klines")
+    def test_intraday_strategy_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+        from edgar.services.intraday_strategy import run_intraday_backtest
+
+        start = datetime(2025, 1, 1)
+        bars = []
+        for i in range(2200):
+            ts = start + timedelta(minutes=5 * i)
+            px = 100.0 + (i * 0.02)
+            bars.append(
+                {
+                    "timestamp": ts,
+                    "open": px,
+                    "high": px + 0.3,
+                    "low": px - 0.3,
+                    "close": px + 0.1,
+                    "volume": 1000.0 + i,
+                }
+            )
+
+        mock_binance_fetch.return_value = (bars, "BTCUSDT")
+        payload = run_intraday_backtest(
             ticker="BTC-USD",
             interval="5m",
             lookback_years=0.1,

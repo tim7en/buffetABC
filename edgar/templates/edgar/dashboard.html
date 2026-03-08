@@ -227,14 +227,21 @@
         <label class="muted">Intraday interval</label>
         <select id="stratIntradayInterval">
           <option value="60m" selected>60m</option>
+          <option value="5m">5m</option>
           <option value="90m">90m</option>
           <option value="30m">30m</option>
           <option value="15m">15m</option>
         </select>
         <label class="muted">Lookback years</label>
         <input id="stratIntradayYears" type="number" min="0.05" step="0.05" value="2" style="width:90px">
+        <label class="muted">Data source</label>
+        <select id="stratDataSource">
+          <option value="auto" selected>auto</option>
+          <option value="binance">binance</option>
+          <option value="yfinance">yfinance</option>
+        </select>
       </div>
-      <p class="muted">Yahoo limit: 15m/30m intraday supports about 60 days, while 60m/90m can run multi-year windows.</p>
+      <p class="muted">Yahoo limit: 15m/30m intraday supports about 60 days, while 60m/90m can run multi-year windows. Binance supports multi-year 5m/15m/30m/60m on supported symbols (e.g., BTCUSDT, PAXGUSDT).</p>
       <div class="row">
         <label><input id="stratForceFetch" type="checkbox"> Force re-fetch prices</label>
         <label><input id="stratUseFractal" type="checkbox" checked> Williams fractal filter</label>
@@ -571,6 +578,13 @@ function deriveBinanceSymbol(ticker){
   if(t.endsWith("USD")&&t.length>3)return `${t.slice(0,-3)}USDT`;
   return t;
 }
+function resolveStrategyDataSource(choice, ticker){
+  const c=(choice||"auto").trim().toLowerCase();
+  if(c==="binance"||c==="yfinance")return c;
+  const t=(ticker||"").trim().toUpperCase();
+  if(t.startsWith("BTC")||t.startsWith("PAXG"))return "binance";
+  return "yfinance";
+}
 
 // ---- Tab 4: Strategy ----
 async function runStrategy(){
@@ -586,7 +600,10 @@ async function runStrategy(){
   const useFractal=document.getElementById("stratUseFractal").checked;
   const fractalBreakout=document.getElementById("stratBreakout").checked;
   const allowShorts=document.getElementById("stratAllowShorts").checked;
-  const useBinanceForCrypto=intradayVariant==="mtf_liquidity_flow"&&(tk.startsWith("BTC")||tk.startsWith("PAXG"));
+  const dataSourceChoice=document.getElementById("stratDataSource").value;
+  const resolvedDataSource=resolveStrategyDataSource(dataSourceChoice, tk);
+  const resolvedDataSymbol=resolvedDataSource==="binance"?deriveBinanceSymbol(tk):null;
+  const resolvedIntradayInterval=resolvedDataSource==="binance"&&intradayInterval==="90m"?"60m":intradayInterval;
   const btn=document.getElementById("stratRunBtn");
   btn.disabled=true;btn.textContent="Running...";
   try{
@@ -596,11 +613,11 @@ async function runStrategy(){
       ? {
           ticker:tk,
           initial_capital:capital,
-          interval:intradayInterval,
+          interval:resolvedIntradayInterval,
           lookback_years:intradayYears,
           strategy_variant:intradayVariant,
-          market_data_source:useBinanceForCrypto?"binance":"yfinance",
-          market_data_symbol:useBinanceForCrypto?deriveBinanceSymbol(tk):null,
+          market_data_source:resolvedDataSource,
+          market_data_symbol:resolvedDataSymbol,
           auto_adjust_for_yf_limits:true,
           entry_model:"hybrid",
           allow_shorts:allowShorts,
@@ -623,9 +640,11 @@ async function runStrategy(){
       ? {
           ticker:tk,
           initial_capital:capital,
-          interval:intradayInterval,
+          interval:resolvedIntradayInterval,
           lookback_years:intradayYears,
           strategy_variant:intradayVariant,
+          market_data_source:resolvedDataSource,
+          market_data_symbol:resolvedDataSymbol,
           auto_adjust_for_yf_limits:true,
           allow_shorts:allowShorts,
           allow_longs:true,
@@ -642,9 +661,11 @@ async function runStrategy(){
       ? {
           ticker:tk,
           initial_capital:capital,
-          interval:intradayInterval,
+          interval:resolvedIntradayInterval,
           lookback_years:intradayYears,
           strategy_variant:intradayVariant,
+          market_data_source:resolvedDataSource,
+          market_data_symbol:resolvedDataSymbol,
           auto_adjust_for_yf_limits:true,
           allow_shorts:allowShorts,
           allow_longs:true,
@@ -663,9 +684,11 @@ async function runStrategy(){
       : {
           ticker:tk,
           initial_capital:capital,
-          interval:intradayInterval,
+          interval:resolvedIntradayInterval,
           lookback_years:intradayYears,
           strategy_variant:intradayVariant,
+          market_data_source:resolvedDataSource,
+          market_data_symbol:resolvedDataSymbol,
           auto_adjust_for_yf_limits:true,
           fractal_window:9,
           rr_multiple:1.5,

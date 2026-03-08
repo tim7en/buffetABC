@@ -24,6 +24,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from edgar.services.binance_data import fetch_binance_klines
 from edgar.services.strategy import _sma, _stochastic_rsi, _williams_fractals
 
 logger = logging.getLogger(__name__)
@@ -96,6 +97,31 @@ def _resolve_effective_interval(
         f"Requested lookback {lookback_days} days exceeds supported intraday history. "
         "Use <=730 days with 60m/90m, or reduce lookback."
     )
+
+
+def _bars_per_day_24x7(interval: str) -> int:
+    text = (interval or "").strip().lower()
+    if text.endswith("m") and text[:-1].isdigit():
+        minutes = max(int(text[:-1]), 1)
+    elif text.endswith("h") and text[:-1].isdigit():
+        minutes = max(int(text[:-1]) * 60, 1)
+    else:
+        minutes = 60
+    return max(int((24 * 60) / minutes), 1)
+
+
+def _resolve_market_data_source(market_data_source: str, ticker: str) -> str:
+    source = (market_data_source or "auto").strip().lower()
+    if source in {"yfinance", "yf"}:
+        return "yfinance"
+    if source in {"binance", "binance_spot"}:
+        return "binance"
+    if source == "auto":
+        text = (ticker or "").strip().upper()
+        if text.startswith("BTC") or text.startswith("PAXG"):
+            return "binance"
+        return "yfinance"
+    raise ValueError("market_data_source must be one of ['auto', 'yfinance', 'binance']")
 
 
 def _ema(values: list[float], period: int) -> list[float | None]:
@@ -230,6 +256,8 @@ def run_intraday_backtest(
     initial_capital: float = 10_000.0,
     interval: str = "60m",
     lookback_years: float = 2.0,
+    market_data_source: str = "auto",
+    market_data_symbol: str | None = None,
     auto_adjust_for_yf_limits: bool = True,
     strategy_variant: str = "fractal_breakout_ema200",
     ema_period: int = 200,
@@ -265,24 +293,34 @@ def run_intraday_backtest(
     if fractal_window < 5 or fractal_window % 2 == 0:
         raise ValueError("fractal_window must be odd and >= 5 (e.g. 5 or 9)")
 
-    requested_interval = interval
-    effective_interval, interval_adjustment = _resolve_effective_interval(
-        requested_interval=requested_interval,
-        lookback_years=lookback_years,
-        auto_adjust_for_yf_limits=auto_adjust_for_yf_limits,
-    )
+    resolved_source = _resolve_market_data_source(market_data_source=market_data_source, ticker=ticker)
 
-    lookback_days = max(int(365.25 * lookback_years), 1)
-    max_days = _max_lookback_days_for_interval(effective_interval)
-    if max_days is not None and lookback_days > max_days:
-        raise ValueError(
-            f"Yahoo Finance limit for interval={effective_interval} is about {max_days} days. "
-            f"Requested {lookback_days} days (~{lookback_years}y). "
-            "Use a shorter window, or allow auto-adjust with 60m/90m."
+    requested_interval = interval
+    interval_adjustment = None
+    if resolved_source == "yfinance":
+        effective_interval, interval_adjustment = _resolve_effective_interval(
+            requested_interval=requested_interval,
+            lookback_years=lookback_years,
+            auto_adjust_for_yf_limits=auto_adjust_for_yf_limits,
         )
 
+        lookback_days = max(int(365.25 * lookback_years), 1)
+        max_days = _max_lookback_days_for_interval(effective_interval)
+        if max_days is not None and lookback_days > max_days:
+            raise ValueError(
+                f"Yahoo Finance limit for interval={effective_interval} is about {max_days} days. "
+                f"Requested {lookback_days} days (~{lookback_years}y). "
+                "Use a shorter window, or allow auto-adjust with 60m/90m."
+            )
+    else:
+        effective_interval = requested_interval
+
     fractal_period = (fractal_window - 1) // 2
-    bars_per_day = max(_bars_per_day(effective_interval), 1)
+    bars_per_day = (
+        max(_bars_per_day(effective_interval), 1)
+        if resolved_source == "yfinance"
+        else _bars_per_day_24x7(effective_interval)
+    )
     warmup_bars = max(
         ema_period + 5,
         stoch_rsi_period * 3 + 5,
@@ -292,12 +330,22 @@ def run_intraday_backtest(
     )
     warmup_days = max(int(warmup_bars / bars_per_day) + 15, 45)
 
-    bars = _fetch_intraday_bars(
-        ticker=ticker,
-        interval=effective_interval,
-        lookback_years=lookback_years,
-        warmup_days=warmup_days,
-    )
+    resolved_symbol = ticker.upper()
+    if resolved_source == "binance":
+        bars, resolved_symbol = fetch_binance_klines(
+            ticker=ticker,
+            interval=effective_interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+    else:
+        bars = _fetch_intraday_bars(
+            ticker=ticker,
+            interval=effective_interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+        )
     if len(bars) < warmup_bars + 30:
         raise ValueError(f"Insufficient intraday data for {ticker}: {len(bars)} bars")
 
@@ -625,6 +673,8 @@ def run_intraday_backtest(
         "requested_interval": requested_interval,
         "effective_interval": effective_interval,
         "interval_adjustment": interval_adjustment,
+        "market_data_source": resolved_source,
+        "market_data_symbol": resolved_symbol,
         "strategy_variant": strategy_variant,
         "lookback_years": lookback_years,
         "bar_count": len(equity_curve),
