@@ -253,6 +253,20 @@
           <div class="chart-box"><canvas id="chartEquity"></canvas></div>
         </div>
       </div>
+      <div class="card" id="tradeReplayCard" style="display:none;margin-bottom:16px">
+        <h2>Trade Replay (No Lookahead)</h2>
+        <p class="muted">Each replay starts at the trade entry with fixed stop-loss and take-profit from that moment. Bars are revealed forward only.</p>
+        <div class="row">
+          <button class="secondary" id="replayPrevBtn">Prev Trade</button>
+          <button class="secondary" id="replayNextBtn">Next Trade</button>
+          <button id="replayPlayBtn">Play</button>
+          <button class="secondary" id="replayResetBtn">Reset</button>
+          <label class="muted">Speed (bars/sec)</label>
+          <input id="replaySpeed" type="number" min="1" max="30" step="1" value="8" style="width:70px">
+          <span class="muted mono" id="replayMeta">-</span>
+        </div>
+        <div class="chart-box"><canvas id="chartReplay"></canvas></div>
+      </div>
       <div class="card">
         <h2>Trade Log</h2>
         <div style="overflow-x:auto">
@@ -270,6 +284,7 @@
 const API="/api/edgar/drf";
 let universePage=1,universePages=1,refreshTimer=null,loading=false;
 const charts={};
+const replayState={timer:null,bars:[],trades:[],tradeIndex:0,startIdx:0,endIdx:0,pointerIdx:0,playing:false};
 function destroyChart(k){if(charts[k]){charts[k].destroy();charts[k]=null}}
 const COLORS=['#0f766e','#0ea5e9','#8b5cf6','#ec4899','#f59e0b','#10b981','#6366f1','#ef4444','#14b8a6','#a855f7','#f97316','#06b6d4','#84cc16','#e11d48','#3b82f6'];
 
@@ -397,6 +412,166 @@ document.getElementById("loadTrendBtn").addEventListener("click",loadTrendChart)
 document.getElementById("loadPriceChartBtn").addEventListener("click",loadPriceChart);
 document.getElementById("assessBtn").addEventListener("click",runAssessment);
 
+function stopReplay(){
+  if(replayState.timer){clearInterval(replayState.timer);replayState.timer=null}
+  replayState.playing=false;
+  const playBtn=document.getElementById("replayPlayBtn");
+  if(playBtn)playBtn.textContent="Play";
+}
+function replayIso(v){return String(v||"").replace(" ", "T")}
+function replayTs(v){const t=Date.parse(replayIso(v));return Number.isFinite(t)?t:NaN}
+function nearestIndex(sorted, target){
+  if(!sorted.length)return -1;
+  let lo=0,hi=sorted.length-1;
+  if(target<=sorted[0])return 0;
+  if(target>=sorted[hi])return hi;
+  while(lo<=hi){
+    const mid=(lo+hi)>>1,val=sorted[mid];
+    if(val===target)return mid;
+    if(val<target)lo=mid+1;else hi=mid-1;
+  }
+  const a=Math.max(0,hi),b=Math.min(sorted.length-1,lo);
+  return Math.abs(sorted[a]-target)<=Math.abs(sorted[b]-target)?a:b;
+}
+function selectReplayTrade(pos){
+  if(!replayState.trades.length)return;
+  stopReplay();
+  replayState.tradeIndex=Math.min(replayState.trades.length-1,Math.max(0,pos));
+  const tr=replayState.trades[replayState.tradeIndex];
+  const preBars=120;
+  const postBars=Math.max((tr.exitIdx!=null?tr.exitIdx:tr.entryIdx)-tr.entryIdx+180,260);
+  replayState.startIdx=Math.max(0,tr.entryIdx-preBars);
+  replayState.endIdx=Math.min(replayState.bars.length-1,tr.entryIdx+postBars);
+  replayState.pointerIdx=Math.max(replayState.startIdx,tr.entryIdx);
+  renderReplay();
+}
+function replayMetaText(){
+  if(!replayState.trades.length)return "-";
+  const tr=replayState.trades[replayState.tradeIndex];
+  const seen=Math.max(0,replayState.pointerIdx-replayState.startIdx+1);
+  const total=Math.max(1,replayState.endIdx-replayState.startIdx+1);
+  const side=(tr.direction||"").toUpperCase();
+  const exitTag=replayState.pointerIdx>=(tr.exitIdx??Number.MAX_SAFE_INTEGER)?` | exit ${tr.exitReason||"-"}`:"";
+  return `Trade ${replayState.tradeIndex+1}/${replayState.trades.length} ${side} | entry ${tr.entryPrice.toFixed(2)} sl ${tr.stopLoss.toFixed(2)} tp ${tr.takeProfit.toFixed(2)} | bars ${seen}/${total}${exitTag}`;
+}
+function replayTick(){
+  if(replayState.pointerIdx>=replayState.endIdx){stopReplay();return}
+  replayState.pointerIdx+=1;
+  renderReplay();
+}
+function replayToggle(){
+  if(!replayState.trades.length)return;
+  if(replayState.playing){stopReplay();return}
+  replayState.playing=true;
+  const playBtn=document.getElementById("replayPlayBtn");
+  if(playBtn)playBtn.textContent="Pause";
+  const speed=Math.max(1,Number(document.getElementById("replaySpeed").value||8));
+  const stepMs=Math.max(40,Math.floor(1000/speed));
+  replayState.timer=setInterval(replayTick,stepMs);
+}
+function renderReplay(){
+  const card=document.getElementById("tradeReplayCard");
+  const meta=document.getElementById("replayMeta");
+  if(!replayState.trades.length||!replayState.bars.length){
+    if(meta)meta.textContent="-";
+    if(card)card.style.display="none";
+    destroyChart("replay");
+    return;
+  }
+  if(card)card.style.display="";
+  const tr=replayState.trades[replayState.tradeIndex];
+  const s=replayState.startIdx,e=replayState.pointerIdx;
+  const labels=[],price=[],sl=[],tp=[],entry=[],exit=[];
+  for(let i=s;i<=e;i++){
+    const b=replayState.bars[i];
+    const ts=replayIso(b.date||"");
+    labels.push(ts.length>=16?ts.slice(0,16).replace("T"," "):ts);
+    price.push(Number(b.close));
+    const live=i>=tr.entryIdx;
+    sl.push(live?tr.stopLoss:null);
+    tp.push(live?tr.takeProfit:null);
+    entry.push(i===tr.entryIdx?tr.entryPrice:null);
+    exit.push(tr.exitIdx!=null&&i===tr.exitIdx&&replayState.pointerIdx>=tr.exitIdx?tr.exitPrice:null);
+  }
+  const data={labels,datasets:[
+    {label:"Close",data:price,borderColor:"#1d4ed8",backgroundColor:"rgba(29,78,216,.08)",fill:true,pointRadius:0,tension:.12},
+    {label:"Take Profit",data:tp,borderColor:"#16a34a",borderDash:[7,5],pointRadius:0,tension:0},
+    {label:"Stop Loss",data:sl,borderColor:"#dc2626",borderDash:[7,5],pointRadius:0,tension:0,fill:"-1",backgroundColor:"rgba(220,38,38,.06)"},
+    {label:"Entry",data:entry,showLine:false,pointRadius:4,pointBackgroundColor:"#111827"},
+    {label:"Exit",data:exit,showLine:false,pointRadius:4,pointBackgroundColor:"#f59e0b"},
+  ]};
+  if(!charts.replay){
+    charts.replay=new Chart(document.getElementById("chartReplay"),{
+      type:"line",
+      data,
+      options:{
+        responsive:true,
+        interaction:{mode:"index",intersect:false},
+        scales:{x:{ticks:{maxTicksLimit:14}},y:{title:{display:true,text:"Price"}}},
+        plugins:{legend:{position:"bottom"}}
+      }
+    });
+  }else{
+    charts.replay.data.labels=data.labels;
+    charts.replay.data.datasets=data.datasets;
+    charts.replay.update("none");
+  }
+  if(meta)meta.textContent=replayMetaText();
+}
+function setupReplay(result){
+  stopReplay();
+  const bars=(result.price_series||[]).filter(b=>b&&b.date!=null&&b.close!=null);
+  const trades=result.trades||[];
+  if(!bars.length||!trades.length){
+    document.getElementById("tradeReplayCard").style.display="none";
+    destroyChart("replay");
+    document.getElementById("replayMeta").textContent="No replay data for this run.";
+    return;
+  }
+  const barTs=bars.map(b=>replayTs(b.date));
+  const mapped=trades.map((t,i)=>{
+    const entryPrice=Number(t.entry_price),stopLoss=Number(t.stop_loss),takeProfit=Number(t.take_profit);
+    if(!Number.isFinite(entryPrice)||!Number.isFinite(stopLoss)||!Number.isFinite(takeProfit))return null;
+    const entryTs=replayTs(t.entry_date);
+    if(!Number.isFinite(entryTs))return null;
+    const entryIdx=nearestIndex(barTs,entryTs);
+    if(entryIdx<0)return null;
+    const exitTs=t.exit_date?replayTs(t.exit_date):NaN;
+    const exitIdx=Number.isFinite(exitTs)?nearestIndex(barTs,exitTs):null;
+    const exitPrice=t.exit_price!=null&&Number.isFinite(Number(t.exit_price))?Number(t.exit_price):entryPrice;
+    return{
+      row:i+1,
+      direction:t.direction||"",
+      entryIdx,
+      exitIdx:exitIdx!=null&&exitIdx>=entryIdx?exitIdx:null,
+      entryPrice,
+      stopLoss,
+      takeProfit,
+      exitPrice,
+      exitReason:t.exit_reason||"",
+    };
+  }).filter(Boolean);
+  if(!mapped.length){
+    document.getElementById("tradeReplayCard").style.display="none";
+    destroyChart("replay");
+    document.getElementById("replayMeta").textContent="No valid trades for replay.";
+    return;
+  }
+  replayState.bars=bars;
+  replayState.trades=mapped;
+  replayState.tradeIndex=0;
+  selectReplayTrade(0);
+}
+function deriveBinanceSymbol(ticker){
+  const t=(ticker||"").trim().toUpperCase();
+  if(!t)return "";
+  if(t.startsWith("BTC"))return "BTCUSDT";
+  if(t.startsWith("PAXG"))return "PAXGUSDT";
+  if(t.endsWith("-USD")&&t.length>4)return `${t.slice(0,-4)}USDT`;
+  if(t.endsWith("USD")&&t.length>3)return `${t.slice(0,-3)}USDT`;
+  return t;
+}
+
 // ---- Tab 4: Strategy ----
 async function runStrategy(){
   const tk=document.getElementById("stratTicker").value.trim().toUpperCase();
@@ -411,6 +586,7 @@ async function runStrategy(){
   const useFractal=document.getElementById("stratUseFractal").checked;
   const fractalBreakout=document.getElementById("stratBreakout").checked;
   const allowShorts=document.getElementById("stratAllowShorts").checked;
+  const useBinanceForCrypto=intradayVariant==="mtf_liquidity_flow"&&(tk.startsWith("BTC")||tk.startsWith("PAXG"));
   const btn=document.getElementById("stratRunBtn");
   btn.disabled=true;btn.textContent="Running...";
   try{
@@ -423,6 +599,8 @@ async function runStrategy(){
           interval:intradayInterval,
           lookback_years:intradayYears,
           strategy_variant:intradayVariant,
+          market_data_source:useBinanceForCrypto?"binance":"yfinance",
+          market_data_symbol:useBinanceForCrypto?deriveBinanceSymbol(tk):null,
           auto_adjust_for_yf_limits:true,
           entry_model:"hybrid",
           allow_shorts:allowShorts,
@@ -448,6 +626,7 @@ async function runStrategy(){
           interval:intradayInterval,
           lookback_years:intradayYears,
           strategy_variant:intradayVariant,
+          auto_adjust_for_yf_limits:true,
           allow_shorts:allowShorts,
           allow_longs:true,
           rr_multiple:2.0,
@@ -466,6 +645,7 @@ async function runStrategy(){
           interval:intradayInterval,
           lookback_years:intradayYears,
           strategy_variant:intradayVariant,
+          auto_adjust_for_yf_limits:true,
           allow_shorts:allowShorts,
           allow_longs:true,
           rr_multiple:3.0,
@@ -486,6 +666,7 @@ async function runStrategy(){
           interval:intradayInterval,
           lookback_years:intradayYears,
           strategy_variant:intradayVariant,
+          auto_adjust_for_yf_limits:true,
           fractal_window:9,
           rr_multiple:1.5,
           breakout_buffer_bps:fractalBreakout?5:0,
@@ -501,6 +682,7 @@ async function runStrategy(){
     document.getElementById("stratSummaryGrid").innerHTML=`
       <div class="score-item"><div class="label">Mode</div><div class="value" style="font-size:13px">${d.data_mode||"daily"}${d.interval?` ${d.interval}`:""}</div></div>
       <div class="score-item"><div class="label">Variant</div><div class="value" style="font-size:12px">${d.strategy_variant||"-"}</div></div>
+      <div class="score-item"><div class="label">Data Source</div><div class="value" style="font-size:12px">${d.market_data_source||"default"}${d.market_data_symbol?`<br>${d.market_data_symbol}`:""}</div></div>
       <div class="score-item"><div class="label">Final Capital</div><div class="value">$${d.final_capital.toFixed(2)}</div></div>
       <div class="score-item"><div class="label">Return</div><div class="value" style="color:${retCls}">${d.total_return_pct.toFixed(1)}%</div></div>
       <div class="score-item"><div class="label">Trades</div><div class="value">${d.total_trades}</div></div>
@@ -530,9 +712,15 @@ async function runStrategy(){
       tr.innerHTML=`<td>${i+1}</td><td><b style="color:${t.direction==="long"?"var(--green)":"var(--red)"}">${t.direction.toUpperCase()}</b></td><td>${t.entry_date}</td><td>$${t.entry_price.toFixed(2)}</td><td>$${t.stop_loss.toFixed(2)}</td><td>$${t.take_profit.toFixed(2)}</td><td>${t.exit_date||"-"}</td><td>${t.exit_price!=null?"$"+t.exit_price.toFixed(2):"-"}</td><td style="color:${pnlCls};font-weight:600">$${t.pnl.toFixed(4)}</td><td>${t.exit_reason}</td><td>${(t.entry_rel_volume??0).toFixed(2)}x</td><td>${t.volume_confirmed?"yes":"no"}</td><td>${t.sizing_tier||"-"}</td><td>${t.stop_source||"-"}</td><td>${t.fractal_high!=null?"$"+Number(t.fractal_high).toFixed(2):"-"}</td><td>${t.fractal_low!=null?"$"+Number(t.fractal_low).toFixed(2):"-"}</td><td>${((t.risk_pct??0)*100).toFixed(2)}%</td><td>${t.hold_days??0}d</td>`;
       tb.appendChild(tr);
     });
-  }catch(e){log("Strategy backtest failed: "+String(e))}finally{btn.disabled=false;btn.textContent="Run Backtest"}
+    setupReplay(d);
+  }catch(e){stopReplay();document.getElementById("tradeReplayCard").style.display="none";destroyChart("replay");log("Strategy backtest failed: "+String(e))}finally{btn.disabled=false;btn.textContent="Run Backtest"}
 }
 document.getElementById("stratRunBtn").addEventListener("click",runStrategy);
+document.getElementById("replayPrevBtn").addEventListener("click",()=>selectReplayTrade(replayState.tradeIndex-1));
+document.getElementById("replayNextBtn").addEventListener("click",()=>selectReplayTrade(replayState.tradeIndex+1));
+document.getElementById("replayPlayBtn").addEventListener("click",replayToggle);
+document.getElementById("replayResetBtn").addEventListener("click",()=>selectReplayTrade(replayState.tradeIndex));
+document.getElementById("replaySpeed").addEventListener("change",()=>{if(replayState.playing){stopReplay();replayToggle()}});
 
 loadCompanies();
 </script>

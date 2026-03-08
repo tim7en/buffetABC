@@ -72,6 +72,40 @@ def _max_lookback_days_for_interval(interval: str) -> int | None:
     return None
 
 
+def _resolve_effective_interval(
+    requested_interval: str,
+    lookback_years: float,
+    auto_adjust_for_yf_limits: bool,
+) -> tuple[str, str | None]:
+    interval = (requested_interval or "60m").strip()
+    lookback_days = max(int(365.25 * lookback_years), 1)
+    max_days = _max_lookback_days_for_interval(interval)
+    if max_days is None or lookback_days <= max_days:
+        return interval, None
+
+    if not auto_adjust_for_yf_limits:
+        raise ValueError(
+            f"Yahoo Finance limit for interval={interval} is about {max_days} days. "
+            f"Requested {lookback_days} days (~{lookback_years}y). "
+            "Enable auto_adjust_for_yf_limits or use a coarser interval."
+        )
+
+    fallback_order = ["60m", "90m"]
+    for fb in fallback_order:
+        fb_max = _max_lookback_days_for_interval(fb)
+        if fb_max is None or lookback_days <= fb_max:
+            note = (
+                f"Adjusted interval from {interval} to {fb} due to Yahoo Finance "
+                f"intraday history limits for lookback {lookback_days} days."
+            )
+            return fb, note
+
+    raise ValueError(
+        f"Requested lookback {lookback_days} days exceeds supported intraday history. "
+        "Use <=730 days with 60m/90m, or reduce lookback."
+    )
+
+
 def _fetch_intraday_bars(
     ticker: str,
     interval: str,
@@ -403,6 +437,7 @@ def run_market_mechanics_backtest(
     initial_capital: float = 10_000.0,
     interval: str = "60m",
     lookback_years: float = 2.0,
+    auto_adjust_for_yf_limits: bool = True,
     rr_multiple: float = 3.0,
     direction_pivot_window: int = 3,
     location_pivot_window: int = 2,
@@ -430,28 +465,35 @@ def run_market_mechanics_backtest(
     if not allow_longs and not allow_shorts:
         raise ValueError("At least one of allow_longs / allow_shorts must be true")
 
+    requested_interval = interval
+    effective_interval, interval_adjustment = _resolve_effective_interval(
+        requested_interval=requested_interval,
+        lookback_years=lookback_years,
+        auto_adjust_for_yf_limits=auto_adjust_for_yf_limits,
+    )
+
     lookback_days = max(int(365.25 * lookback_years), 1)
-    max_days = _max_lookback_days_for_interval(interval)
+    max_days = _max_lookback_days_for_interval(effective_interval)
     if max_days is not None and lookback_days > max_days:
         raise ValueError(
-            f"Yahoo Finance limit for interval={interval} is about {max_days} days. "
+            f"Yahoo Finance limit for interval={effective_interval} is about {max_days} days. "
             f"Requested {lookback_days} days (~{lookback_years}y). "
-            "Use a shorter window, or use interval=60m for multi-year runs."
+            "Use a shorter window, or allow auto-adjust with 60m/90m."
         )
 
-    base_minutes = max(_interval_to_minutes(interval), 1)
+    base_minutes = max(_interval_to_minutes(effective_interval), 1)
     htf_factor = max(1, int(round(240 / base_minutes)))  # 4h proxy
     mtf_factor = max(1, int(round(60 / base_minutes)))   # 1h proxy
 
     dir_window = max(2, direction_pivot_window * htf_factor)
     loc_window = max(2, location_pivot_window * mtf_factor)
-    bars_per_day = max(_bars_per_day(interval), 1)
+    bars_per_day = max(_bars_per_day(effective_interval), 1)
     warmup_bars = max(dir_window * 8, loc_window * 6, volume_period + 20, 140)
     warmup_days = max(int(warmup_bars / bars_per_day) + 20, 45)
 
     bars = _fetch_intraday_bars(
         ticker=ticker,
-        interval=interval,
+        interval=effective_interval,
         lookback_years=lookback_years,
         warmup_days=warmup_days,
     )
@@ -816,7 +858,10 @@ def run_market_mechanics_backtest(
     return {
         "ticker": ticker.upper(),
         "data_mode": "intraday",
-        "interval": interval,
+        "interval": effective_interval,
+        "requested_interval": requested_interval,
+        "effective_interval": effective_interval,
+        "interval_adjustment": interval_adjustment,
         "strategy_variant": "price_action_3step",
         "lookback_years": lookback_years,
         "bar_count": len(equity_curve),
@@ -837,6 +882,16 @@ def run_market_mechanics_backtest(
         "avg_trade_return_pct": round(avg_trade_return, 2),
         "exposure_pct": round(exposure, 2),
         "total_fees": round(total_fees, 4),
+        "price_series": [
+            {
+                "date": timestamps[i].isoformat(),
+                "open": round(opens[i], 4),
+                "high": round(highs[i], 4),
+                "low": round(lows[i], 4),
+                "close": round(closes[i], 4),
+            }
+            for i in range(start_idx, len(bars))
+        ],
         "trades": [
             {
                 "direction": t.direction,

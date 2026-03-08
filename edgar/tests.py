@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 from io import StringIO
 import json
 from unittest.mock import MagicMock, patch
@@ -309,6 +309,7 @@ class DrfApiTests(TestCase):
             mock_intraday.call_args.kwargs["strategy_variant"],
             "fractal_breakout_ema200",
         )
+        self.assertTrue(mock_intraday.call_args.kwargs["auto_adjust_for_yf_limits"])
 
     def test_strategy_intraday_endpoint_missing_ticker(self):
         res = self.client.post(
@@ -365,6 +366,7 @@ class DrfApiTests(TestCase):
         self.assertEqual(payload["strategy_variant"], "manipulation_ifvg")
         mock_manipulation.assert_called_once()
         self.assertEqual(mock_manipulation.call_args.kwargs["lookback_years"], 2.0)
+        self.assertTrue(mock_manipulation.call_args.kwargs["auto_adjust_for_yf_limits"])
 
     @patch("edgar.services.market_mechanics_strategy.run_market_mechanics_backtest")
     def test_strategy_intraday_endpoint_price_action_variant(self, mock_market_mechanics):
@@ -413,6 +415,7 @@ class DrfApiTests(TestCase):
         self.assertEqual(payload["strategy_variant"], "price_action_3step")
         mock_market_mechanics.assert_called_once()
         self.assertEqual(mock_market_mechanics.call_args.kwargs["lookback_years"], 2.0)
+        self.assertTrue(mock_market_mechanics.call_args.kwargs["auto_adjust_for_yf_limits"])
 
     @patch("edgar.services.mtf_liquidity_flow_strategy.run_mtf_liquidity_flow_backtest")
     def test_strategy_intraday_endpoint_mtf_liquidity_flow_variant(self, mock_mtf_flow):
@@ -462,6 +465,7 @@ class DrfApiTests(TestCase):
         self.assertEqual(payload["strategy_variant"], "mtf_liquidity_flow")
         mock_mtf_flow.assert_called_once()
         self.assertEqual(mock_mtf_flow.call_args.kwargs["lookback_years"], 2.0)
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_mtf_flow.call_args.kwargs["auto_adjust_for_yf_limits"])
 
 
@@ -486,6 +490,83 @@ class MtfIntervalPolicyTests(TestCase):
                 lookback_years=2.0,
                 auto_adjust_for_yf_limits=False,
             )
+
+    def test_resolve_effective_interval_intraday_auto_adjusts(self):
+        from edgar.services.intraday_strategy import _resolve_effective_interval
+
+        effective, note = _resolve_effective_interval(
+            requested_interval="5m",
+            lookback_years=2.0,
+            auto_adjust_for_yf_limits=True,
+        )
+        self.assertEqual(effective, "60m")
+        self.assertIn("Adjusted interval", note)
+
+    def test_resolve_effective_interval_market_mechanics_strict_raises(self):
+        from edgar.services.market_mechanics_strategy import _resolve_effective_interval
+
+        with self.assertRaises(ValueError):
+            _resolve_effective_interval(
+                requested_interval="5m",
+                lookback_years=2.0,
+                auto_adjust_for_yf_limits=False,
+            )
+
+    def test_resolve_effective_interval_manipulation_auto_adjusts(self):
+        from edgar.services.manipulation_strategy import _resolve_effective_interval
+
+        effective, note = _resolve_effective_interval(
+            requested_interval="15m",
+            lookback_years=1.5,
+            auto_adjust_for_yf_limits=True,
+        )
+        self.assertEqual(effective, "60m")
+        self.assertIn("Adjusted interval", note)
+
+
+class BinanceDataTests(TestCase):
+    def test_resolve_binance_symbol_for_btc_and_paxg(self):
+        from edgar.services.binance_data import resolve_binance_symbol
+
+        self.assertEqual(resolve_binance_symbol("BTC-USD"), "BTCUSDT")
+        self.assertEqual(resolve_binance_symbol("PAXG-USD"), "PAXGUSDT")
+
+    @patch("edgar.services.mtf_liquidity_flow_strategy._fetch_intraday_bars")
+    @patch("edgar.services.mtf_liquidity_flow_strategy.fetch_binance_klines")
+    def test_mtf_strategy_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+        from edgar.services.mtf_liquidity_flow_strategy import run_mtf_liquidity_flow_backtest
+
+        start = datetime(2025, 1, 1)
+        bars = []
+        for i in range(1400):
+            ts = start + timedelta(minutes=5 * i)
+            px = 100.0 + (i * 0.01)
+            bars.append(
+                {
+                    "timestamp": ts,
+                    "open": px,
+                    "high": px + 0.2,
+                    "low": px - 0.2,
+                    "close": px + 0.05,
+                    "volume": 1000.0 + i,
+                }
+            )
+
+        mock_binance_fetch.return_value = (bars, "BTCUSDT")
+        payload = run_mtf_liquidity_flow_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=0.1,
+            market_data_source="binance",
+            auto_adjust_for_yf_limits=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "binance")
+        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
+        self.assertEqual(payload["effective_interval"], "5m")
+        self.assertGreater(payload["bar_count"], 0)
+        mock_binance_fetch.assert_called_once()
+        mock_yf_fetch.assert_not_called()
 
 
 class StrategySerializationTests(TestCase):

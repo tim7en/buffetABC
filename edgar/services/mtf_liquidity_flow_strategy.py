@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from edgar.services.binance_data import fetch_binance_klines
 from edgar.services.market_mechanics_strategy import (
     _bars_per_day,
     _fetch_intraday_bars,
@@ -26,6 +27,25 @@ from edgar.services.market_mechanics_strategy import (
     _recent_pivots,
 )
 from edgar.services.strategy import _sma
+
+
+def _bars_per_day_24x7(interval: str) -> int:
+    minutes = max(_interval_to_minutes(interval), 1)
+    return max(int((24 * 60) / minutes), 1)
+
+
+def _resolve_market_data_source(market_data_source: str, ticker: str) -> str:
+    source = (market_data_source or "auto").strip().lower()
+    if source in {"yfinance", "yf"}:
+        return "yfinance"
+    if source in {"binance", "binance_spot"}:
+        return "binance"
+    if source == "auto":
+        text = (ticker or "").strip().upper()
+        if text.startswith("BTC") or text.startswith("PAXG"):
+            return "binance"
+        return "yfinance"
+    raise ValueError("market_data_source must be one of ['auto', 'yfinance', 'binance']")
 
 
 def _internal_direction(
@@ -176,6 +196,8 @@ def run_mtf_liquidity_flow_backtest(
     initial_capital: float = 10_000.0,
     interval: str = "60m",
     lookback_years: float = 2.0,
+    market_data_source: str = "auto",  # auto | yfinance | binance
+    market_data_symbol: str | None = None,  # e.g. BTCUSDT / PAXGUSDT
     auto_adjust_for_yf_limits: bool = True,
     entry_model: str = "hybrid",  # aggressive | conservative | hybrid
     rr_multiple: float = 3.0,
@@ -208,21 +230,31 @@ def run_mtf_liquidity_flow_backtest(
     if not allow_longs and not allow_shorts:
         raise ValueError("At least one of allow_longs / allow_shorts must be true")
 
-    requested_interval = interval
-    effective_interval, interval_adjustment = _resolve_effective_interval(
-        requested_interval=requested_interval,
-        lookback_years=lookback_years,
-        auto_adjust_for_yf_limits=auto_adjust_for_yf_limits,
-    )
+    resolved_source = _resolve_market_data_source(market_data_source=market_data_source, ticker=ticker)
 
-    lookback_days = max(int(365.25 * lookback_years), 1)
-    max_days = _max_lookback_days_for_interval(effective_interval)
-    if max_days is not None and lookback_days > max_days:
-        raise ValueError(
-            f"Yahoo Finance limit for interval={effective_interval} is about {max_days} days. "
-            f"Requested {lookback_days} days (~{lookback_years}y). "
-            "Use a shorter window, or allow auto-adjust with 60m/90m."
+    requested_interval = interval
+    interval_adjustment = None
+    if resolved_source == "yfinance":
+        effective_interval, interval_adjustment = _resolve_effective_interval(
+            requested_interval=requested_interval,
+            lookback_years=lookback_years,
+            auto_adjust_for_yf_limits=auto_adjust_for_yf_limits,
         )
+
+        lookback_days = max(int(365.25 * lookback_years), 1)
+        max_days = _max_lookback_days_for_interval(effective_interval)
+        if max_days is not None and lookback_days > max_days:
+            raise ValueError(
+                f"Yahoo Finance limit for interval={effective_interval} is about {max_days} days. "
+                f"Requested {lookback_days} days (~{lookback_years}y). "
+                "Use a shorter window, or allow auto-adjust with 60m/90m."
+            )
+    else:
+        effective_interval = (requested_interval or "5m").strip().lower()
+        if effective_interval not in {"1m", "3m", "5m", "15m", "30m", "60m"}:
+            raise ValueError(
+                "Binance source supports intervals ['1m','3m','5m','15m','30m','60m']"
+            )
 
     base_minutes = max(_interval_to_minutes(effective_interval), 1)
     htf_factor = max(1, int(round(240 / base_minutes)))  # 4h proxy
@@ -232,14 +264,29 @@ def run_mtf_liquidity_flow_backtest(
     htf_window = max(2, htf_pivot_window * htf_factor)
     internal_window = max(2, internal_pivot_window * mtf_factor)
     warmup_bars = max(htf_window * 8, internal_window * 8, volume_period + 20, 160)
-    warmup_days = max(int(warmup_bars / max(_bars_per_day(interval), 1)) + 20, 45)
-
-    bars = _fetch_intraday_bars(
-        ticker=ticker,
-        interval=effective_interval,
-        lookback_years=lookback_years,
-        warmup_days=warmup_days,
+    bars_per_day = (
+        max(_bars_per_day(effective_interval), 1)
+        if resolved_source == "yfinance"
+        else _bars_per_day_24x7(effective_interval)
     )
+    warmup_days = max(int(warmup_bars / bars_per_day) + 20, 45)
+
+    resolved_symbol = ticker.upper()
+    if resolved_source == "binance":
+        bars, resolved_symbol = fetch_binance_klines(
+            ticker=ticker,
+            interval=effective_interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+    else:
+        bars = _fetch_intraday_bars(
+            ticker=ticker,
+            interval=effective_interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+        )
     if len(bars) < warmup_bars + 30:
         raise ValueError(f"Insufficient intraday data for {ticker}: {len(bars)} bars")
 
@@ -605,6 +652,8 @@ def run_mtf_liquidity_flow_backtest(
         "requested_interval": requested_interval,
         "effective_interval": effective_interval,
         "interval_adjustment": interval_adjustment,
+        "market_data_source": resolved_source,
+        "market_data_symbol": resolved_symbol,
         "strategy_variant": "mtf_liquidity_flow",
         "entry_model": entry_model,
         "lookback_years": lookback_years,
@@ -626,6 +675,16 @@ def run_mtf_liquidity_flow_backtest(
         "avg_trade_return_pct": round(avg_trade_return, 2),
         "exposure_pct": round(exposure, 2),
         "total_fees": round(total_fees, 4),
+        "price_series": [
+            {
+                "date": timestamps[i].isoformat(),
+                "open": round(opens[i], 4),
+                "high": round(highs[i], 4),
+                "low": round(lows[i], 4),
+                "close": round(closes[i], 4),
+            }
+            for i in range(start_idx, len(bars))
+        ],
         "trades": [
             {
                 "direction": t.direction,
