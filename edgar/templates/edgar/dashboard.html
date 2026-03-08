@@ -61,6 +61,7 @@
     <button class="tab" data-tab="explore">Exploration</button>
     <button class="tab" data-tab="assessment">Assessment</button>
     <button class="tab" data-tab="strategy">Strategy</button>
+    <button class="tab" data-tab="binance">Binance</button>
   </div>
 
   <!-- ===== TAB 1: DATA INGESTION ===== -->
@@ -241,12 +242,26 @@
           <option value="yfinance">yfinance</option>
         </select>
       </div>
-      <p class="muted">Yahoo limit: 15m/30m intraday supports about 60 days, while 60m/90m can run multi-year windows. Binance supports multi-year 5m/15m/30m/60m on supported symbols (e.g., BTCUSDT, PAXGUSDT).</p>
+      <p class="muted">Yahoo limit: 15m/30m intraday supports about 60 days, while 60m/90m can run multi-year windows. Binance supports multi-year 5m/15m/30m/60m on supported symbols (e.g., BTCUSDT, ETHUSDT, PAXGUSDT).</p>
       <div class="row">
         <label><input id="stratForceFetch" type="checkbox"> Force re-fetch prices</label>
         <label><input id="stratUseFractal" type="checkbox" checked> Williams fractal filter</label>
         <label><input id="stratBreakout" type="checkbox"> Fractal breakout</label>
         <label><input id="stratAllowShorts" type="checkbox" checked> Allow shorts</label>
+      </div>
+      <div class="row">
+        <label><input id="stratUseChandelier" type="checkbox"> Chandelier trailing stop</label>
+        <label class="muted">Chandelier bars</label>
+        <input id="stratChandelierPeriod" type="number" min="2" step="1" value="22" style="width:70px">
+        <label class="muted">ATR bars</label>
+        <input id="stratChandelierAtrPeriod" type="number" min="2" step="1" value="22" style="width:70px">
+        <label class="muted">ATR x</label>
+        <input id="stratChandelierAtrMult" type="number" min="0.5" step="0.1" value="3.0" style="width:70px">
+        <label class="muted">Same-bar fill</label>
+        <select id="stratExitFillPolicy">
+          <option value="stop_first" selected>stop first</option>
+          <option value="target_first">target first</option>
+        </select>
       </div>
     </div>
     <div id="stratResults" style="display:none">
@@ -278,10 +293,44 @@
         <h2>Trade Log</h2>
         <div style="overflow-x:auto">
           <table class="top-table" id="stratTradeTable">
-            <thead><tr><th>#</th><th>Dir</th><th>Entry</th><th>Price</th><th>SL</th><th>TP</th><th>Exit</th><th>Exit $</th><th>PnL</th><th>Reason</th><th>RelVol</th><th>Vol</th><th>Sizing</th><th>StopSrc</th><th>FracH</th><th>FracL</th><th>Risk%</th><th>Hold</th></tr></thead>
+            <thead><tr><th>#</th><th>Dir</th><th>Entry</th><th>Price</th><th>Init SL</th><th>Active SL</th><th>TP</th><th>Exit</th><th>Exit $</th><th>PnL</th><th>Reason</th><th>Conflict</th><th>RelVol</th><th>Vol</th><th>Sizing</th><th>StopSrc</th><th>FracH</th><th>FracL</th><th>Risk%</th><th>Hold</th></tr></thead>
             <tbody></tbody>
           </table>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 5: BINANCE ===== -->
+  <div id="tab-binance" class="tab-panel">
+    <div class="card" style="margin-bottom:16px">
+      <h2>Binance Market Calls</h2>
+      <p class="muted">Public Binance spot candles for BTC, ETH, and PAXG. Use this tab to inspect raw market structure before sending the symbol into strategy backtests.</p>
+      <div class="row">
+        <button class="secondary binance-preset-btn" data-ticker="BTC-USD">BTC</button>
+        <button class="secondary binance-preset-btn" data-ticker="ETH-USD">ETH</button>
+        <button class="secondary binance-preset-btn" data-ticker="PAXG-USD">PAXG</button>
+        <input id="binanceTicker" value="BTC-USD" placeholder="Ticker or symbol" style="width:120px">
+        <label class="muted">Interval</label>
+        <select id="binanceInterval">
+          <option value="5m" selected>5m</option>
+          <option value="15m">15m</option>
+          <option value="60m">60m</option>
+        </select>
+        <label class="muted">Days</label>
+        <input id="binanceDays" type="number" min="1" max="365" step="1" value="14" style="width:80px">
+        <button id="binanceLoadBtn">Load Binance</button>
+        <button class="secondary" id="binanceUseInStrategyBtn">Use In Strategy</button>
+      </div>
+    </div>
+    <div class="grid-2-equal">
+      <div class="card">
+        <h2>Snapshot</h2>
+        <div class="score-grid" id="binanceSummaryGrid"></div>
+      </div>
+      <div class="card">
+        <h2>Raw Candle View</h2>
+        <div class="chart-box"><canvas id="chartBinance"></canvas></div>
       </div>
     </div>
   </div>
@@ -291,7 +340,8 @@
 const API="/api/edgar/drf";
 let universePage=1,universePages=1,refreshTimer=null,loading=false;
 const charts={};
-const replayState={timer:null,bars:[],trades:[],tradeIndex:0,startIdx:0,endIdx:0,pointerIdx:0,playing:false};
+const replayState={timer:null,bars:[],trades:[],tradeIndex:0,startIdx:0,endIdx:0,pointerIdx:0,playing:false,config:{}};
+const binanceState={data:null};
 function destroyChart(k){if(charts[k]){charts[k].destroy();charts[k]=null}}
 const COLORS=['#0f766e','#0ea5e9','#8b5cf6','#ec4899','#f59e0b','#10b981','#6366f1','#ef4444','#14b8a6','#a855f7','#f97316','#06b6d4','#84cc16','#e11d48','#3b82f6'];
 
@@ -398,7 +448,7 @@ async function runAssessment(){
 }
 
 // ---- Tab switching ----
-document.querySelectorAll(".tab").forEach(t=>{t.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.remove("active"));t.classList.add("active");document.getElementById(`tab-${t.dataset.tab}`).classList.add("active");if(t.dataset.tab==="explore"){loadSectorChart();loadScoreDistChart();loadSectorScoresChart();loadTopScores()}})});
+document.querySelectorAll(".tab").forEach(t=>{t.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".tab-panel").forEach(x=>x.classList.remove("active"));t.classList.add("active");document.getElementById(`tab-${t.dataset.tab}`).classList.add("active");if(t.dataset.tab==="explore"){loadSectorChart();loadScoreDistChart();loadSectorScoresChart();loadTopScores()}if(t.dataset.tab==="binance"&&!binanceState.data){loadBinanceMarket().catch(e=>log("Binance load failed",{error:String(e)}))}})});
 
 // ---- Events ----
 document.getElementById("searchBtn").addEventListener("click",()=>{universePage=1;loadCompanies()});
@@ -427,6 +477,276 @@ function stopReplay(){
 }
 function replayIso(v){return String(v||"").replace(" ", "T")}
 function replayTs(v){const t=Date.parse(replayIso(v));return Number.isFinite(t)?t:NaN}
+function intervalMinutes(v){
+  const t=String(v||"").trim().toLowerCase();
+  if(t.endsWith("m"))return Math.max(1,Number(t.slice(0,-1))||5);
+  if(t.endsWith("h"))return Math.max(1,(Number(t.slice(0,-1))||1)*60);
+  return 5;
+}
+function chartDateLabel(v){
+  const ts=typeof v==="number"?v:replayTs(v);
+  if(!Number.isFinite(ts))return "";
+  const d=new Date(ts);
+  const mm=String(d.getUTCMonth()+1).padStart(2,"0");
+  const dd=String(d.getUTCDate()).padStart(2,"0");
+  const hh=String(d.getUTCHours()).padStart(2,"0");
+  const mi=String(d.getUTCMinutes()).padStart(2,"0");
+  return `${mm}-${dd} ${hh}:${mi}`;
+}
+function prepareCanvas(canvasId){
+  const canvas=document.getElementById(canvasId);
+  if(!canvas)return null;
+  const rect=canvas.getBoundingClientRect();
+  const width=Math.max(320,Math.floor(rect.width||960));
+  const height=Math.max(280,Math.floor(rect.height||320));
+  const dpr=window.devicePixelRatio||1;
+  if(canvas.width!==Math.floor(width*dpr)||canvas.height!==Math.floor(height*dpr)){
+    canvas.width=Math.floor(width*dpr);
+    canvas.height=Math.floor(height*dpr);
+  }
+  const ctx=canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,width,height);
+  return {canvas,ctx,width,height};
+}
+function makeCustomChartHandle(key, canvasId){
+  charts[key]={
+    kind:"custom-canvas",
+    destroy(){
+      const canvas=document.getElementById(canvasId);
+      if(!canvas)return;
+      const ctx=canvas.getContext("2d");
+      if(ctx)ctx.clearRect(0,0,canvas.width,canvas.height);
+    }
+  };
+}
+function drawCandlestickCanvas(canvasId, cfg){
+  const surface=prepareCanvas(canvasId);
+  if(!surface)return;
+  const {ctx,width,height}=surface;
+  const bars=(cfg.bars||[]).filter(b=>b&&Number.isFinite(Number(b.open))&&Number.isFinite(Number(b.high))&&Number.isFinite(Number(b.low))&&Number.isFinite(Number(b.close)));
+  if(!bars.length)return;
+  const lines=(cfg.lines||[]).filter(x=>x&&Number.isFinite(Number(x.value)));
+  const bands=(cfg.bands||[]).filter(x=>x&&Number.isFinite(Number(x.low))&&Number.isFinite(Number(x.high)));
+  const markers=(cfg.markers||[]).filter(x=>x&&Number.isFinite(Number(x.index))&&Number.isFinite(Number(x.value)));
+  const series=(cfg.series||[]).filter(x=>x&&Array.isArray(x.values));
+  const values=[];
+  bars.forEach(b=>{values.push(Number(b.low),Number(b.high));});
+  lines.forEach(x=>values.push(Number(x.value)));
+  bands.forEach(x=>{values.push(Number(x.low),Number(x.high));});
+  markers.forEach(x=>values.push(Number(x.value)));
+  series.forEach(s=>s.values.forEach(v=>{if(Number.isFinite(Number(v)))values.push(Number(v));}));
+  let minPrice=Math.min(...values),maxPrice=Math.max(...values);
+  const span=Math.max(maxPrice-minPrice,Math.abs(maxPrice)*0.02,1);
+  minPrice-=span*0.08;
+  maxPrice+=span*0.08;
+
+  const left=66,right=22,top=18,bottom=28;
+  const plotW=width-left-right,plotH=height-top-bottom;
+  if(plotW<=10||plotH<=10)return;
+  const xStep=plotW/Math.max(bars.length,1);
+  const candleW=Math.max(3,Math.min(14,xStep*0.72));
+  const yOf=v=>top+((maxPrice-Number(v))/Math.max(maxPrice-minPrice,1e-9))*plotH;
+  const xOf=i=>left+(i*xStep)+(xStep/2);
+
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(0,0,width,height);
+
+  ctx.strokeStyle="#e5e7eb";
+  ctx.lineWidth=1;
+  for(let i=0;i<=5;i++){
+    const y=top+(plotH/5)*i;
+    ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(width-right,y);ctx.stroke();
+    const price=maxPrice-((maxPrice-minPrice)/5)*i;
+    ctx.fillStyle="#64748b";
+    ctx.font='11px "Avenir Next","Segoe UI",sans-serif';
+    ctx.textAlign="right";
+    ctx.fillText(price.toFixed(2),left-8,y+4);
+  }
+
+  bands.forEach(b=>{
+    const y1=yOf(Math.max(Number(b.low),Number(b.high)));
+    const y2=yOf(Math.min(Number(b.low),Number(b.high)));
+    ctx.fillStyle=b.fill||"rgba(59,130,246,.06)";
+    ctx.fillRect(left,y1,plotW,y2-y1);
+    if(b.stroke){
+      ctx.strokeStyle=b.stroke;
+      ctx.lineWidth=1;
+      ctx.strokeRect(left,y1,plotW,y2-y1);
+    }
+  });
+
+  bars.forEach((b,i)=>{
+    const open=Number(b.open),high=Number(b.high),low=Number(b.low),close=Number(b.close);
+    const x=xOf(i);
+    const bull=close>=open;
+    const color=bull?"#16a34a":"#dc2626";
+    ctx.strokeStyle=color;
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(x,yOf(high));
+    ctx.lineTo(x,yOf(low));
+    ctx.stroke();
+    const bodyTop=yOf(Math.max(open,close));
+    const bodyBottom=yOf(Math.min(open,close));
+    const bodyH=Math.max(1,bodyBottom-bodyTop);
+    ctx.fillStyle=color;
+    ctx.fillRect(x-(candleW/2),bodyTop,candleW,bodyH);
+  });
+
+  series.forEach(s=>{
+    ctx.save();
+    ctx.strokeStyle=s.color||"#111827";
+    ctx.lineWidth=s.width||1.5;
+    if(s.dash)ctx.setLineDash(s.dash);
+    let started=false;
+    ctx.beginPath();
+    s.values.forEach((v,i)=>{
+      if(!Number.isFinite(Number(v)))return;
+      const x=xOf(i),y=yOf(v);
+      if(!started){ctx.moveTo(x,y);started=true}else{ctx.lineTo(x,y)}
+    });
+    if(started)ctx.stroke();
+    ctx.restore();
+  });
+
+  lines.forEach((line,idx)=>{
+    const y=yOf(line.value);
+    ctx.save();
+    ctx.strokeStyle=line.color||"#334155";
+    ctx.lineWidth=line.width||1;
+    if(line.dash)ctx.setLineDash(line.dash);
+    ctx.beginPath();ctx.moveTo(left,y);ctx.lineTo(width-right,y);ctx.stroke();
+    if(line.label){
+      ctx.fillStyle=line.color||"#334155";
+      ctx.font='11px "Avenir Next","Segoe UI",sans-serif';
+      ctx.textAlign="left";
+      ctx.fillText(line.label,left+6,Math.max(top+12,Math.min(height-bottom-6,y-4-(idx%2)*12)));
+    }
+    ctx.restore();
+  });
+
+  markers.forEach(m=>{
+    const x=xOf(m.index),y=yOf(m.value);
+    ctx.fillStyle=m.color||"#111827";
+    ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+    if(m.label){
+      ctx.font='11px "Avenir Next","Segoe UI",sans-serif';
+      ctx.textAlign="center";
+      ctx.fillText(m.label,x,y-8);
+    }
+  });
+
+  ctx.strokeStyle="#94a3b8";
+  ctx.beginPath();ctx.moveTo(left,top);ctx.lineTo(left,height-bottom);ctx.lineTo(width-right,height-bottom);ctx.stroke();
+  ctx.fillStyle="#64748b";
+  ctx.font='11px "Avenir Next","Segoe UI",sans-serif';
+  ctx.textAlign="center";
+  const tickCount=Math.min(6,bars.length);
+  for(let t=0;t<tickCount;t++){
+    const idx=Math.min(bars.length-1,Math.floor((bars.length-1)*(t/Math.max(tickCount-1,1))));
+    ctx.fillText(chartDateLabel(bars[idx].ts||bars[idx].date),xOf(idx),height-8);
+  }
+  makeCustomChartHandle(canvasId==="chartReplay"?"replay":"binance",canvasId);
+}
+function aggregateBarsToTf(bars, uptoIdx, targetMinutes, baseMinutes){
+  const actualMinutes=Math.max(targetMinutes,baseMinutes);
+  const bucketMs=actualMinutes*60*1000;
+  const out=[];
+  let current=null;
+  for(let i=0;i<=uptoIdx;i++){
+    const b=bars[i];
+    const ts=b.ts;
+    if(!Number.isFinite(ts))continue;
+    const bucket=Math.floor(ts/bucketMs)*bucketMs;
+    if(!current||current.bucket!==bucket){
+      if(current)out.push(current);
+      current={bucket,ts:bucket,open:b.open,high:b.high,low:b.low,close:b.close};
+    }else{
+      current.high=Math.max(current.high,b.high);
+      current.low=Math.min(current.low,b.low);
+      current.close=b.close;
+    }
+  }
+  if(current)out.push(current);
+  return {bars:out,actualMinutes};
+}
+function computeTimeframeContext(bars, entryIdx, targetMinutes, lookbackDays, baseMinutes){
+  if(entryIdx<0||entryIdx>=bars.length)return null;
+  const entryTs=bars[entryIdx].ts;
+  const aggregated=aggregateBarsToTf(bars,entryIdx,targetMinutes,baseMinutes);
+  const cutoff=entryTs-(lookbackDays*24*60*60*1000);
+  const sample=aggregated.bars.filter(b=>b.ts>=cutoff&&b.ts<=entryTs);
+  if(sample.length<2)return null;
+  return{
+    actualMinutes:aggregated.actualMinutes,
+    support:Math.min(...sample.map(b=>b.low)),
+    resistance:Math.max(...sample.map(b=>b.high)),
+    lookbackDays
+  };
+}
+function computeAtrSeries(bars, period){
+  const out=Array(bars.length).fill(null);
+  if(period<=0||bars.length<period+1)return out;
+  const tr=Array(bars.length).fill(0);
+  tr[0]=bars[0].high-bars[0].low;
+  for(let i=1;i<bars.length;i++){
+    const hl=bars[i].high-bars[i].low;
+    const hc=Math.abs(bars[i].high-bars[i-1].close);
+    const lc=Math.abs(bars[i].low-bars[i-1].close);
+    tr[i]=Math.max(hl,hc,lc);
+  }
+  let atr=tr.slice(1,period+1).reduce((a,b)=>a+b,0)/period;
+  out[period]=atr;
+  for(let i=period+1;i<bars.length;i++){
+    atr=((atr*(period-1))+tr[i])/period;
+    out[i]=atr;
+  }
+  return out;
+}
+function rollingMax(values, period){
+  const out=Array(values.length).fill(null);
+  if(period<=0||values.length<period)return out;
+  for(let i=period-1;i<values.length;i++)out[i]=Math.max(...values.slice(i-period+1,i+1));
+  return out;
+}
+function rollingMin(values, period){
+  const out=Array(values.length).fill(null);
+  if(period<=0||values.length<period)return out;
+  for(let i=period-1;i<values.length;i++)out[i]=Math.min(...values.slice(i-period+1,i+1));
+  return out;
+}
+function computeChandelierPath(bars, trade, config, startIdx, endIdx){
+  const path=Array(Math.max(endIdx-startIdx+1,0)).fill(null);
+  if(!config.use_chandelier_exit)return path;
+  const period=Math.max(2,Number(config.chandelier_period||22));
+  const atrPeriod=Math.max(2,Number(config.chandelier_atr_period||22));
+  const atrMult=Math.max(0.1,Number(config.chandelier_atr_mult||3));
+  const highs=bars.map(b=>b.high),lows=bars.map(b=>b.low),atr=computeAtrSeries(bars,atrPeriod);
+  const hh=rollingMax(highs,period),ll=rollingMin(lows,period);
+  let current=Number(trade.stopLoss);
+  const lastStopIdx=trade.exitIdx!=null?trade.exitIdx:endIdx;
+  for(let i=startIdx;i<=endIdx;i++){
+    const rel=i-startIdx;
+    if(i>=trade.entryIdx&&i<=lastStopIdx)path[rel]=current;
+    if(i<trade.entryIdx)continue;
+    const atrNow=atr[i];
+    let candidate=null;
+    if(Number.isFinite(atrNow)){
+      candidate=trade.direction==="long"?(hh[i]!=null?hh[i]-(atrNow*atrMult):null):(ll[i]!=null?ll[i]+(atrNow*atrMult):null);
+    }
+    if(Number.isFinite(candidate)){
+      if(trade.direction==="long"){
+        current=Math.max(current,candidate);
+        current=Math.min(current,Number(trade.takeProfit)-1e-6);
+      }else{
+        current=Math.min(current,candidate);
+        current=Math.max(current,Number(trade.takeProfit)+1e-6);
+      }
+    }
+  }
+  return path;
+}
 function nearestIndex(sorted, target){
   if(!sorted.length)return -1;
   let lo=0,hi=sorted.length-1;
@@ -459,7 +779,9 @@ function replayMetaText(){
   const total=Math.max(1,replayState.endIdx-replayState.startIdx+1);
   const side=(tr.direction||"").toUpperCase();
   const exitTag=replayState.pointerIdx>=(tr.exitIdx??Number.MAX_SAFE_INTEGER)?` | exit ${tr.exitReason||"-"}`:"";
-  return `Trade ${replayState.tradeIndex+1}/${replayState.trades.length} ${side} | entry ${tr.entryPrice.toFixed(2)} sl ${tr.stopLoss.toFixed(2)} tp ${tr.takeProfit.toFixed(2)} | bars ${seen}/${total}${exitTag}`;
+  const htf4=tr.ctx4h?` | 4h S/R ${tr.ctx4h.support.toFixed(2)}-${tr.ctx4h.resistance.toFixed(2)}`:"";
+  const mtf15=tr.ctx15m?` | 15m range ${tr.ctx15m.support.toFixed(2)}-${tr.ctx15m.resistance.toFixed(2)}`:"";
+  return `Trade ${replayState.tradeIndex+1}/${replayState.trades.length} ${side} | entry ${tr.entryPrice.toFixed(2)} sl ${tr.stopLoss.toFixed(2)} tp ${tr.takeProfit.toFixed(2)} | bars ${seen}/${total}${exitTag}${htf4}${mtf15}`;
 }
 function replayTick(){
   if(replayState.pointerIdx>=replayState.endIdx){stopReplay();return}
@@ -488,46 +810,57 @@ function renderReplay(){
   if(card)card.style.display="";
   const tr=replayState.trades[replayState.tradeIndex];
   const s=replayState.startIdx,e=replayState.pointerIdx;
-  const labels=[],price=[],sl=[],tp=[],entry=[],exit=[];
-  for(let i=s;i<=e;i++){
-    const b=replayState.bars[i];
-    const ts=replayIso(b.date||"");
-    labels.push(ts.length>=16?ts.slice(0,16).replace("T"," "):ts);
-    price.push(Number(b.close));
-    const live=i>=tr.entryIdx;
-    sl.push(live?tr.stopLoss:null);
-    tp.push(live?tr.takeProfit:null);
-    entry.push(i===tr.entryIdx?tr.entryPrice:null);
-    exit.push(tr.exitIdx!=null&&i===tr.exitIdx&&replayState.pointerIdx>=tr.exitIdx?tr.exitPrice:null);
+  const visibleBars=replayState.bars.slice(s,e+1);
+  const showExecutionBand=["manipulation_ifvg","price_action_3step","mtf_liquidity_flow"].includes(replayState.config.strategy_variant||"");
+  const executionBand=showExecutionBand&&Number.isFinite(tr.zoneLow)&&Number.isFinite(tr.zoneHigh)
+    ? {low:Math.min(tr.zoneLow,tr.zoneHigh),high:Math.max(tr.zoneLow,tr.zoneHigh),fill:"rgba(245,158,11,.08)",stroke:"rgba(245,158,11,.45)"}
+    : null;
+  const tradeRange=tr.ctx15m
+    ? {low:tr.ctx15m.support,high:tr.ctx15m.resistance,fill:"rgba(59,130,246,.06)",stroke:"rgba(59,130,246,.32)"}
+    : null;
+  const lines=[
+    {value:tr.entryPrice,color:"#111827",dash:[2,2],label:"Entry"},
+    {value:tr.takeProfit,color:"#16a34a",dash:[7,5],label:"TP"},
+    {value:tr.stopLoss,color:"#dc2626",dash:[7,5],label:"Init SL"},
+  ];
+  if(tr.ctx4h){
+    lines.push({value:tr.ctx4h.support,color:"#0f766e",dash:[10,6],label:"4h Support"});
+    lines.push({value:tr.ctx4h.resistance,color:"#0f766e",dash:[10,6],label:"4h Resistance"});
   }
-  const data={labels,datasets:[
-    {label:"Close",data:price,borderColor:"#1d4ed8",backgroundColor:"rgba(29,78,216,.08)",fill:true,pointRadius:0,tension:.12},
-    {label:"Take Profit",data:tp,borderColor:"#16a34a",borderDash:[7,5],pointRadius:0,tension:0},
-    {label:"Stop Loss",data:sl,borderColor:"#dc2626",borderDash:[7,5],pointRadius:0,tension:0,fill:"-1",backgroundColor:"rgba(220,38,38,.06)"},
-    {label:"Entry",data:entry,showLine:false,pointRadius:4,pointBackgroundColor:"#111827"},
-    {label:"Exit",data:exit,showLine:false,pointRadius:4,pointBackgroundColor:"#f59e0b"},
-  ]};
-  if(!charts.replay){
-    charts.replay=new Chart(document.getElementById("chartReplay"),{
-      type:"line",
-      data,
-      options:{
-        responsive:true,
-        interaction:{mode:"index",intersect:false},
-        scales:{x:{ticks:{maxTicksLimit:14}},y:{title:{display:true,text:"Price"}}},
-        plugins:{legend:{position:"bottom"}}
-      }
-    });
-  }else{
-    charts.replay.data.labels=data.labels;
-    charts.replay.data.datasets=data.datasets;
-    charts.replay.update("none");
+  if(tr.ctx15m){
+    lines.push({value:tr.ctx15m.support,color:"#2563eb",dash:[4,4],label:"15m Support"});
+    lines.push({value:tr.ctx15m.resistance,color:"#2563eb",dash:[4,4],label:"15m Resistance"});
   }
+  const chandelierPath=computeChandelierPath(replayState.bars,tr,replayState.config,s,e);
+  drawCandlestickCanvas("chartReplay",{
+    bars:visibleBars,
+    bands:[tradeRange,executionBand].filter(Boolean),
+    lines,
+    series:[
+      replayState.config.use_chandelier_exit
+        ? {values:chandelierPath,color:"#7c3aed",width:1.8,dash:[8,4]}
+        : null
+    ].filter(Boolean),
+    markers:[
+      {index:Math.max(0,tr.entryIdx-s),value:tr.entryPrice,color:"#111827",label:"E"},
+      tr.exitIdx!=null&&replayState.pointerIdx>=tr.exitIdx
+        ? {index:Math.max(0,tr.exitIdx-s),value:tr.exitPrice,color:"#f59e0b",label:"X"}
+        : null
+    ].filter(Boolean)
+  });
   if(meta)meta.textContent=replayMetaText();
 }
 function setupReplay(result){
   stopReplay();
-  const bars=(result.price_series||[]).filter(b=>b&&b.date!=null&&b.close!=null);
+  const bars=(result.price_series||[]).filter(b=>b&&b.date!=null&&b.close!=null).map(b=>({
+    date:b.date,
+    ts:replayTs(b.date),
+    open:Number(b.open),
+    high:Number(b.high),
+    low:Number(b.low),
+    close:Number(b.close),
+    volume:Number(b.volume||0)
+  }));
   const trades=result.trades||[];
   if(!bars.length||!trades.length){
     document.getElementById("tradeReplayCard").style.display="none";
@@ -535,7 +868,8 @@ function setupReplay(result){
     document.getElementById("replayMeta").textContent="No replay data for this run.";
     return;
   }
-  const barTs=bars.map(b=>replayTs(b.date));
+  const barTs=bars.map(b=>b.ts);
+  const baseMinutes=intervalMinutes(result.effective_interval||result.interval||"5m");
   const mapped=trades.map((t,i)=>{
     const entryPrice=Number(t.entry_price),stopLoss=Number(t.stop_loss),takeProfit=Number(t.take_profit);
     if(!Number.isFinite(entryPrice)||!Number.isFinite(stopLoss)||!Number.isFinite(takeProfit))return null;
@@ -554,8 +888,12 @@ function setupReplay(result){
       entryPrice,
       stopLoss,
       takeProfit,
+      zoneLow:Number(t.fractal_low),
+      zoneHigh:Number(t.fractal_high),
       exitPrice,
       exitReason:t.exit_reason||"",
+      ctx4h:computeTimeframeContext(bars,entryIdx,240,30,baseMinutes),
+      ctx15m:computeTimeframeContext(bars,entryIdx,15,30,baseMinutes),
     };
   }).filter(Boolean);
   if(!mapped.length){
@@ -566,13 +904,91 @@ function setupReplay(result){
   }
   replayState.bars=bars;
   replayState.trades=mapped;
+  replayState.config={
+    strategy_variant:String(result.strategy_variant||""),
+    use_chandelier_exit:Boolean(result.use_chandelier_exit),
+    chandelier_period:Number(result.chandelier_period||22),
+    chandelier_atr_period:Number(result.chandelier_atr_period||22),
+    chandelier_atr_mult:Number(result.chandelier_atr_mult||3),
+  };
   replayState.tradeIndex=0;
   selectReplayTrade(0);
+}
+function renderBinanceChart(){
+  if(!binanceState.data||!(binanceState.data.price_series||[]).length){
+    destroyChart("binance");
+    return;
+  }
+  const bars=(binanceState.data.price_series||[]).map(b=>({
+    date:b.date,
+    ts:replayTs(b.date),
+    open:Number(b.open),
+    high:Number(b.high),
+    low:Number(b.low),
+    close:Number(b.close),
+    volume:Number(b.volume||0)
+  }));
+  const baseMinutes=intervalMinutes(binanceState.data.interval||"5m");
+  const lastIdx=bars.length-1;
+  const ctx4h=computeTimeframeContext(bars,lastIdx,240,30,baseMinutes);
+  const ctx15m=computeTimeframeContext(bars,lastIdx,15,30,baseMinutes);
+  drawCandlestickCanvas("chartBinance",{
+    bars,
+    bands:ctx15m?[{low:ctx15m.support,high:ctx15m.resistance,fill:"rgba(59,130,246,.06)",stroke:"rgba(59,130,246,.32)"}]:[],
+    lines:[
+      ctx4h?{value:ctx4h.support,color:"#0f766e",dash:[10,6],label:"4h Support"}:null,
+      ctx4h?{value:ctx4h.resistance,color:"#0f766e",dash:[10,6],label:"4h Resistance"}:null,
+      ctx15m?{value:ctx15m.support,color:"#2563eb",dash:[4,4],label:"15m Support"}:null,
+      ctx15m?{value:ctx15m.resistance,color:"#2563eb",dash:[4,4],label:"15m Resistance"}:null,
+    ].filter(Boolean),
+    markers:[{index:lastIdx,value:bars[lastIdx].close,color:"#111827",label:"Last"}]
+  });
+}
+async function loadBinanceMarket(){
+  const tk=document.getElementById("binanceTicker").value.trim().toUpperCase();
+  if(!tk)return;
+  const interval=document.getElementById("binanceInterval").value;
+  const days=Math.max(1,Number(document.getElementById("binanceDays").value||14));
+  const symbol=deriveBinanceSymbol(tk);
+  const d=await fetchJson(`${API}/charts/binance-klines/?symbol=${encodeURIComponent(symbol)}&ticker=${encodeURIComponent(tk)}&interval=${encodeURIComponent(interval)}&days=${days}&max_bars=500`);
+  binanceState.data=d;
+  const bars=(d.price_series||[]).map(b=>({
+    date:b.date,ts:replayTs(b.date),open:Number(b.open),high:Number(b.high),low:Number(b.low),close:Number(b.close),volume:Number(b.volume||0)
+  }));
+  const baseMinutes=intervalMinutes(d.interval||interval);
+  const ctx4h=bars.length?computeTimeframeContext(bars,bars.length-1,240,30,baseMinutes):null;
+  const ctx15m=bars.length?computeTimeframeContext(bars,bars.length-1,15,30,baseMinutes):null;
+  const barsText=d.full_bar_count!=null&&d.full_bar_count!==d.bar_count?`${d.bar_count}/${d.full_bar_count}`:String(d.bar_count||0);
+  document.getElementById("binanceSummaryGrid").innerHTML=`
+    <div class="score-item"><div class="label">Symbol</div><div class="value" style="font-size:18px">${d.symbol||symbol}</div></div>
+    <div class="score-item"><div class="label">Interval</div><div class="value">${d.interval||interval}</div></div>
+    <div class="score-item"><div class="label">Bars</div><div class="value">${barsText}</div></div>
+    <div class="score-item"><div class="label">Last Close</div><div class="value">$${Number(d.last_close||0).toFixed(2)}</div></div>
+    <div class="score-item"><div class="label">Window High</div><div class="value">$${Number(d.window_high||0).toFixed(2)}</div></div>
+    <div class="score-item"><div class="label">Window Low</div><div class="value">$${Number(d.window_low||0).toFixed(2)}</div></div>
+    <div class="score-item"><div class="label">4h S/R</div><div class="value" style="font-size:12px">${ctx4h?`$${ctx4h.support.toFixed(2)}<br>$${ctx4h.resistance.toFixed(2)}`:"-"}</div></div>
+    <div class="score-item"><div class="label">15m Range</div><div class="value" style="font-size:12px">${ctx15m?`$${ctx15m.support.toFixed(2)}<br>$${ctx15m.resistance.toFixed(2)}`:"-"}</div></div>
+    <div class="score-item"><div class="label">Volume Sum</div><div class="value">${Number(d.volume_sum||0).toLocaleString()}</div></div>
+    <div class="score-item"><div class="label">Range</div><div class="value" style="font-size:12px">${d.start_date||"-"}<br>${d.end_date||"-"}</div></div>`;
+  renderBinanceChart();
+}
+function useBinanceInStrategy(){
+  const tk=document.getElementById("binanceTicker").value.trim().toUpperCase();
+  if(!tk)return;
+  document.getElementById("stratTicker").value=tk.includes("USDT")?tk.replace("USDT","-USD"):tk;
+  document.getElementById("stratMode").value="intraday_custom";
+  document.getElementById("stratDataSource").value="binance";
+  document.getElementById("stratIntradayInterval").value=document.getElementById("binanceInterval").value;
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".tab-panel").forEach(x=>x.classList.remove("active"));
+  document.querySelector('.tab[data-tab="strategy"]').classList.add("active");
+  document.getElementById("tab-strategy").classList.add("active");
 }
 function deriveBinanceSymbol(ticker){
   const t=(ticker||"").trim().toUpperCase();
   if(!t)return "";
   if(t.startsWith("BTC"))return "BTCUSDT";
+  if(t.startsWith("ETH"))return "ETHUSDT";
   if(t.startsWith("PAXG"))return "PAXGUSDT";
   if(t.endsWith("-USD")&&t.length>4)return `${t.slice(0,-4)}USDT`;
   if(t.endsWith("USD")&&t.length>3)return `${t.slice(0,-3)}USDT`;
@@ -582,7 +998,7 @@ function resolveStrategyDataSource(choice, ticker){
   const c=(choice||"auto").trim().toLowerCase();
   if(c==="binance"||c==="yfinance")return c;
   const t=(ticker||"").trim().toUpperCase();
-  if(t.startsWith("BTC")||t.startsWith("PAXG"))return "binance";
+  if(t.startsWith("BTC")||t.startsWith("ETH")||t.startsWith("PAXG"))return "binance";
   return "yfinance";
 }
 
@@ -601,6 +1017,11 @@ async function runStrategy(){
   const fractalBreakout=document.getElementById("stratBreakout").checked;
   const allowShorts=document.getElementById("stratAllowShorts").checked;
   const dataSourceChoice=document.getElementById("stratDataSource").value;
+  const useChandelier=document.getElementById("stratUseChandelier").checked;
+  const chandelierPeriod=Number(document.getElementById("stratChandelierPeriod").value||22);
+  const chandelierAtrPeriod=Number(document.getElementById("stratChandelierAtrPeriod").value||22);
+  const chandelierAtrMult=Number(document.getElementById("stratChandelierAtrMult").value||3);
+  const exitFillPolicy=document.getElementById("stratExitFillPolicy").value;
   const resolvedDataSource=resolveStrategyDataSource(dataSourceChoice, tk);
   const resolvedDataSymbol=resolvedDataSource==="binance"?deriveBinanceSymbol(tk):null;
   const resolvedIntradayInterval=resolvedDataSource==="binance"&&intradayInterval==="90m"?"60m":intradayInterval;
@@ -635,6 +1056,11 @@ async function runStrategy(){
           stop_buffer_bps:5,
           use_volume_filter:false,
           min_rel_volume:1.0
+          ,use_chandelier_exit:useChandelier
+          ,chandelier_period:chandelierPeriod
+          ,chandelier_atr_period:chandelierAtrPeriod
+          ,chandelier_atr_mult:chandelierAtrMult
+          ,exit_fill_policy:exitFillPolicy
         }
       : intradayVariant==="manipulation_ifvg"
       ? {
@@ -655,7 +1081,12 @@ async function runStrategy(){
           ifvg_proximity_bars:16,
           ifvg_break_buffer_bps:fractalBreakout?5:0,
           use_volume_filter:false,
-          min_rel_volume:1.0
+          min_rel_volume:1.0,
+          use_chandelier_exit:useChandelier,
+          chandelier_period:chandelierPeriod,
+          chandelier_atr_period:chandelierAtrPeriod,
+          chandelier_atr_mult:chandelierAtrMult,
+          exit_fill_policy:exitFillPolicy
         }
       : intradayVariant==="price_action_3step"
       ? {
@@ -679,7 +1110,12 @@ async function runStrategy(){
           break_buffer_bps:fractalBreakout?5:0,
           stop_buffer_bps:5.0,
           use_volume_filter:false,
-          min_rel_volume:1.0
+          min_rel_volume:1.0,
+          use_chandelier_exit:useChandelier,
+          chandelier_period:chandelierPeriod,
+          chandelier_atr_period:chandelierAtrPeriod,
+          chandelier_atr_mult:chandelierAtrMult,
+          exit_fill_policy:exitFillPolicy
         }
       : {
           ticker:tk,
@@ -694,14 +1130,28 @@ async function runStrategy(){
           rr_multiple:1.5,
           breakout_buffer_bps:fractalBreakout?5:0,
           allow_shorts:allowShorts,
-          allow_longs:true
+          allow_longs:true,
+          use_chandelier_exit:useChandelier,
+          chandelier_period:chandelierPeriod,
+          chandelier_atr_period:chandelierAtrPeriod,
+          chandelier_atr_mult:chandelierAtrMult,
+          exit_fill_policy:exitFillPolicy
         };
     const body=isIntraday
       ? intradayBody
-      : {ticker:tk,initial_capital:capital,fetch_period:period,force_fetch:force,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true};
+      : {ticker:tk,initial_capital:capital,fetch_period:period,force_fetch:force,require_fractal_confirmation:useFractal,require_fractal_breakout:fractalBreakout,allow_shorts:allowShorts,allow_longs:true,use_chandelier_exit:useChandelier,chandelier_period:chandelierPeriod,chandelier_atr_period:chandelierAtrPeriod,chandelier_atr_mult:chandelierAtrMult,exit_fill_policy:exitFillPolicy};
     const d=await fetchJson(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
     document.getElementById("stratResults").style.display="";
     const retCls=d.total_return_pct>=0?"var(--green)":"var(--red)";
+    const allTrades=d.trades||[];
+    const cleanTrades=allTrades.filter(t=>!t.intrabar_conflict);
+    const ambiguousTrades=allTrades.length-cleanTrades.length;
+    const cleanWinners=cleanTrades.filter(t=>Number(t.pnl)>0).length;
+    const cleanLosers=cleanTrades.filter(t=>Number(t.pnl)<=0);
+    const cleanProfit=cleanTrades.filter(t=>Number(t.pnl)>0).reduce((acc,t)=>acc+Number(t.pnl||0),0);
+    const cleanLossAbs=Math.abs(cleanLosers.reduce((acc,t)=>acc+Number(t.pnl||0),0));
+    const cleanWinRate=cleanTrades.length?(cleanWinners/cleanTrades.length)*100:0;
+    const cleanPf=cleanLossAbs>0?(cleanProfit/cleanLossAbs):(cleanProfit>0?999:0);
     document.getElementById("stratSummaryGrid").innerHTML=`
       <div class="score-item"><div class="label">Mode</div><div class="value" style="font-size:13px">${d.data_mode||"daily"}${d.interval?` ${d.interval}`:""}</div></div>
       <div class="score-item"><div class="label">Variant</div><div class="value" style="font-size:12px">${d.strategy_variant||"-"}</div></div>
@@ -719,6 +1169,12 @@ async function runStrategy(){
       <div class="score-item"><div class="label">Losers</div><div class="value" style="color:var(--red)">${d.losing_trades}</div></div>
       <div class="score-item"><div class="label">Max Drawdown</div><div class="value" style="color:var(--red)">${d.max_drawdown_pct.toFixed(1)}%</div></div>
       <div class="score-item"><div class="label">Fees</div><div class="value">$${(d.total_fees??0).toFixed(2)}</div></div>
+      <div class="score-item"><div class="label">Ambiguous</div><div class="value">${ambiguousTrades}</div></div>
+      <div class="score-item"><div class="label">Clean Trades</div><div class="value">${cleanTrades.length}</div></div>
+      <div class="score-item"><div class="label">Clean Win Rate</div><div class="value">${cleanWinRate.toFixed(1)}%</div></div>
+      <div class="score-item"><div class="label">Clean PF</div><div class="value">${cleanPf.toFixed(2)}</div></div>
+      <div class="score-item"><div class="label">Trailing Exit</div><div class="value" style="font-size:12px">${d.use_chandelier_exit?"chandelier":"default"}${d.use_chandelier_exit?`<br>${d.chandelier_period}/${d.chandelier_atr_period} x ${d.chandelier_atr_mult}`:""}</div></div>
+      <div class="score-item"><div class="label">Fill Policy</div><div class="value" style="font-size:12px">${d.exit_fill_policy||"stop_first"}</div></div>
       <div class="score-item"><div class="label">Period</div><div class="value" style="font-size:13px">${d.start_date}<br>${d.end_date}</div></div>`;
 
     // Equity curve chart
@@ -731,8 +1187,10 @@ async function runStrategy(){
     const tb=document.querySelector("#stratTradeTable tbody");tb.innerHTML="";
     (d.trades||[]).forEach((t,i)=>{
       const pnlCls=t.pnl>=0?"var(--green)":"var(--red)";
+      const activeStop=t.active_stop_loss!=null?Number(t.active_stop_loss):Number(t.stop_loss);
+      const exitReason=t.intrabar_conflict?`${t.exit_reason} (same bar)`:t.exit_reason;
       const tr=document.createElement("tr");
-      tr.innerHTML=`<td>${i+1}</td><td><b style="color:${t.direction==="long"?"var(--green)":"var(--red)"}">${t.direction.toUpperCase()}</b></td><td>${t.entry_date}</td><td>$${t.entry_price.toFixed(2)}</td><td>$${t.stop_loss.toFixed(2)}</td><td>$${t.take_profit.toFixed(2)}</td><td>${t.exit_date||"-"}</td><td>${t.exit_price!=null?"$"+t.exit_price.toFixed(2):"-"}</td><td style="color:${pnlCls};font-weight:600">$${t.pnl.toFixed(4)}</td><td>${t.exit_reason}</td><td>${(t.entry_rel_volume??0).toFixed(2)}x</td><td>${t.volume_confirmed?"yes":"no"}</td><td>${t.sizing_tier||"-"}</td><td>${t.stop_source||"-"}</td><td>${t.fractal_high!=null?"$"+Number(t.fractal_high).toFixed(2):"-"}</td><td>${t.fractal_low!=null?"$"+Number(t.fractal_low).toFixed(2):"-"}</td><td>${((t.risk_pct??0)*100).toFixed(2)}%</td><td>${t.hold_days??0}d</td>`;
+      tr.innerHTML=`<td>${i+1}</td><td><b style="color:${t.direction==="long"?"var(--green)":"var(--red)"}">${t.direction.toUpperCase()}</b></td><td>${t.entry_date}</td><td>$${t.entry_price.toFixed(2)}</td><td>$${t.stop_loss.toFixed(2)}</td><td>$${activeStop.toFixed(2)}</td><td>$${t.take_profit.toFixed(2)}</td><td>${t.exit_date||"-"}</td><td>${t.exit_price!=null?"$"+t.exit_price.toFixed(2):"-"}</td><td style="color:${pnlCls};font-weight:600">$${t.pnl.toFixed(4)}</td><td>${exitReason||"-"}</td><td>${t.intrabar_conflict?"yes":"no"}</td><td>${(t.entry_rel_volume??0).toFixed(2)}x</td><td>${t.volume_confirmed?"yes":"no"}</td><td>${t.sizing_tier||"-"}</td><td>${t.stop_source||"-"}</td><td>${t.fractal_high!=null?"$"+Number(t.fractal_high).toFixed(2):"-"}</td><td>${t.fractal_low!=null?"$"+Number(t.fractal_low).toFixed(2):"-"}</td><td>${((t.risk_pct??0)*100).toFixed(2)}%</td><td>${t.hold_days??0}d</td>`;
       tb.appendChild(tr);
     });
     setupReplay(d);
@@ -744,6 +1202,10 @@ document.getElementById("replayNextBtn").addEventListener("click",()=>selectRepl
 document.getElementById("replayPlayBtn").addEventListener("click",replayToggle);
 document.getElementById("replayResetBtn").addEventListener("click",()=>selectReplayTrade(replayState.tradeIndex));
 document.getElementById("replaySpeed").addEventListener("change",()=>{if(replayState.playing){stopReplay();replayToggle()}});
+document.getElementById("binanceLoadBtn").addEventListener("click",()=>loadBinanceMarket().catch(e=>log("Binance load failed",{error:String(e)})));
+document.getElementById("binanceUseInStrategyBtn").addEventListener("click",useBinanceInStrategy);
+document.querySelectorAll(".binance-preset-btn").forEach(btn=>btn.addEventListener("click",()=>{document.getElementById("binanceTicker").value=btn.dataset.ticker||"BTC-USD"}));
+window.addEventListener("resize",()=>{if(replayState.trades.length)renderReplay();if(binanceState.data)renderBinanceChart()});
 
 loadCompanies();
 </script>

@@ -25,7 +25,18 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 from edgar.services.binance_data import fetch_binance_klines
-from edgar.services.strategy import _sma, _stochastic_rsi, _williams_fractals
+from edgar.services.strategy import (
+    _atr,
+    _chandelier_stop_candidate,
+    _resolve_bar_bracket_exit,
+    _rolling_highest,
+    _rolling_lowest,
+    _sma,
+    _stop_is_trailed,
+    _stochastic_rsi,
+    _tighten_stop,
+    _williams_fractals,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +129,7 @@ def _resolve_market_data_source(market_data_source: str, ticker: str) -> str:
         return "binance"
     if source == "auto":
         text = (ticker or "").strip().upper()
-        if text.startswith("BTC") or text.startswith("PAXG"):
+        if text.startswith("BTC") or text.startswith("ETH") or text.startswith("PAXG"):
             return "binance"
         return "yfinance"
     raise ValueError("market_data_source must be one of ['auto', 'yfinance', 'binance']")
@@ -236,11 +247,14 @@ class _Trade:
     position_size: float
     shares: float
     entry_index: int
+    active_stop_loss: float | None = None
     exit_ts: datetime | None = None
     exit_price: float | None = None
     pnl: float = 0.0
     exit_reason: str = ""
     fees_paid: float = 0.0
+    intrabar_conflict: bool = False
+    exit_fill_policy: str = "stop_first"
     entry_rel_volume: float = 0.0
     volume_confirmed: bool = False
     sizing_tier: str = ""
@@ -282,6 +296,11 @@ def run_intraday_backtest(
     commission_bps: float = 1.0,
     allow_longs: bool = True,
     allow_shorts: bool = True,
+    use_chandelier_exit: bool = False,
+    chandelier_period: int = 22,
+    chandelier_atr_period: int = 22,
+    chandelier_atr_mult: float = 3.0,
+    exit_fill_policy: str = "stop_first",
 ) -> dict:
     valid_variants = {"fractal_breakout_ema200", "alligator_stoch_fractal"}
     if strategy_variant not in valid_variants:
@@ -292,6 +311,10 @@ def run_intraday_backtest(
         raise ValueError("At least one of allow_longs / allow_shorts must be true")
     if fractal_window < 5 or fractal_window % 2 == 0:
         raise ValueError("fractal_window must be odd and >= 5 (e.g. 5 or 9)")
+    if exit_fill_policy not in {"stop_first", "target_first"}:
+        raise ValueError("exit_fill_policy must be one of ['stop_first', 'target_first']")
+    if chandelier_period < 2 or chandelier_atr_period < 2:
+        raise ValueError("chandelier periods must be >= 2")
 
     resolved_source = _resolve_market_data_source(market_data_source=market_data_source, ticker=ticker)
 
@@ -368,6 +391,9 @@ def run_intraday_backtest(
         rsi_period=stoch_rsi_period,
         stoch_period=stoch_rsi_period,
     )
+    chandelier_atr_vals = _atr(highs, lows, closes, period=chandelier_atr_period) if use_chandelier_exit else []
+    chandelier_highs = _rolling_highest(highs, chandelier_period) if use_chandelier_exit else []
+    chandelier_lows = _rolling_lowest(lows, chandelier_period) if use_chandelier_exit else []
     vol_sma = _sma(volumes, volume_period)
     frac_hi, frac_lo = _williams_fractals(highs, lows, period=fractal_period)
 
@@ -426,41 +452,60 @@ def run_intraday_backtest(
             bars_in_position += 1
 
         if open_trade is not None:
-            hit_sl = False
-            hit_tp = False
             line_exit = False
             raw_exit: float | None = None
+            current_stop = open_trade.active_stop_loss if open_trade.active_stop_loss is not None else open_trade.stop_loss
+            raw_exit, hit_sl, hit_tp, intrabar_conflict = _resolve_bar_bracket_exit(
+                direction=open_trade.direction,
+                bar_high=high_i,
+                bar_low=low_i,
+                stop_loss=current_stop,
+                take_profit=open_trade.take_profit,
+                fill_policy=exit_fill_policy,
+            )
 
-            if open_trade.direction == "long":
-                hit_sl = low_i <= open_trade.stop_loss
-                hit_tp = high_i >= open_trade.take_profit
-                if hit_sl:
-                    raw_exit = open_trade.stop_loss
-                elif strategy_variant == "alligator_stoch_fractal" and teeth[i] is not None and close_i <= teeth[i]:
-                    line_exit = True
-                    raw_exit = close_i
-                elif hit_tp:
-                    raw_exit = open_trade.take_profit
-            else:
-                hit_sl = high_i >= open_trade.stop_loss
-                hit_tp = low_i <= open_trade.take_profit
-                if hit_sl:
-                    raw_exit = open_trade.stop_loss
-                elif strategy_variant == "alligator_stoch_fractal" and teeth[i] is not None and close_i >= teeth[i]:
-                    line_exit = True
-                    raw_exit = close_i
-                elif hit_tp:
-                    raw_exit = open_trade.take_profit
+            if raw_exit is None:
+                if open_trade.direction == "long":
+                    if strategy_variant == "alligator_stoch_fractal" and teeth[i] is not None and close_i <= teeth[i]:
+                        line_exit = True
+                        raw_exit = close_i
+                else:
+                    if strategy_variant == "alligator_stoch_fractal" and teeth[i] is not None and close_i >= teeth[i]:
+                        line_exit = True
+                        raw_exit = close_i
 
             if raw_exit is not None:
+                open_trade.intrabar_conflict = intrabar_conflict
                 if hit_sl:
-                    reason = "stop_loss"
+                    reason = (
+                        "chandelier_stop"
+                        if use_chandelier_exit and _stop_is_trailed(open_trade.direction, open_trade.stop_loss, current_stop)
+                        else "stop_loss"
+                    )
                 elif line_exit:
                     reason = "alligator_line_exit"
                 else:
                     reason = "take_profit"
                 _close_trade(open_trade, i, raw_exit, reason)
                 open_trade = None
+            elif use_chandelier_exit:
+                tr_stop = _chandelier_stop_candidate(
+                    direction=open_trade.direction,
+                    idx=i,
+                    rolling_highs=chandelier_highs,
+                    rolling_lows=chandelier_lows,
+                    atr_values=chandelier_atr_vals,
+                    atr_mult=chandelier_atr_mult,
+                )
+                open_trade.active_stop_loss = round(
+                    _tighten_stop(
+                        direction=open_trade.direction,
+                        current_stop=current_stop,
+                        candidate_stop=tr_stop,
+                        take_profit=open_trade.take_profit,
+                    ),
+                    4,
+                )
 
         unrealized = 0.0
         if open_trade is not None:
@@ -632,7 +677,9 @@ def run_intraday_backtest(
             position_size=round(position_size, 4),
             shares=round(shares, 6),
             entry_index=i + 1,
+            active_stop_loss=round(stop_loss, 4),
             fees_paid=round(entry_fee, 4),
+            exit_fill_policy=exit_fill_policy,
             entry_rel_volume=round(rel_volume, 3),
             volume_confirmed=(not use_volume_filter) or rel_volume >= min_rel_volume,
             sizing_tier=sizing_tier,
@@ -676,6 +723,11 @@ def run_intraday_backtest(
         "market_data_source": resolved_source,
         "market_data_symbol": resolved_symbol,
         "strategy_variant": strategy_variant,
+        "use_chandelier_exit": use_chandelier_exit,
+        "chandelier_period": chandelier_period,
+        "chandelier_atr_period": chandelier_atr_period,
+        "chandelier_atr_mult": chandelier_atr_mult,
+        "exit_fill_policy": exit_fill_policy,
         "lookback_years": lookback_years,
         "bar_count": len(equity_curve),
         "start_date": start_ts.isoformat(),
@@ -712,6 +764,7 @@ def run_intraday_backtest(
                 "entry_price": t.entry_price,
                 "stop_loss": t.stop_loss,
                 "take_profit": t.take_profit,
+                "active_stop_loss": t.active_stop_loss,
                 "risk_pct": t.risk_pct,
                 "position_size": t.position_size,
                 "shares": t.shares,
@@ -720,6 +773,8 @@ def run_intraday_backtest(
                 "pnl": t.pnl,
                 "exit_reason": t.exit_reason,
                 "fees_paid": t.fees_paid,
+                "intrabar_conflict": t.intrabar_conflict,
+                "exit_fill_policy": t.exit_fill_policy,
                 "entry_rel_volume": t.entry_rel_volume,
                 "volume_confirmed": t.volume_confirmed,
                 "sizing_tier": t.sizing_tier,

@@ -137,6 +137,110 @@ def _atr(
     return out
 
 
+def _rolling_highest(values: list[float], period: int) -> list[float | None]:
+    """Rolling highest value aligned with input."""
+    n = len(values)
+    out: list[float | None] = [None] * n
+    if period <= 0 or n < period:
+        return out
+    for i in range(period - 1, n):
+        out[i] = max(values[i - period + 1: i + 1])
+    return out
+
+
+def _rolling_lowest(values: list[float], period: int) -> list[float | None]:
+    """Rolling lowest value aligned with input."""
+    n = len(values)
+    out: list[float | None] = [None] * n
+    if period <= 0 or n < period:
+        return out
+    for i in range(period - 1, n):
+        out[i] = min(values[i - period + 1: i + 1])
+    return out
+
+
+def _chandelier_stop_candidate(
+    direction: str,
+    idx: int,
+    rolling_highs: list[float | None],
+    rolling_lows: list[float | None],
+    atr_values: list[float | None],
+    atr_mult: float,
+) -> float | None:
+    """Bias-safe chandelier stop candidate to apply after bar close."""
+    if idx < 0 or idx >= len(atr_values):
+        return None
+    atr_now = atr_values[idx]
+    if atr_now is None or atr_now <= 0:
+        return None
+    if direction == "long":
+        hh = rolling_highs[idx]
+        if hh is None:
+            return None
+        return hh - (atr_now * atr_mult)
+    ll = rolling_lows[idx]
+    if ll is None:
+        return None
+    return ll + (atr_now * atr_mult)
+
+
+def _tighten_stop(
+    direction: str,
+    current_stop: float,
+    candidate_stop: float | None,
+    take_profit: float | None = None,
+) -> float:
+    if candidate_stop is None:
+        return current_stop
+    if direction == "long":
+        new_stop = max(current_stop, candidate_stop)
+        if take_profit is not None:
+            new_stop = min(new_stop, take_profit - 1e-6)
+        return new_stop
+    new_stop = min(current_stop, candidate_stop)
+    if take_profit is not None:
+        new_stop = max(new_stop, take_profit + 1e-6)
+    return new_stop
+
+
+def _stop_is_trailed(direction: str, initial_stop: float, active_stop: float, tolerance: float = 1e-8) -> bool:
+    if direction == "long":
+        return active_stop > (initial_stop + tolerance)
+    return active_stop < (initial_stop - tolerance)
+
+
+def _resolve_bar_bracket_exit(
+    direction: str,
+    bar_high: float,
+    bar_low: float,
+    stop_loss: float,
+    take_profit: float,
+    fill_policy: str = "stop_first",
+) -> tuple[float | None, bool, bool, bool]:
+    """Return raw exit price plus hit flags using a defined same-bar fill policy."""
+    if fill_policy not in {"stop_first", "target_first"}:
+        raise ValueError("fill_policy must be one of ['stop_first', 'target_first']")
+
+    if direction == "long":
+        hit_sl = bar_low <= stop_loss
+        hit_tp = bar_high >= take_profit
+    else:
+        hit_sl = bar_high >= stop_loss
+        hit_tp = bar_low <= take_profit
+
+    intrabar_conflict = hit_sl and hit_tp
+    if not hit_sl and not hit_tp:
+        return None, hit_sl, hit_tp, intrabar_conflict
+    if intrabar_conflict:
+        return (
+            (stop_loss if fill_policy == "stop_first" else take_profit),
+            fill_policy == "stop_first",
+            fill_policy == "target_first",
+            True,
+        )
+    return (stop_loss if hit_sl else take_profit), hit_sl, hit_tp, False
+
+
 def _williams_fractals(
     highs: list[float],
     lows: list[float],
@@ -182,11 +286,14 @@ class Trade:
     risk_pct: float
     position_size: float
     shares: float
+    active_stop_loss: float | None = None
     exit_date: date | None = None
     exit_price: float | None = None
     pnl: float = 0.0
     exit_reason: str = ""
     fees_paid: float = 0.0
+    intrabar_conflict: bool = False
+    exit_fill_policy: str = "stop_first"
     entry_rel_volume: float = 0.0
     volume_confirmed: bool = False
     sizing_tier: str = ""
@@ -217,6 +324,12 @@ class BacktestResult:
     total_fees: float = 0.0
     long_trades: int = 0
     short_trades: int = 0
+    use_chandelier_exit: bool = False
+    chandelier_period: int = 22
+    chandelier_atr_period: int = 22
+    chandelier_atr_mult: float = 3.0
+    exit_fill_policy: str = "stop_first"
+    trailing_exit_mode: str = ""
     trades: list[Trade] = field(default_factory=list)
     equity_curve: list[dict] = field(default_factory=list)
 
@@ -261,6 +374,10 @@ def run_backtest(
     max_fractal_stop_atr: float = 5.0,
     take_profit_rr: float = 2.0,
     trail_atr_mult: float = 2.2,
+    use_chandelier_exit: bool = False,
+    chandelier_period: int = 22,
+    chandelier_atr_period: int = 22,
+    chandelier_atr_mult: float = 3.0,
     volume_period: int = 20,
     min_rel_volume: float = 1.0,
     base_risk_pct: float = 0.01,
@@ -273,6 +390,7 @@ def run_backtest(
     lookback_years: int = 5,
     force_fetch: bool = False,
     fetch_period: str = "5y",
+    exit_fill_policy: str = "stop_first",
 ) -> BacktestResult:
     """Run a daily backtest using technical indicators and relative volume."""
     if initial_capital <= 0:
@@ -283,6 +401,10 @@ def run_backtest(
         raise ValueError("At least one of allow_longs / allow_shorts must be true")
     if fractal_period < 1:
         raise ValueError("fractal_period must be >= 1")
+    if exit_fill_policy not in {"stop_first", "target_first"}:
+        raise ValueError("exit_fill_policy must be one of ['stop_first', 'target_first']")
+    if chandelier_period < 2 or chandelier_atr_period < 2:
+        raise ValueError("chandelier periods must be >= 2")
 
     try:
         company = EdgarCompany.objects.get(ticker=ticker.upper())
@@ -342,6 +464,9 @@ def run_backtest(
         stoch_period=stoch_rsi_period,
     )
     atr_vals = _atr(highs, lows, closes, period=atr_period)
+    chandelier_atr_vals = _atr(highs, lows, closes, period=chandelier_atr_period) if use_chandelier_exit else atr_vals
+    chandelier_highs = _rolling_highest(highs, chandelier_period) if use_chandelier_exit else []
+    chandelier_lows = _rolling_lowest(lows, chandelier_period) if use_chandelier_exit else []
     vol_sma = _sma(volumes, volume_period)
     frac_hi, frac_lo = _williams_fractals(highs, lows, period=fractal_period)
 
@@ -395,53 +520,65 @@ def run_backtest(
         if open_trade is not None and today >= period_start:
             bars_in_position += 1
 
-        # 1) Manage open position exits with conservative intraday assumption:
-        #    if both TP and SL are touched in one bar, SL is filled first.
         if open_trade is not None:
-            hit_sl = False
-            hit_tp = False
-            raw_exit: float | None = None
-
-            if open_trade.direction == "long":
-                hit_sl = today_low <= open_trade.stop_loss
-                hit_tp = today_high >= open_trade.take_profit
-                if hit_sl:
-                    raw_exit = open_trade.stop_loss
-                elif hit_tp:
-                    raw_exit = open_trade.take_profit
-            else:
-                hit_sl = today_high >= open_trade.stop_loss
-                hit_tp = today_low <= open_trade.take_profit
-                if hit_sl:
-                    raw_exit = open_trade.stop_loss
-                elif hit_tp:
-                    raw_exit = open_trade.take_profit
+            current_stop = open_trade.active_stop_loss if open_trade.active_stop_loss is not None else open_trade.stop_loss
+            raw_exit, hit_sl, hit_tp, intrabar_conflict = _resolve_bar_bracket_exit(
+                direction=open_trade.direction,
+                bar_high=today_high,
+                bar_low=today_low,
+                stop_loss=current_stop,
+                take_profit=open_trade.take_profit,
+                fill_policy=exit_fill_policy,
+            )
 
             if raw_exit is not None:
+                open_trade.intrabar_conflict = intrabar_conflict
                 close_trade(
                     trade=open_trade,
                     exit_day=today,
                     raw_exit_price=raw_exit,
-                    reason="take_profit" if hit_tp and not hit_sl else "stop_loss",
+                    reason=(
+                        "take_profit"
+                        if hit_tp and not hit_sl
+                        else (
+                            "chandelier_stop"
+                            if use_chandelier_exit and _stop_is_trailed(open_trade.direction, open_trade.stop_loss, current_stop)
+                            else (
+                                "atr_trailing_stop"
+                                if not use_chandelier_exit and _stop_is_trailed(open_trade.direction, open_trade.stop_loss, current_stop)
+                                else "stop_loss"
+                            )
+                        )
+                    ),
                 )
                 open_trade = None
             else:
-                atr_now = atr_vals[i]
-                if atr_now is not None and atr_now > 0:
-                    if open_trade.direction == "long":
-                        tr_stop = today_close - (atr_now * trail_atr_mult)
-                        if tr_stop > open_trade.stop_loss:
-                            open_trade.stop_loss = round(
-                                min(tr_stop, open_trade.take_profit - 1e-6),
-                                4,
-                            )
-                    else:
-                        tr_stop = today_close + (atr_now * trail_atr_mult)
-                        if tr_stop < open_trade.stop_loss:
-                            open_trade.stop_loss = round(
-                                max(tr_stop, open_trade.take_profit + 1e-6),
-                                4,
-                            )
+                if use_chandelier_exit:
+                    tr_stop = _chandelier_stop_candidate(
+                        direction=open_trade.direction,
+                        idx=i,
+                        rolling_highs=chandelier_highs,
+                        rolling_lows=chandelier_lows,
+                        atr_values=chandelier_atr_vals,
+                        atr_mult=chandelier_atr_mult,
+                    )
+                else:
+                    atr_now = atr_vals[i]
+                    tr_stop = None
+                    if atr_now is not None and atr_now > 0:
+                        if open_trade.direction == "long":
+                            tr_stop = today_close - (atr_now * trail_atr_mult)
+                        else:
+                            tr_stop = today_close + (atr_now * trail_atr_mult)
+                open_trade.active_stop_loss = round(
+                    _tighten_stop(
+                        direction=open_trade.direction,
+                        current_stop=current_stop,
+                        candidate_stop=tr_stop,
+                        take_profit=open_trade.take_profit,
+                    ),
+                    4,
+                )
 
         unrealized = 0.0
         if open_trade is not None:
@@ -623,10 +760,12 @@ def run_backtest(
             entry_price=round(entry_price, 4),
             stop_loss=round(stop_loss, 4),
             take_profit=round(take_profit, 4),
+            active_stop_loss=round(stop_loss, 4),
             risk_pct=round(risk_pct, 6),
             position_size=round(position_size, 4),
             shares=round(shares, 6),
             fees_paid=round(entry_fee, 4),
+            exit_fill_policy=exit_fill_policy,
             entry_rel_volume=round(rel_volume, 3),
             volume_confirmed=True,
             sizing_tier=tier,
@@ -689,6 +828,12 @@ def run_backtest(
         total_fees=round(total_fees, 4),
         long_trades=len(long_trades),
         short_trades=len(short_trades),
+        use_chandelier_exit=use_chandelier_exit,
+        chandelier_period=chandelier_period,
+        chandelier_atr_period=chandelier_atr_period,
+        chandelier_atr_mult=chandelier_atr_mult,
+        exit_fill_policy=exit_fill_policy,
+        trailing_exit_mode="chandelier" if use_chandelier_exit else "atr_close_trail",
         trades=trades,
         equity_curve=equity_curve,
     )
@@ -715,6 +860,12 @@ def backtest_to_dict(result: BacktestResult) -> dict:
         "total_fees": result.total_fees,
         "long_trades": result.long_trades,
         "short_trades": result.short_trades,
+        "use_chandelier_exit": result.use_chandelier_exit,
+        "chandelier_period": result.chandelier_period,
+        "chandelier_atr_period": result.chandelier_atr_period,
+        "chandelier_atr_mult": result.chandelier_atr_mult,
+        "exit_fill_policy": result.exit_fill_policy,
+        "trailing_exit_mode": result.trailing_exit_mode,
         "trades": [
             {
                 "direction": t.direction,
@@ -722,6 +873,7 @@ def backtest_to_dict(result: BacktestResult) -> dict:
                 "entry_price": t.entry_price,
                 "stop_loss": t.stop_loss,
                 "take_profit": t.take_profit,
+                "active_stop_loss": t.active_stop_loss,
                 "risk_pct": t.risk_pct,
                 "position_size": t.position_size,
                 "shares": t.shares,
@@ -730,6 +882,8 @@ def backtest_to_dict(result: BacktestResult) -> dict:
                 "pnl": t.pnl,
                 "exit_reason": t.exit_reason,
                 "fees_paid": t.fees_paid,
+                "intrabar_conflict": t.intrabar_conflict,
+                "exit_fill_policy": t.exit_fill_policy,
                 "entry_rel_volume": t.entry_rel_volume,
                 "volume_confirmed": t.volume_confirmed,
                 "sizing_tier": t.sizing_tier,

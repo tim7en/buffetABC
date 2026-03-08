@@ -11,7 +11,14 @@ from django.test import TestCase
 from edgar import sp500
 from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental, EdgarMetricMapping
 from edgar.services.edgar_client import EdgarClient, RateLimiter
-from edgar.services.strategy import BacktestResult, Trade, backtest_to_dict, _williams_fractals
+from edgar.services.strategy import (
+    BacktestResult,
+    Trade,
+    _chandelier_stop_candidate,
+    _resolve_bar_bracket_exit,
+    _williams_fractals,
+    backtest_to_dict,
+)
 
 
 class SP500Tests(TestCase):
@@ -123,6 +130,44 @@ class ApiTests(TestCase):
 
 
 class DrfApiTests(TestCase):
+    @patch("edgar.services.strategy.run_backtest")
+    def test_strategy_daily_endpoint_passes_chandelier_options(self, mock_backtest):
+        mock_backtest.return_value = BacktestResult(
+            ticker="AAPL",
+            start_date=date(2024, 1, 1),
+            end_date=date(2024, 12, 31),
+            initial_capital=10000.0,
+            final_capital=10100.0,
+            total_return_pct=1.0,
+            total_trades=0,
+            winning_trades=0,
+            losing_trades=0,
+            win_rate=0.0,
+            max_drawdown_pct=0.0,
+        )
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "fetch_period": "5y",
+            "use_chandelier_exit": True,
+            "chandelier_period": 18,
+            "chandelier_atr_period": 14,
+            "chandelier_atr_mult": 2.5,
+            "exit_fill_policy": "target_first",
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_backtest.assert_called_once()
+        self.assertTrue(mock_backtest.call_args.kwargs["use_chandelier_exit"])
+        self.assertEqual(mock_backtest.call_args.kwargs["chandelier_period"], 18)
+        self.assertEqual(mock_backtest.call_args.kwargs["chandelier_atr_period"], 14)
+        self.assertEqual(mock_backtest.call_args.kwargs["chandelier_atr_mult"], 2.5)
+        self.assertEqual(mock_backtest.call_args.kwargs["exit_fill_policy"], "target_first")
+
     @patch("edgar.drf_views.EdgarClient.company_facts")
     def test_bulk_ingestion_endpoint(self, mock_company_facts):
         mock_company_facts.return_value = {"facts": {"us-gaap": {"Assets": {"units": {"USD": []}}}}}
@@ -311,6 +356,61 @@ class DrfApiTests(TestCase):
         )
         self.assertEqual(mock_intraday.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_intraday.call_args.kwargs["auto_adjust_for_yf_limits"])
+        self.assertFalse(mock_intraday.call_args.kwargs["use_chandelier_exit"])
+        self.assertEqual(mock_intraday.call_args.kwargs["exit_fill_policy"], "stop_first")
+
+    @patch("edgar.services.intraday_strategy.run_intraday_backtest")
+    def test_strategy_intraday_endpoint_passes_chandelier_options(self, mock_intraday):
+        mock_intraday.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "15m",
+            "strategy_variant": "fractal_breakout_ema200",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10100,
+            "total_return_pct": 1.0,
+            "total_trades": 2,
+            "long_trades": 1,
+            "short_trades": 1,
+            "winning_trades": 1,
+            "losing_trades": 1,
+            "win_rate": 50.0,
+            "max_drawdown_pct": 2.0,
+            "profit_factor": 1.2,
+            "cagr_pct": 0.5,
+            "avg_trade_return_pct": 0.2,
+            "exposure_pct": 10.0,
+            "total_fees": 3.5,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "15m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "fractal_breakout_ema200",
+            "use_chandelier_exit": True,
+            "chandelier_period": 20,
+            "chandelier_atr_period": 10,
+            "chandelier_atr_mult": 2.7,
+            "exit_fill_policy": "target_first",
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_intraday.assert_called_once()
+        self.assertTrue(mock_intraday.call_args.kwargs["use_chandelier_exit"])
+        self.assertEqual(mock_intraday.call_args.kwargs["chandelier_period"], 20)
+        self.assertEqual(mock_intraday.call_args.kwargs["chandelier_atr_period"], 10)
+        self.assertEqual(mock_intraday.call_args.kwargs["chandelier_atr_mult"], 2.7)
+        self.assertEqual(mock_intraday.call_args.kwargs["exit_fill_policy"], "target_first")
 
     def test_strategy_intraday_endpoint_missing_ticker(self):
         res = self.client.post(
@@ -579,7 +679,39 @@ class BinanceDataTests(TestCase):
         from edgar.services.binance_data import resolve_binance_symbol
 
         self.assertEqual(resolve_binance_symbol("BTC-USD"), "BTCUSDT")
+        self.assertEqual(resolve_binance_symbol("ETH-USD"), "ETHUSDT")
         self.assertEqual(resolve_binance_symbol("PAXG-USD"), "PAXGUSDT")
+
+    @patch("edgar.services.binance_data.fetch_binance_klines")
+    def test_binance_klines_chart_endpoint(self, mock_fetch):
+        start = datetime(2025, 1, 1)
+        mock_fetch.return_value = (
+            [
+                {
+                    "timestamp": start,
+                    "open": 100.0,
+                    "high": 101.0,
+                    "low": 99.0,
+                    "close": 100.5,
+                    "volume": 1200.0,
+                },
+                {
+                    "timestamp": start + timedelta(minutes=5),
+                    "open": 100.5,
+                    "high": 102.0,
+                    "low": 100.0,
+                    "close": 101.8,
+                    "volume": 1500.0,
+                },
+            ],
+            "ETHUSDT",
+        )
+        res = self.client.get("/api/edgar/drf/charts/binance-klines/?symbol=ETHUSDT&interval=5m&days=3")
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["symbol"], "ETHUSDT")
+        self.assertEqual(payload["bar_count"], 2)
+        self.assertEqual(len(payload["price_series"]), 2)
 
     @patch("edgar.services.mtf_liquidity_flow_strategy._fetch_intraday_bars")
     @patch("edgar.services.mtf_liquidity_flow_strategy.fetch_binance_klines")
@@ -708,8 +840,13 @@ class StrategySerializationTests(TestCase):
         self.assertIn("cagr_pct", payload)
         self.assertIn("long_trades", payload)
         self.assertIn("short_trades", payload)
+        self.assertIn("use_chandelier_exit", payload)
+        self.assertIn("exit_fill_policy", payload)
         self.assertEqual(len(payload["trades"]), 1)
         t0 = payload["trades"][0]
+        self.assertIn("active_stop_loss", t0)
+        self.assertIn("intrabar_conflict", t0)
+        self.assertIn("exit_fill_policy", t0)
         self.assertIn("entry_rel_volume", t0)
         self.assertIn("volume_confirmed", t0)
         self.assertIn("sizing_tier", t0)
@@ -730,3 +867,31 @@ class StrategyIndicatorTests(TestCase):
         self.assertEqual(len(frac_lo), len(lows))
         self.assertEqual(frac_hi[2], 15.0)
         self.assertEqual(frac_lo[2], 7.0)
+
+    def test_same_bar_exit_policy_marks_conflict(self):
+        raw_exit, hit_sl, hit_tp, intrabar_conflict = _resolve_bar_bracket_exit(
+            direction="long",
+            bar_high=110.0,
+            bar_low=94.0,
+            stop_loss=95.0,
+            take_profit=108.0,
+            fill_policy="stop_first",
+        )
+        self.assertEqual(raw_exit, 95.0)
+        self.assertTrue(hit_sl)
+        self.assertFalse(hit_tp)
+        self.assertTrue(intrabar_conflict)
+
+    def test_chandelier_candidate_uses_recent_extreme(self):
+        rolling_highs = [None, None, 105.0, 107.0]
+        rolling_lows = [None, None, 95.0, 96.0]
+        atr_vals = [None, None, 2.0, 2.5]
+        candidate = _chandelier_stop_candidate(
+            direction="long",
+            idx=3,
+            rolling_highs=rolling_highs,
+            rolling_lows=rolling_lows,
+            atr_values=atr_vals,
+            atr_mult=3.0,
+        )
+        self.assertEqual(candidate, 99.5)

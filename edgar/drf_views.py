@@ -534,6 +534,11 @@ class StrategyViewSet(viewsets.ViewSet):
         allow_longs = _as_bool(request.data.get("allow_longs"), True)
         require_fractal_confirmation = _as_bool(request.data.get("require_fractal_confirmation"), True)
         require_fractal_breakout = _as_bool(request.data.get("require_fractal_breakout"), False)
+        use_chandelier_exit = _as_bool(request.data.get("use_chandelier_exit"), False)
+        chandelier_period = int(request.data.get("chandelier_period", 22))
+        chandelier_atr_period = int(request.data.get("chandelier_atr_period", 22))
+        chandelier_atr_mult = float(request.data.get("chandelier_atr_mult", 3.0))
+        exit_fill_policy = (request.data.get("exit_fill_policy") or "stop_first").strip().lower()
         lookback_years = int(request.data.get("lookback_years", 5))
         if isinstance(fetch_period, str) and fetch_period.endswith("y") and fetch_period[:-1].isdigit():
             lookback_years = int(fetch_period[:-1])
@@ -548,6 +553,11 @@ class StrategyViewSet(viewsets.ViewSet):
                 lookback_years=lookback_years,
                 force_fetch=force_fetch,
                 fetch_period=fetch_period,
+                use_chandelier_exit=use_chandelier_exit,
+                chandelier_period=chandelier_period,
+                chandelier_atr_period=chandelier_atr_period,
+                chandelier_atr_mult=chandelier_atr_mult,
+                exit_fill_policy=exit_fill_policy,
             )
             return Response(backtest_to_dict(result))
         except Exception as exc:
@@ -578,6 +588,11 @@ class StrategyViewSet(viewsets.ViewSet):
         strategy_variant = (request.data.get("strategy_variant") or "fractal_breakout_ema200").strip()
         allow_shorts = _as_bool(request.data.get("allow_shorts"), True)
         allow_longs = _as_bool(request.data.get("allow_longs"), True)
+        use_chandelier_exit = _as_bool(request.data.get("use_chandelier_exit"), False)
+        chandelier_period = int(request.data.get("chandelier_period", 22))
+        chandelier_atr_period = int(request.data.get("chandelier_atr_period", 22))
+        chandelier_atr_mult = float(request.data.get("chandelier_atr_mult", 3.0))
+        exit_fill_policy = (request.data.get("exit_fill_policy") or "stop_first").strip().lower()
 
         try:
             if strategy_variant == "mtf_liquidity_flow":
@@ -610,6 +625,11 @@ class StrategyViewSet(viewsets.ViewSet):
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),
                     slippage_bps=float(request.data.get("slippage_bps", 4.0)),
                     commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    use_chandelier_exit=use_chandelier_exit,
+                    chandelier_period=chandelier_period,
+                    chandelier_atr_period=chandelier_atr_period,
+                    chandelier_atr_mult=chandelier_atr_mult,
+                    exit_fill_policy=exit_fill_policy,
                 )
             elif strategy_variant == "price_action_3step":
                 payload = run_market_mechanics_backtest(
@@ -639,6 +659,11 @@ class StrategyViewSet(viewsets.ViewSet):
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),
                     slippage_bps=float(request.data.get("slippage_bps", 4.0)),
                     commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    use_chandelier_exit=use_chandelier_exit,
+                    chandelier_period=chandelier_period,
+                    chandelier_atr_period=chandelier_atr_period,
+                    chandelier_atr_mult=chandelier_atr_mult,
+                    exit_fill_policy=exit_fill_policy,
                 )
             elif strategy_variant == "manipulation_ifvg":
                 payload = run_manipulation_backtest(
@@ -673,6 +698,11 @@ class StrategyViewSet(viewsets.ViewSet):
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),
                     slippage_bps=float(request.data.get("slippage_bps", 4.0)),
                     commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    use_chandelier_exit=use_chandelier_exit,
+                    chandelier_period=chandelier_period,
+                    chandelier_atr_period=chandelier_atr_period,
+                    chandelier_atr_mult=chandelier_atr_mult,
+                    exit_fill_policy=exit_fill_policy,
                 )
             else:
                 payload = run_intraday_backtest(
@@ -693,6 +723,11 @@ class StrategyViewSet(viewsets.ViewSet):
                     fractal_window=int(request.data.get("fractal_window", 9)),
                     rr_multiple=float(request.data.get("rr_multiple", 1.5)),
                     breakout_buffer_bps=float(request.data.get("breakout_buffer_bps", 0.0)),
+                    use_chandelier_exit=use_chandelier_exit,
+                    chandelier_period=chandelier_period,
+                    chandelier_atr_period=chandelier_atr_period,
+                    chandelier_atr_mult=chandelier_atr_mult,
+                    exit_fill_policy=exit_fill_policy,
                 )
             return Response(payload)
         except Exception as exc:
@@ -750,3 +785,69 @@ class ChartsViewSet(viewsets.ViewSet):
         from edgar.services.charts import top_scored_companies
         limit = int(request.query_params.get("limit", "20"))
         return Response(top_scored_companies(limit=limit))
+
+    @action(detail=False, methods=["get"], url_path="binance-klines")
+    def binance_klines(self, request):
+        from edgar.services.binance_data import fetch_binance_klines
+
+        symbol = (request.query_params.get("symbol") or "").strip().upper()
+        ticker = (request.query_params.get("ticker") or symbol or "BTC-USD").strip().upper()
+        interval = (request.query_params.get("interval") or "5m").strip().lower()
+        days = max(int(request.query_params.get("days", "14")), 1)
+        max_bars = max(int(request.query_params.get("max_bars", "500")), 50)
+
+        try:
+            bars, resolved_symbol = fetch_binance_klines(
+                ticker=ticker,
+                interval=interval,
+                lookback_years=(days / 365.25),
+                warmup_days=0,
+                market_data_symbol=symbol or None,
+            )
+        except Exception as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not bars:
+            return Response(
+                {
+                    "ticker": ticker,
+                    "symbol": symbol or ticker,
+                    "interval": interval,
+                    "days": days,
+                    "bar_count": 0,
+                    "price_series": [],
+                }
+            )
+
+        clipped = bars[-max_bars:]
+        closes = [float(b["close"]) for b in clipped]
+        highs = [float(b["high"]) for b in clipped]
+        lows = [float(b["low"]) for b in clipped]
+        volumes = [float(b["volume"]) for b in clipped]
+        return Response(
+            {
+                "ticker": ticker,
+                "symbol": resolved_symbol,
+                "interval": interval,
+                "days": days,
+                "bar_count": len(clipped),
+                "full_bar_count": len(bars),
+                "start_date": clipped[0]["timestamp"].isoformat(),
+                "end_date": clipped[-1]["timestamp"].isoformat(),
+                "last_close": round(closes[-1], 4),
+                "window_high": round(max(highs), 4),
+                "window_low": round(min(lows), 4),
+                "volume_sum": round(sum(volumes), 4),
+                "price_series": [
+                    {
+                        "date": b["timestamp"].isoformat(),
+                        "open": round(float(b["open"]), 4),
+                        "high": round(float(b["high"]), 4),
+                        "low": round(float(b["low"]), 4),
+                        "close": round(float(b["close"]), 4),
+                        "volume": round(float(b["volume"]), 4),
+                    }
+                    for b in clipped
+                ],
+            }
+        )
