@@ -913,6 +913,12 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_orb_turtle.call_args.kwargs["orb_window_minutes"], 15)
         self.assertEqual(mock_orb_turtle.call_args.kwargs["donchian_period"], 200)
         self.assertEqual(mock_orb_turtle.call_args.kwargs["min_rel_volume"], 1.1)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["turtle_initial_stop_atr_mult"], 2.5)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["turtle_weak_breakout_minutes"], 120)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["turtle_weak_breakout_atr"], 0.5)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["chandelier_period"], 14)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["chandelier_atr_period"], 14)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["chandelier_atr_mult"], 3.5)
         self.assertEqual(mock_orb_turtle.call_args.kwargs["short_time_stop_minutes"], 120)
         self.assertEqual(mock_orb_turtle.call_args.kwargs["portfolio_gate_threshold_pct"], -1.0)
 
@@ -1357,6 +1363,41 @@ class BinanceDataTests(TestCase):
         self.assertGreater(payload["bar_count"], 0)
         mock_binance_fetch.assert_called_once()
         mock_yf_fetch.assert_not_called()
+
+    def test_orb_turtle_long_gate_snapshot_requires_all_five_gates(self):
+        from edgar.services.orb_turtle_hybrid_strategy import _turtle_long_gate_snapshot
+
+        passed = _turtle_long_gate_snapshot(
+            ts=datetime(2025, 1, 6, 15, 5, tzinfo=timezone.utc),
+            close_tf=101.5,
+            donchian_upper=100.0,
+            ema_now=99.0,
+            daily_slope_positive=True,
+            rel_volume=1.3,
+            min_rel_volume=1.0,
+            breakout_buffer=0.0,
+        )
+        self.assertTrue(passed["passed"])
+        self.assertEqual(passed["count"], 5)
+        self.assertEqual(passed["failed_names"], [])
+
+        failed = _turtle_long_gate_snapshot(
+            ts=datetime(2025, 1, 6, 14, 20, tzinfo=timezone.utc),
+            close_tf=99.8,
+            donchian_upper=100.0,
+            ema_now=100.5,
+            daily_slope_positive=False,
+            rel_volume=0.8,
+            min_rel_volume=1.0,
+            breakout_buffer=0.0,
+        )
+        self.assertFalse(failed["passed"])
+        self.assertLess(failed["count"], failed["required"])
+        self.assertIn("session_window", failed["failed_names"])
+        self.assertIn("donchian_breakout", failed["failed_names"])
+        self.assertIn("ema_filter", failed["failed_names"])
+        self.assertIn("daily_slope", failed["failed_names"])
+        self.assertIn("rvol_filter", failed["failed_names"])
 
     def test_session_range_breakout_pre_open_range_handles_asia_midnight_crossover(self):
         from edgar.services.session_range_breakout_strategy import _pre_open_range

@@ -95,6 +95,9 @@ class _Trade:
     short_meta_gate_active: bool = False
     signal_score: int = 0
     time_stop_minutes: int = 0
+    atr_at_entry: float | None = None
+    gate_count: int = 0
+    gate_names: str = ""
 
 
 def _aggregate_timeframe(bars: list[dict], minutes: int) -> tuple[list[dict], list[int]]:
@@ -199,6 +202,13 @@ def _minutes_until_us_close(ts: datetime) -> int:
     return int((close_ts - local).total_seconds() / 60)
 
 
+def _is_turtle_entry_window(ts: datetime) -> bool:
+    local = _to_new_york(ts)
+    start = local.replace(hour=9, minute=50, second=0, microsecond=0)
+    end = local.replace(hour=14, minute=0, second=0, microsecond=0)
+    return start <= local < end
+
+
 def _build_opening_ranges(
     timestamps: list[datetime],
     highs: list[float],
@@ -270,6 +280,36 @@ def _recent_short_loss_count(closed_meta: list[dict], lookback: int) -> int:
     return sum(1 for m in recent if float(m.get("pnl", 0.0)) < 0)
 
 
+def _turtle_long_gate_snapshot(
+    ts: datetime,
+    close_tf: float,
+    donchian_upper: float | None,
+    ema_now: float | None,
+    daily_slope_positive: bool,
+    rel_volume: float,
+    min_rel_volume: float,
+    breakout_buffer: float,
+) -> dict:
+    gates = {
+        "session_window": _is_turtle_entry_window(ts),
+        "donchian_breakout": (
+            donchian_upper is not None
+            and close_tf > (float(donchian_upper) * (1.0 + breakout_buffer))
+        ),
+        "ema_filter": ema_now is not None and close_tf > float(ema_now),
+        "daily_slope": daily_slope_positive,
+        "rvol_filter": rel_volume >= min_rel_volume,
+    }
+    passed_names = [name for name, passed in gates.items() if passed]
+    return {
+        "count": len(passed_names),
+        "required": len(gates),
+        "passed": len(passed_names) == len(gates),
+        "passed_names": passed_names,
+        "failed_names": [name for name, passed in gates.items() if not passed],
+    }
+
+
 def run_orb_turtle_hybrid_backtest(
     ticker: str,
     initial_capital: float = 10_000.0,
@@ -298,12 +338,14 @@ def run_orb_turtle_hybrid_backtest(
     short_time_stop_min_r: float = 0.5,
     short_full_trail_score_threshold: int = 3,
     turtle_initial_stop_atr_period: int = 20,
-    turtle_initial_stop_atr_mult: float = 2.0,
+    turtle_initial_stop_atr_mult: float = 2.5,
+    turtle_weak_breakout_minutes: int = 120,
+    turtle_weak_breakout_atr: float = 0.5,
     use_break_even_stop: bool = False,
     break_even_trigger_r: float = 1.0,
-    chandelier_period: int = 22,
-    chandelier_atr_period: int = 22,
-    chandelier_atr_mult: float = 3.0,
+    chandelier_period: int = 14,
+    chandelier_atr_period: int = 14,
+    chandelier_atr_mult: float = 3.5,
     portfolio_gate_lookback: int = 8,
     portfolio_gate_threshold_pct: float = -1.0,
     portfolio_gate_risk_scale: float = 0.5,
@@ -548,6 +590,15 @@ def run_orb_turtle_hybrid_backtest(
                     if current_r < short_time_stop_min_r:
                         _close_trade(open_trade, i, close_i, "time_stop")
                         open_trade = None
+                if (
+                    open_trade is not None
+                    and open_trade.leg == "turtle_long"
+                    and open_trade.atr_at_entry is not None
+                    and elapsed_minutes >= turtle_weak_breakout_minutes
+                    and close_i <= (open_trade.entry_price + (open_trade.atr_at_entry * turtle_weak_breakout_atr))
+                ):
+                    _close_trade(open_trade, i, close_i, "weak_breakout_exit")
+                    open_trade = None
                 if open_trade is not None and _bar_crosses_us_close(ts, effective_minutes):
                     _close_trade(open_trade, i, close_i, "session_close")
                     open_trade = None
@@ -724,8 +775,8 @@ def run_orb_turtle_hybrid_backtest(
         if open_trade is not None:
             continue
 
-        # Turtle long leg: completed 15m Donchian breakout with trend and RVOL filters.
-        if allow_longs and (session_date, "turtle_long") not in day_leg_taken and session_label in {"asia", "new_york"}:
+        # Turtle long leg: explicit 5-gate U.S.-session breakout model.
+        if allow_longs and (session_date, "turtle_long") not in day_leg_taken:
             if _is_new_tf_bucket(bar_to_tf_idx, i):
                 completed_tf_idx = bar_to_tf_idx[i] - 1
                 if completed_tf_idx >= max(donchian_period, ema_period, rvol_period):
@@ -740,15 +791,17 @@ def run_orb_turtle_hybrid_backtest(
                         else 1.0
                     )
                     close_tf = tf_closes[completed_tf_idx]
-                    if (
-                        donchian_upper is not None
-                        and ema_now is not None
-                        and atr_now is not None
-                        and daily_slope_positive
-                        and rel_volume >= min_rel_volume
-                        and close_tf > donchian_upper
-                        and close_tf > ema_now
-                    ):
+                    long_gates = _turtle_long_gate_snapshot(
+                        ts=ts,
+                        close_tf=close_tf,
+                        donchian_upper=donchian_upper,
+                        ema_now=ema_now,
+                        daily_slope_positive=daily_slope_positive,
+                        rel_volume=rel_volume,
+                        min_rel_volume=min_rel_volume,
+                        breakout_buffer=orb_break_buffer,
+                    )
+                    if donchian_upper is not None and ema_now is not None and atr_now is not None and long_gates["passed"]:
                         next_open = opens[i] if opens[i] > 0 else closes[i]
                         if next_open > 0:
                             entry_price = next_open * (1.0 + slippage_rate)
@@ -794,16 +847,19 @@ def run_orb_turtle_hybrid_backtest(
                                         entry_rel_volume=round(rel_volume, 3),
                                         volume_confirmed=True,
                                         sizing_tier=sizing_tier,
-                                        signal_quality="A" if rel_volume >= 1.5 else "B",
+                                        signal_quality="A" if long_gates["count"] >= 5 and rel_volume >= 1.5 else "B",
                                         stop_source="breakout_bar_or_atr",
-                                        session_label=session_label,
+                                        session_label="new_york",
                                         full_trail_mode=True,
                                         use_chandelier_exit=True,
                                         use_break_even_stop=use_break_even_stop,
                                         portfolio_gate_active=portfolio_gate_active,
                                         short_meta_gate_active=False,
-                                        signal_score=3 + (1 if rel_volume >= 1.5 else 0),
-                                        time_stop_minutes=0,
+                                        signal_score=long_gates["count"],
+                                        time_stop_minutes=turtle_weak_breakout_minutes,
+                                        atr_at_entry=round(float(atr_now), 4),
+                                        gate_count=long_gates["count"],
+                                        gate_names="|".join(long_gates["passed_names"]),
                                     )
                                     day_leg_taken.add((session_date, "turtle_long"))
 
@@ -843,17 +899,28 @@ def run_orb_turtle_hybrid_backtest(
         "strategy_variant": "orb_turtle_hybrid",
         "strategy_name": "Opening Pressure + Turtle",
         "bias_model": "15m_donchian_plus_daily_ema",
-        "entry_session": "asia_and_new_york",
+        "entry_session": "new_york_orb_plus_new_york_turtle",
         "orb_window_minutes": orb_window_minutes,
         "use_five_minute_or": use_five_minute_or,
         "donchian_period": donchian_period,
         "ema_period": ema_period,
         "daily_ema_period": daily_ema_period,
         "min_rel_volume": min_rel_volume,
+        "turtle_long_gate_count_required": 5,
+        "turtle_long_gate_names": [
+            "session_window",
+            "donchian_breakout",
+            "ema_filter",
+            "daily_slope",
+            "rvol_filter",
+        ],
+        "turtle_entry_window": "09:50-14:00 America/New_York",
         "short_risk_pct": short_risk_pct,
         "long_risk_pct": long_risk_pct,
         "short_time_stop_minutes": short_time_stop_minutes,
         "short_full_trail_score_threshold": short_full_trail_score_threshold,
+        "turtle_weak_breakout_minutes": turtle_weak_breakout_minutes,
+        "turtle_weak_breakout_atr": turtle_weak_breakout_atr,
         "use_chandelier_exit": True,
         "use_break_even_stop": use_break_even_stop,
         "break_even_trigger_r": break_even_trigger_r,
@@ -939,6 +1006,9 @@ def run_orb_turtle_hybrid_backtest(
                 "short_meta_gate_active": t.short_meta_gate_active,
                 "signal_score": t.signal_score,
                 "time_stop_minutes": t.time_stop_minutes,
+                "atr_at_entry": t.atr_at_entry,
+                "gate_count": t.gate_count,
+                "gate_names": t.gate_names,
             }
             for t in trades
         ],

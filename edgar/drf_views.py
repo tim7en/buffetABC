@@ -680,6 +680,9 @@ class StrategyViewSet(viewsets.ViewSet):
                     exit_fill_policy=exit_fill_policy,
                 )
             elif strategy_variant == "orb_turtle_hybrid":
+                orb_turtle_chandelier_period = int(request.data.get("chandelier_period", 14))
+                orb_turtle_chandelier_atr_period = int(request.data.get("chandelier_atr_period", 14))
+                orb_turtle_chandelier_atr_mult = float(request.data.get("chandelier_atr_mult", 3.5))
                 payload = run_orb_turtle_hybrid_backtest(
                     ticker=ticker,
                     initial_capital=capital,
@@ -708,12 +711,14 @@ class StrategyViewSet(viewsets.ViewSet):
                     short_time_stop_min_r=float(request.data.get("short_time_stop_min_r", 0.5)),
                     short_full_trail_score_threshold=int(request.data.get("short_full_trail_score_threshold", 3)),
                     turtle_initial_stop_atr_period=int(request.data.get("turtle_initial_stop_atr_period", 20)),
-                    turtle_initial_stop_atr_mult=float(request.data.get("turtle_initial_stop_atr_mult", 2.0)),
+                    turtle_initial_stop_atr_mult=float(request.data.get("turtle_initial_stop_atr_mult", 2.5)),
+                    turtle_weak_breakout_minutes=int(request.data.get("turtle_weak_breakout_minutes", 120)),
+                    turtle_weak_breakout_atr=float(request.data.get("turtle_weak_breakout_atr", 0.5)),
                     use_break_even_stop=use_break_even_stop,
                     break_even_trigger_r=break_even_trigger_r,
-                    chandelier_period=chandelier_period,
-                    chandelier_atr_period=chandelier_atr_period,
-                    chandelier_atr_mult=chandelier_atr_mult,
+                    chandelier_period=orb_turtle_chandelier_period,
+                    chandelier_atr_period=orb_turtle_chandelier_atr_period,
+                    chandelier_atr_mult=orb_turtle_chandelier_atr_mult,
                     portfolio_gate_lookback=int(request.data.get("portfolio_gate_lookback", 8)),
                     portfolio_gate_threshold_pct=float(request.data.get("portfolio_gate_threshold_pct", -1.0)),
                     portfolio_gate_risk_scale=float(request.data.get("portfolio_gate_risk_scale", 0.5)),
