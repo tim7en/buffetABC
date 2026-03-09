@@ -573,6 +573,7 @@ class StrategyViewSet(viewsets.ViewSet):
         from edgar.services.market_mechanics_strategy import run_market_mechanics_backtest
         from edgar.services.manipulation_strategy import run_manipulation_backtest
         from edgar.services.mtf_liquidity_flow_strategy import run_mtf_liquidity_flow_backtest
+        from edgar.services.session_sfp_fvg_strategy import run_session_sfp_fvg_backtest
 
         def _as_bool(value, default=True):
             if value is None:
@@ -601,7 +602,47 @@ class StrategyViewSet(viewsets.ViewSet):
         exit_fill_policy = (request.data.get("exit_fill_policy") or "stop_first").strip().lower()
 
         try:
-            if strategy_variant == "mtf_liquidity_flow":
+            if strategy_variant == "hourly_sfp_fvg":
+                payload = run_session_sfp_fvg_backtest(
+                    ticker=ticker,
+                    initial_capital=capital,
+                    interval=interval,
+                    lookback_years=lookback_years,
+                    market_data_source=(request.data.get("market_data_source") or "auto").strip().lower(),
+                    market_data_symbol=(request.data.get("market_data_symbol") or "").strip().upper() or None,
+                    auto_adjust_for_yf_limits=_as_bool(request.data.get("auto_adjust_for_yf_limits"), True),
+                    allow_longs=allow_longs,
+                    allow_shorts=allow_shorts,
+                    hourly_bias_pivot_window=int(request.data.get("hourly_bias_pivot_window", 2)),
+                    hourly_level_pivot_window=int(request.data.get("hourly_level_pivot_window", 1)),
+                    swing_lookback_hours=int(request.data.get("swing_lookback_hours", 48)),
+                    session_trigger_window_minutes=int(request.data.get("session_trigger_window_minutes", 60)),
+                    sfp_structure_buffer_bps=float(request.data.get("sfp_structure_buffer_bps", 0.0)),
+                    sfp_sweep_buffer_bps=float(request.data.get("sfp_sweep_buffer_bps", 3.0)),
+                    sfp_reclaim_buffer_bps=float(request.data.get("sfp_reclaim_buffer_bps", 0.0)),
+                    fvg_search_bars=int(request.data.get("fvg_search_bars", 18)),
+                    fvg_retest_bars=int(request.data.get("fvg_retest_bars", 18)),
+                    fvg_reclaim_buffer_bps=float(request.data.get("fvg_reclaim_buffer_bps", 0.0)),
+                    use_target_room_filter=_as_bool(request.data.get("use_target_room_filter"), True),
+                    min_target_room_ratio=float(request.data.get("min_target_room_ratio", 1.0)),
+                    stop_buffer_bps=float(request.data.get("stop_buffer_bps", 5.0)),
+                    rr_multiple=float(request.data.get("rr_multiple", 2.0)),
+                    volume_period=int(request.data.get("volume_period", 40)),
+                    use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
+                    min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                    base_risk_pct=float(request.data.get("base_risk_pct", 0.01)),
+                    max_position_pct=float(request.data.get("max_position_pct", 0.30)),
+                    slippage_bps=float(request.data.get("slippage_bps", 4.0)),
+                    commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    use_break_even_stop=use_break_even_stop,
+                    break_even_trigger_r=break_even_trigger_r,
+                    use_chandelier_exit=use_chandelier_exit,
+                    chandelier_period=chandelier_period,
+                    chandelier_atr_period=chandelier_atr_period,
+                    chandelier_atr_mult=chandelier_atr_mult,
+                    exit_fill_policy=exit_fill_policy,
+                )
+            elif strategy_variant == "mtf_liquidity_flow":
                 payload = run_mtf_liquidity_flow_backtest(
                     ticker=ticker,
                     initial_capital=capital,

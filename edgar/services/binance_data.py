@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import math
 import time
 from typing import Any
 
@@ -36,6 +37,16 @@ def _interval_to_minutes(interval: str) -> int:
             f"Unsupported Binance interval '{interval}'. Supported: {sorted(_INTERVAL_MINUTES.keys())}"
         )
     return minutes
+
+
+def _cache_timeout_sec(interval_minutes: int) -> int:
+    if interval_minutes <= 5:
+        return 15 * 60
+    if interval_minutes <= 15:
+        return 30 * 60
+    if interval_minutes <= 60:
+        return 60 * 60
+    return 2 * 60 * 60
 
 
 def resolve_binance_symbol(ticker: str, explicit_symbol: str | None = None) -> str:
@@ -78,7 +89,13 @@ def fetch_binance_klines(
     warmup_days: int,
     market_data_symbol: str | None = None,
     request_timeout_sec: int = 20,
+    use_cache: bool = True,
 ) -> tuple[list[dict[str, Any]], str]:
+    try:
+        from django.core.cache import cache
+    except Exception:  # pragma: no cover - fallback for non-Django execution
+        cache = None
+
     interval_key = (interval or "").strip().lower()
     api_interval = _VALID_INTERVALS.get(interval_key)
     if api_interval is None:
@@ -96,6 +113,15 @@ def fetch_binance_klines(
     start_dt = end_dt - timedelta(days=total_days)
     end_ms = int(end_dt.timestamp() * 1000)
     cursor_ms = int(start_dt.timestamp() * 1000)
+    end_bucket = math.floor(end_dt.timestamp() / max(interval_minutes * 60, 1))
+    cache_key = (
+        f"binance:klines:v1:{symbol}:{interval_key}:"
+        f"{lookback_days}:{int(warmup_days)}:{end_bucket}"
+    )
+    if use_cache and cache is not None:
+        cached_payload = cache.get(cache_key)
+        if cached_payload is not None:
+            return cached_payload
 
     rows: list[list[Any]] = []
     session = requests.Session()
@@ -163,4 +189,7 @@ def fetch_binance_klines(
         except Exception:
             continue
 
-    return bars, symbol
+    payload = (bars, symbol)
+    if use_cache and cache is not None and bars:
+        cache.set(cache_key, payload, timeout=_cache_timeout_sec(interval_minutes))
+    return payload

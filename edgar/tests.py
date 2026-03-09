@@ -1,10 +1,11 @@
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 import json
 from unittest.mock import MagicMock, patch
 
 import requests
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase
 
@@ -741,6 +742,60 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_market_mechanics.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_market_mechanics.call_args.kwargs["auto_adjust_for_yf_limits"])
 
+    @patch("edgar.services.session_sfp_fvg_strategy.run_session_sfp_fvg_backtest")
+    def test_strategy_intraday_endpoint_hourly_sfp_fvg_variant(self, mock_session_sfp):
+        mock_session_sfp.return_value = {
+            "ticker": "ETH-USD",
+            "data_mode": "intraday",
+            "interval": "5m",
+            "strategy_variant": "hourly_sfp_fvg",
+            "entry_session": "new_york_equity_open",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10310,
+            "total_return_pct": 3.1,
+            "total_trades": 5,
+            "long_trades": 3,
+            "short_trades": 2,
+            "winning_trades": 3,
+            "losing_trades": 2,
+            "win_rate": 60.0,
+            "max_drawdown_pct": 2.2,
+            "profit_factor": 1.8,
+            "cagr_pct": 1.5,
+            "avg_trade_return_pct": 0.5,
+            "exposure_pct": 4.0,
+            "total_fees": 5.0,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "ETH-USD",
+            "initial_capital": 10000,
+            "interval": "5m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "hourly_sfp_fvg",
+            "market_data_source": "binance",
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "ETH-USD")
+        self.assertEqual(payload["interval"], "5m")
+        self.assertEqual(payload["strategy_variant"], "hourly_sfp_fvg")
+        mock_session_sfp.assert_called_once()
+        self.assertEqual(mock_session_sfp.call_args.kwargs["market_data_source"], "binance")
+        self.assertEqual(mock_session_sfp.call_args.kwargs["rr_multiple"], 2.0)
+        self.assertEqual(mock_session_sfp.call_args.kwargs["session_trigger_window_minutes"], 60)
+        self.assertTrue(mock_session_sfp.call_args.kwargs["use_target_room_filter"])
+        self.assertEqual(mock_session_sfp.call_args.kwargs["min_target_room_ratio"], 1.0)
+
     @patch("edgar.services.mtf_liquidity_flow_strategy.run_mtf_liquidity_flow_backtest")
     def test_strategy_intraday_endpoint_mtf_liquidity_flow_variant(self, mock_mtf_flow):
         mock_mtf_flow.return_value = {
@@ -993,6 +1048,48 @@ class BinanceDataTests(TestCase):
         self.assertEqual(payload["bar_count"], 2)
         self.assertEqual(len(payload["price_series"]), 2)
 
+    @patch("edgar.services.binance_data.time.sleep")
+    @patch("edgar.services.binance_data.requests.Session.get")
+    def test_fetch_binance_klines_uses_cache_for_repeat_5m_calls(self, mock_get, mock_sleep):
+        from edgar.services.binance_data import fetch_binance_klines
+
+        cache.clear()
+        row = [
+            int(datetime(2025, 1, 1, tzinfo=timezone.utc).timestamp() * 1000),
+            "100.0",
+            "101.0",
+            "99.0",
+            "100.5",
+            "1200.0",
+        ]
+        first_response = MagicMock()
+        first_response.status_code = 200
+        first_response.text = ""
+        first_response.json.return_value = [row]
+        second_response = MagicMock()
+        second_response.status_code = 200
+        second_response.text = ""
+        second_response.json.return_value = []
+        mock_get.side_effect = [first_response, second_response]
+
+        bars1, symbol1 = fetch_binance_klines(
+            ticker="ETH-USD",
+            interval="5m",
+            lookback_years=0.1,
+            warmup_days=5,
+        )
+        bars2, symbol2 = fetch_binance_klines(
+            ticker="ETH-USD",
+            interval="5m",
+            lookback_years=0.1,
+            warmup_days=5,
+        )
+
+        self.assertEqual(symbol1, "ETHUSDT")
+        self.assertEqual(symbol2, "ETHUSDT")
+        self.assertEqual(bars1, bars2)
+        self.assertEqual(mock_get.call_count, 1)
+
     @patch("edgar.services.mtf_liquidity_flow_strategy._fetch_intraday_bars")
     @patch("edgar.services.mtf_liquidity_flow_strategy.fetch_binance_klines")
     def test_mtf_strategy_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
@@ -1067,6 +1164,44 @@ class BinanceDataTests(TestCase):
         mock_binance_fetch.assert_called_once()
         mock_yf_fetch.assert_not_called()
 
+    @patch("edgar.services.session_sfp_fvg_strategy._fetch_intraday_bars")
+    @patch("edgar.services.session_sfp_fvg_strategy.fetch_binance_klines")
+    def test_session_sfp_strategy_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+        from edgar.services.session_sfp_fvg_strategy import run_session_sfp_fvg_backtest
+
+        start = datetime(2025, 1, 1)
+        bars = []
+        for i in range(5000):
+            ts = start + timedelta(minutes=5 * i)
+            px = 100.0 + (i * 0.01)
+            bars.append(
+                {
+                    "timestamp": ts,
+                    "open": px,
+                    "high": px + 0.25,
+                    "low": px - 0.25,
+                    "close": px + 0.05,
+                    "volume": 1000.0 + i,
+                }
+            )
+
+        mock_binance_fetch.return_value = (bars, "ETHUSDT")
+        payload = run_session_sfp_fvg_backtest(
+            ticker="ETH-USD",
+            interval="5m",
+            lookback_years=0.1,
+            market_data_source="binance",
+            auto_adjust_for_yf_limits=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "binance")
+        self.assertEqual(payload["market_data_symbol"], "ETHUSDT")
+        self.assertEqual(payload["effective_interval"], "5m")
+        self.assertEqual(payload["strategy_variant"], "hourly_sfp_fvg")
+        self.assertGreater(payload["bar_count"], 0)
+        mock_binance_fetch.assert_called_once()
+        mock_yf_fetch.assert_not_called()
+
 
 class ManipulationStopLogicTests(TestCase):
     def test_initial_long_stop_uses_sweep_wick_not_ifvg_edge(self):
@@ -1108,6 +1243,49 @@ class MtfLiquidityFlowValidationTests(TestCase):
                 lookback_years=2.0,
                 entry_session="tokyo_open",
             )
+
+    def test_session_sfp_variant_rejects_hourly_execution_interval(self):
+        from edgar.services.session_sfp_fvg_strategy import run_session_sfp_fvg_backtest
+
+        with self.assertRaises(ValueError):
+            run_session_sfp_fvg_backtest(
+                ticker="ETH-USD",
+                market_data_source="binance",
+                interval="60m",
+                lookback_years=0.5,
+            )
+
+    def test_session_sfp_previous_two_sessions_bias_helper(self):
+        from edgar.services.session_sfp_fvg_strategy import _SessionBar, _session_bias_from_previous_two
+
+        sessions = [
+            _SessionBar(date(2025, 1, 1), 100.0, 105.0, 95.0, 102.0, 1000.0),
+            _SessionBar(date(2025, 1, 2), 102.0, 109.0, 99.0, 108.0, 1100.0),
+            _SessionBar(date(2025, 1, 3), 108.0, 110.0, 104.0, 106.0, 900.0),
+        ]
+
+        bias, older, recent = _session_bias_from_previous_two(
+            sessions=sessions,
+            current_session_idx=2,
+            buffer=0.0,
+        )
+
+        self.assertEqual(bias, "long")
+        self.assertEqual(older.session_date, date(2025, 1, 1))
+        self.assertEqual(recent.session_date, date(2025, 1, 2))
+
+    def test_session_sfp_prefers_nearest_liquidity_target(self):
+        from edgar.services.session_sfp_fvg_strategy import _resolve_next_liquidity_target
+
+        target, source = _resolve_next_liquidity_target(
+            direction="long",
+            reference_price=100.0,
+            hourly_targets=(106.0, "hourly_pivot"),
+            session_targets=(104.0, "prior_session_high"),
+        )
+
+        self.assertEqual(target, 104.0)
+        self.assertEqual(source, "prior_session_high")
 
 
 class StrategySerializationTests(TestCase):
