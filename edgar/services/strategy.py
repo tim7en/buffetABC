@@ -271,6 +271,166 @@ def _resolve_bar_bracket_exit(
     return (stop_loss if hit_sl else take_profit), hit_sl, hit_tp, False
 
 
+def _directional_volume_reference(
+    direction: str,
+    volumes: list[float],
+    opens: list[float],
+    closes: list[float],
+    end_idx: int,
+    lookback: int,
+) -> float:
+    """Average volume of the directional push into a sweep zone."""
+    if end_idx <= 0 or lookback <= 0:
+        return 0.0
+    start = max(0, end_idx - lookback)
+    selected: list[float] = []
+    for j in range(start, end_idx):
+        if direction == "short":
+            if closes[j] >= opens[j]:
+                selected.append(float(volumes[j]))
+        else:
+            if closes[j] <= opens[j]:
+                selected.append(float(volumes[j]))
+    if not selected:
+        selected = [float(v) for v in volumes[start:end_idx]]
+    if not selected:
+        return 0.0
+    return sum(selected) / len(selected)
+
+
+def _bar_pressure(
+    open_price: float,
+    high_price: float,
+    low_price: float,
+    close_price: float,
+    volume: float,
+) -> float:
+    """Signed pressure proxy from OHLCV when true order-flow delta is unavailable."""
+    candle_range = max(high_price - low_price, 1e-8)
+    return ((close_price - open_price) / candle_range) * float(volume)
+
+
+def _directional_pressure_reference(
+    direction: str,
+    volumes: list[float],
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    end_idx: int,
+    lookback: int,
+) -> tuple[float, float]:
+    """Average volume and directional pressure of the push into a sweep."""
+    if end_idx <= 0 or lookback <= 0:
+        return 0.0, 0.0
+
+    start = max(0, end_idx - lookback)
+    selected_volumes: list[float] = []
+    selected_pressures: list[float] = []
+    for j in range(start, end_idx):
+        pressure = _bar_pressure(opens[j], highs[j], lows[j], closes[j], volumes[j])
+        if direction == "short":
+            if closes[j] >= opens[j]:
+                selected_volumes.append(float(volumes[j]))
+                selected_pressures.append(max(pressure, 0.0))
+        else:
+            if closes[j] <= opens[j]:
+                selected_volumes.append(float(volumes[j]))
+                selected_pressures.append(max(-pressure, 0.0))
+
+    if not selected_volumes:
+        selected_volumes = [float(v) for v in volumes[start:end_idx]]
+    if not selected_pressures:
+        selected_pressures = [
+            abs(_bar_pressure(opens[j], highs[j], lows[j], closes[j], volumes[j]))
+            for j in range(start, end_idx)
+        ]
+
+    avg_volume = sum(selected_volumes) / len(selected_volumes) if selected_volumes else 0.0
+    avg_pressure = sum(selected_pressures) / len(selected_pressures) if selected_pressures else 0.0
+    return avg_volume, avg_pressure
+
+
+def _sweep_exhaustion_confirmed(
+    direction: str,
+    volumes: list[float],
+    opens: list[float],
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    idx: int,
+    lookback: int,
+    max_sweep_rel_volume: float,
+    min_reversal_pressure_ratio: float,
+    min_rejection_wick_ratio: float,
+    vol_sma: list[float | None] | None = None,
+) -> tuple[bool, float, float]:
+    """Confirm a sweep via rejection + controlled volume + reversal pressure."""
+    if idx < 0 or idx >= len(volumes):
+        return False, 0.0, 0.0
+
+    reference_volume, reference_pressure = _directional_pressure_reference(
+        direction=direction,
+        volumes=volumes,
+        opens=opens,
+        highs=highs,
+        lows=lows,
+        closes=closes,
+        end_idx=idx,
+        lookback=lookback,
+    )
+    current_pressure = _bar_pressure(opens[idx], highs[idx], lows[idx], closes[idx], volumes[idx])
+    if direction == "short":
+        rejection_wick = highs[idx] - max(opens[idx], closes[idx])
+        reversal_pressure = max(-current_pressure, 0.0)
+    else:
+        rejection_wick = min(opens[idx], closes[idx]) - lows[idx]
+        reversal_pressure = max(current_pressure, 0.0)
+
+    candle_range = max(highs[idx] - lows[idx], 1e-8)
+    wick_ratio = rejection_wick / candle_range
+    rel_volume = 1.0
+    if vol_sma is not None and idx < len(vol_sma):
+        avg_volume = vol_sma[idx]
+        if avg_volume is not None and avg_volume > 0:
+            rel_volume = float(volumes[idx]) / avg_volume
+
+    wick_ok = wick_ratio >= min_rejection_wick_ratio
+    rel_volume_ok = max_sweep_rel_volume <= 0 or rel_volume <= max_sweep_rel_volume
+    reversal_pressure_ok = reversal_pressure > 0 and (
+        reference_pressure <= 0 or reversal_pressure >= (reference_pressure * min_reversal_pressure_ratio)
+    )
+    return wick_ok and rel_volume_ok and reversal_pressure_ok, reference_volume, reference_pressure
+
+
+def _volume_divergence_confirmed(
+    direction: str,
+    volumes: list[float],
+    opens: list[float],
+    closes: list[float],
+    idx: int,
+    lookback: int,
+    divergence_ratio: float,
+) -> tuple[bool, float]:
+    """Confirm a fakeout-style sweep when price extends on weaker participation."""
+    if idx < 0 or idx >= len(volumes):
+        return False, 0.0
+    reference_volume = _directional_volume_reference(
+        direction=direction,
+        volumes=volumes,
+        opens=opens,
+        closes=closes,
+        end_idx=idx,
+        lookback=lookback,
+    )
+    current_volume = float(volumes[idx])
+    if reference_volume <= 0 or current_volume <= 0:
+        return True, reference_volume
+    if divergence_ratio <= 0:
+        return True, reference_volume
+    return current_volume <= (reference_volume * divergence_ratio), reference_volume
+
+
 def _williams_fractals(
     highs: list[float],
     lows: list[float],

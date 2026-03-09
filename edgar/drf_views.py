@@ -610,10 +610,12 @@ class StrategyViewSet(viewsets.ViewSet):
                     market_data_source=(request.data.get("market_data_source") or "auto").strip().lower(),
                     market_data_symbol=(request.data.get("market_data_symbol") or "").strip().upper() or None,
                     auto_adjust_for_yf_limits=_as_bool(request.data.get("auto_adjust_for_yf_limits"), True),
+                    trend_alignment_mode=(request.data.get("trend_alignment_mode") or "aligned").strip().lower(),
+                    entry_session=(request.data.get("entry_session") or "all").strip().lower(),
                     allow_longs=allow_longs,
                     allow_shorts=allow_shorts,
                     entry_model=(request.data.get("entry_model") or "hybrid").strip().lower(),
-                    rr_multiple=float(request.data.get("rr_multiple", 3.0)),
+                    rr_multiple=float(request.data.get("rr_multiple", 2.0)),
                     htf_pivot_window=int(request.data.get("htf_pivot_window", 3)),
                     internal_pivot_window=int(request.data.get("internal_pivot_window", 2)),
                     structure_search_bars=int(request.data.get("structure_search_bars", 200)),
@@ -627,6 +629,19 @@ class StrategyViewSet(viewsets.ViewSet):
                     volume_period=int(request.data.get("volume_period", 40)),
                     use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
                     min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                    use_volume_exhaustion_filter=_as_bool(
+                        request.data.get("use_volume_exhaustion_filter"),
+                        _as_bool(request.data.get("use_volume_divergence_filter"), True),
+                    ),
+                    max_sweep_rel_volume=float(request.data.get("max_sweep_rel_volume", 3.5)),
+                    min_reversal_pressure_ratio=float(request.data.get("min_reversal_pressure_ratio", 0.25)),
+                    min_rejection_wick_ratio=float(request.data.get("min_rejection_wick_ratio", 0.15)),
+                    exhaustion_lookback_bars=int(
+                        request.data.get(
+                            "exhaustion_lookback_bars",
+                            request.data.get("volume_divergence_lookback_bars", 24),
+                        )
+                    ),
                     base_risk_pct=float(request.data.get("base_risk_pct", 0.01)),
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),
                     slippage_bps=float(request.data.get("slippage_bps", 4.0)),
@@ -703,6 +718,19 @@ class StrategyViewSet(viewsets.ViewSet):
                     volume_period=int(request.data.get("volume_period", 40)),
                     use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
                     min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                    use_volume_exhaustion_filter=_as_bool(
+                        request.data.get("use_volume_exhaustion_filter"),
+                        _as_bool(request.data.get("use_volume_divergence_filter"), True),
+                    ),
+                    max_sweep_rel_volume=float(request.data.get("max_sweep_rel_volume", 3.5)),
+                    min_reversal_pressure_ratio=float(request.data.get("min_reversal_pressure_ratio", 0.25)),
+                    min_rejection_wick_ratio=float(request.data.get("min_rejection_wick_ratio", 0.15)),
+                    exhaustion_lookback_bars=int(
+                        request.data.get(
+                            "exhaustion_lookback_bars",
+                            request.data.get("volume_divergence_lookback_bars", 24),
+                        )
+                    ),
                     base_risk_pct=float(request.data.get("base_risk_pct", 0.01)),
                     max_risk_pct=float(request.data.get("max_risk_pct", 0.02)),
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),

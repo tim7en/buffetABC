@@ -26,6 +26,7 @@ from edgar.services.strategy import (
     _sma,
     _stop_is_break_even_or_better,
     _stop_is_trailed,
+    _sweep_exhaustion_confirmed,
     _tighten_stop,
 )
 
@@ -234,6 +235,7 @@ class _Trade:
     signal_quality: str = ""
     hold_bars: int = 0
     stop_source: str = "ifvg"
+    volume_exhaustion_confirmed: bool = False
 
 
 def _initial_stop_from_event(
@@ -326,6 +328,11 @@ def run_manipulation_backtest(
     volume_period: int = 40,
     use_volume_filter: bool = False,
     min_rel_volume: float = 1.0,
+    use_volume_exhaustion_filter: bool = True,
+    max_sweep_rel_volume: float = 3.5,
+    min_reversal_pressure_ratio: float = 0.25,
+    min_rejection_wick_ratio: float = 0.15,
+    exhaustion_lookback_bars: int = 24,
     base_risk_pct: float = 0.01,
     max_risk_pct: float = 0.02,
     max_position_pct: float = 0.30,
@@ -351,6 +358,8 @@ def run_manipulation_backtest(
         raise ValueError("exit_fill_policy must be one of ['stop_first', 'target_first']")
     if chandelier_period < 2 or chandelier_atr_period < 2:
         raise ValueError("chandelier periods must be >= 2")
+    if exhaustion_lookback_bars < 2:
+        raise ValueError("exhaustion_lookback_bars must be >= 2")
 
     resolved_source = _resolve_market_data_source(market_data_source=market_data_source, ticker=ticker)
 
@@ -610,12 +619,54 @@ def run_manipulation_backtest(
             swept = low_i < (support * (1.0 - sweep_buffer))
             recovered = close_i >= (support * (1.0 + recovery_buffer))
             if swept and recovered:
-                bull_event = {"idx": i, "level": support, "sweep_low": low_i}
+                exhaustion_confirmed, reference_volume, reference_pressure = _sweep_exhaustion_confirmed(
+                    direction="long",
+                    volumes=volumes,
+                    opens=opens,
+                    highs=highs,
+                    lows=lows,
+                    closes=closes,
+                    idx=i,
+                    lookback=exhaustion_lookback_bars,
+                    max_sweep_rel_volume=max_sweep_rel_volume,
+                    min_reversal_pressure_ratio=min_reversal_pressure_ratio,
+                    min_rejection_wick_ratio=min_rejection_wick_ratio,
+                    vol_sma=vol_sma,
+                )
+                bull_event = {
+                    "idx": i,
+                    "level": support,
+                    "sweep_low": low_i,
+                    "reference_volume": reference_volume,
+                    "reference_pressure": reference_pressure,
+                    "volume_exhaustion_confirmed": exhaustion_confirmed,
+                }
         if allow_shorts and resistance is not None:
             swept = high_i > (resistance * (1.0 + sweep_buffer))
             recovered = close_i <= (resistance * (1.0 - recovery_buffer))
             if swept and recovered:
-                bear_event = {"idx": i, "level": resistance, "sweep_high": high_i}
+                exhaustion_confirmed, reference_volume, reference_pressure = _sweep_exhaustion_confirmed(
+                    direction="short",
+                    volumes=volumes,
+                    opens=opens,
+                    highs=highs,
+                    lows=lows,
+                    closes=closes,
+                    idx=i,
+                    lookback=exhaustion_lookback_bars,
+                    max_sweep_rel_volume=max_sweep_rel_volume,
+                    min_reversal_pressure_ratio=min_reversal_pressure_ratio,
+                    min_rejection_wick_ratio=min_rejection_wick_ratio,
+                    vol_sma=vol_sma,
+                )
+                bear_event = {
+                    "idx": i,
+                    "level": resistance,
+                    "sweep_high": high_i,
+                    "reference_volume": reference_volume,
+                    "reference_pressure": reference_pressure,
+                    "volume_exhaustion_confirmed": exhaustion_confirmed,
+                }
 
         if bull_event is not None and i - bull_event["idx"] > manipulation_max_age_bars:
             bull_event = None
@@ -626,30 +677,37 @@ def run_manipulation_backtest(
         short_signal = False
         chosen_ifvg: _FVG | None = None
         chosen_level = None
+        chosen_event: dict | None = None
 
         if allow_longs and bull_event is not None:
             ifvg = _find_ifvg(bull_event["idx"], i, desired_kind="bearish")
-            if ifvg is not None:
+            if ifvg is not None and (
+                (not use_volume_exhaustion_filter) or bull_event.get("volume_exhaustion_confirmed", False)
+            ):
                 broke = prev_close <= (ifvg.zone_high * (1.0 + break_buffer)) and close_i > (ifvg.zone_high * (1.0 + break_buffer))
                 if broke:
                     long_signal = True
                     chosen_ifvg = ifvg
                     chosen_level = float(bull_event["level"])
+                    chosen_event = bull_event
 
         if allow_shorts and bear_event is not None:
             ifvg = _find_ifvg(bear_event["idx"], i, desired_kind="bullish")
-            if ifvg is not None:
+            if ifvg is not None and (
+                (not use_volume_exhaustion_filter) or bear_event.get("volume_exhaustion_confirmed", False)
+            ):
                 broke = prev_close >= (ifvg.zone_low * (1.0 - break_buffer)) and close_i < (ifvg.zone_low * (1.0 - break_buffer))
                 if broke:
                     short_signal = True
                     chosen_ifvg = ifvg
                     chosen_level = float(bear_event["level"])
+                    chosen_event = bear_event
 
         if long_signal and short_signal:
             continue
         if not long_signal and not short_signal:
             continue
-        if chosen_ifvg is None or chosen_level is None:
+        if chosen_ifvg is None or chosen_level is None or chosen_event is None:
             continue
 
         rel_volume = 1.0
@@ -668,7 +726,7 @@ def run_manipulation_backtest(
             stop_loss, stop_source = _initial_stop_from_event(
                 direction="long",
                 ifvg=chosen_ifvg,
-                event=bull_event or {},
+                event=chosen_event,
                 stop_buffer=stop_buffer,
             )
             sl_distance = entry_price - stop_loss
@@ -679,7 +737,7 @@ def run_manipulation_backtest(
             stop_loss, stop_source = _initial_stop_from_event(
                 direction="short",
                 ifvg=chosen_ifvg,
-                event=bear_event or {},
+                event=chosen_event,
                 stop_buffer=stop_buffer,
             )
             sl_distance = stop_loss - entry_price
@@ -743,6 +801,7 @@ def run_manipulation_backtest(
             sizing_tier=sizing_tier,
             signal_quality=signal_quality,
             stop_source=stop_source,
+            volume_exhaustion_confirmed=bool(chosen_event.get("volume_exhaustion_confirmed", False)),
         )
         bull_event = None
         bear_event = None
@@ -783,6 +842,11 @@ def run_manipulation_backtest(
         "use_chandelier_exit": use_chandelier_exit,
         "use_break_even_stop": use_break_even_stop,
         "break_even_trigger_r": break_even_trigger_r,
+        "use_volume_exhaustion_filter": use_volume_exhaustion_filter,
+        "max_sweep_rel_volume": max_sweep_rel_volume,
+        "min_reversal_pressure_ratio": min_reversal_pressure_ratio,
+        "min_rejection_wick_ratio": min_rejection_wick_ratio,
+        "exhaustion_lookback_bars": exhaustion_lookback_bars,
         "chandelier_period": chandelier_period,
         "chandelier_atr_period": chandelier_atr_period,
         "chandelier_atr_mult": chandelier_atr_mult,
@@ -836,6 +900,8 @@ def run_manipulation_backtest(
                 "exit_fill_policy": t.exit_fill_policy,
                 "entry_rel_volume": t.entry_rel_volume,
                 "volume_confirmed": t.volume_confirmed,
+                "volume_exhaustion_confirmed": t.volume_exhaustion_confirmed,
+                "volume_divergence_confirmed": t.volume_exhaustion_confirmed,
                 "sizing_tier": t.sizing_tier,
                 "signal_quality": t.signal_quality,
                 "hold_days": t.hold_bars,

@@ -36,6 +36,7 @@ from edgar.services.strategy import (
     _sma,
     _stop_is_break_even_or_better,
     _stop_is_trailed,
+    _sweep_exhaustion_confirmed,
     _tighten_stop,
 )
 
@@ -57,6 +58,22 @@ def _resolve_market_data_source(market_data_source: str, ticker: str) -> str:
             return "binance"
         return "yfinance"
     raise ValueError("market_data_source must be one of ['auto', 'yfinance', 'binance']")
+
+
+def _entry_session_allowed(ts: datetime, entry_session: str) -> bool:
+    session = (entry_session or "all").strip().lower()
+    if session == "all":
+        return True
+    hour = ts.hour
+    if session == "asia":
+        return 0 <= hour < 8
+    if session == "london":
+        return 7 <= hour < 13
+    if session in {"new_york", "ny"}:
+        return 13 <= hour < 20
+    if session in {"overlap", "london_ny_overlap"}:
+        return 13 <= hour < 16
+    raise ValueError("entry_session must be one of ['all', 'asia', 'london', 'new_york', 'overlap']")
 
 
 def _internal_direction(
@@ -173,6 +190,10 @@ class _Setup:
     weak_level: float | None
     activated_idx: int
     expires_idx: int
+    sweep_idx: int | None = None
+    sweep_reference_volume: float = 0.0
+    sweep_reference_pressure: float = 0.0
+    sweep_exhaustion_confirmed: bool = False
 
 
 @dataclass
@@ -203,6 +224,7 @@ class _Trade:
     signal_quality: str = "A"
     hold_bars: int = 0
     stop_source: str = "liquidation_candle"
+    volume_exhaustion_confirmed: bool = False
 
 
 def run_mtf_liquidity_flow_backtest(
@@ -213,8 +235,10 @@ def run_mtf_liquidity_flow_backtest(
     market_data_source: str = "auto",  # auto | yfinance | binance
     market_data_symbol: str | None = None,  # e.g. BTCUSDT / PAXGUSDT
     auto_adjust_for_yf_limits: bool = True,
+    trend_alignment_mode: str = "aligned",  # aligned | pullback
+    entry_session: str = "all",  # UTC entry window
     entry_model: str = "hybrid",  # aggressive | conservative | hybrid
-    rr_multiple: float = 3.0,
+    rr_multiple: float = 2.0,
     htf_pivot_window: int = 3,
     internal_pivot_window: int = 2,
     structure_search_bars: int = 200,
@@ -228,6 +252,11 @@ def run_mtf_liquidity_flow_backtest(
     volume_period: int = 40,
     use_volume_filter: bool = False,
     min_rel_volume: float = 1.0,
+    use_volume_exhaustion_filter: bool = True,
+    max_sweep_rel_volume: float = 3.5,
+    min_reversal_pressure_ratio: float = 0.25,
+    min_rejection_wick_ratio: float = 0.15,
+    exhaustion_lookback_bars: int = 24,
     base_risk_pct: float = 0.01,
     max_position_pct: float = 0.30,
     slippage_bps: float = 4.0,
@@ -248,12 +277,18 @@ def run_mtf_liquidity_flow_backtest(
         raise ValueError("rr_multiple must be positive")
     if entry_model not in {"aggressive", "conservative", "hybrid"}:
         raise ValueError("entry_model must be one of ['aggressive', 'conservative', 'hybrid']")
+    if trend_alignment_mode not in {"aligned", "pullback"}:
+        raise ValueError("trend_alignment_mode must be one of ['aligned', 'pullback']")
+    if (entry_session or "all").strip().lower() not in {"all", "asia", "london", "new_york", "ny", "overlap", "london_ny_overlap"}:
+        raise ValueError("entry_session must be one of ['all', 'asia', 'london', 'new_york', 'overlap']")
     if not allow_longs and not allow_shorts:
         raise ValueError("At least one of allow_longs / allow_shorts must be true")
     if exit_fill_policy not in {"stop_first", "target_first"}:
         raise ValueError("exit_fill_policy must be one of ['stop_first', 'target_first']")
     if chandelier_period < 2 or chandelier_atr_period < 2:
         raise ValueError("chandelier periods must be >= 2")
+    if exhaustion_lookback_bars < 2:
+        raise ValueError("exhaustion_lookback_bars must be >= 2")
 
     resolved_source = _resolve_market_data_source(market_data_source=market_data_source, ticker=ticker)
 
@@ -503,15 +538,29 @@ def run_mtf_liquidity_flow_backtest(
         if int_dir is None or len(int_highs) < 2 or len(int_lows) < 2:
             continue
 
-        preferred = "short" if htf_dir == "bullish" else "long"
-        if preferred == "short" and int_dir != "bearish":
-            continue
-        if preferred == "long" and int_dir != "bullish":
-            continue
+        # Default path: only trade 5m sweeps when 4h and 15m structure agree.
+        if trend_alignment_mode == "aligned":
+            if htf_dir != int_dir:
+                if active_setup is not None:
+                    active_setup = None
+                continue
+            preferred = "long" if htf_dir == "bullish" else "short"
+        else:
+            preferred = "short" if htf_dir == "bullish" else "long"
+            if preferred == "short" and int_dir != "bearish":
+                if active_setup is not None:
+                    active_setup = None
+                continue
+            if preferred == "long" and int_dir != "bullish":
+                if active_setup is not None:
+                    active_setup = None
+                continue
         if preferred == "short" and not allow_shorts:
             continue
         if preferred == "long" and not allow_longs:
             continue
+        if active_setup is not None and active_setup.direction != preferred:
+            active_setup = None
 
         if active_setup is None:
             if preferred == "short":
@@ -575,13 +624,13 @@ def run_mtf_liquidity_flow_backtest(
         rel_volume = 1.0
         if vol_sma[i] is not None and vol_sma[i] > 0:
             rel_volume = volumes[i] / vol_sma[i]
-        if use_volume_filter and rel_volume < min_rel_volume:
-            continue
 
         next_open = opens[i + 1] if opens[i + 1] > 0 else closes[i + 1]
         next_high = highs[i + 1]
         next_low = lows[i + 1]
         if next_open <= 0:
+            continue
+        if not _entry_session_allowed(timestamps[i + 1], entry_session):
             continue
 
         entry_price = None
@@ -589,6 +638,7 @@ def run_mtf_liquidity_flow_backtest(
         take_profit = None
         signal_model = None
         stop_source = None
+        exhaustion_confirmed = active_setup.sweep_exhaustion_confirmed
 
         # Step 3A: aggressive liquidation entry.
         if entry_model in {"aggressive", "hybrid"} and _in_zone(low_i, high_i, active_setup.zone_low, active_setup.zone_high):
@@ -596,13 +646,31 @@ def run_mtf_liquidity_flow_backtest(
                 recent_high = max(highs[max(0, i - max(liquidity_lookback_bars, 2)):i] or [high_i])
                 strong_liquidation = high_i > (recent_high * (1.0 + sweep_buffer)) and close_i < open_i
                 if strong_liquidation:
+                    exhaustion_confirmed, reference_volume, reference_pressure = _sweep_exhaustion_confirmed(
+                        direction="short",
+                        volumes=volumes,
+                        opens=opens,
+                        highs=highs,
+                        lows=lows,
+                        closes=closes,
+                        idx=i,
+                        lookback=max(exhaustion_lookback_bars, exec_factor * 4),
+                        max_sweep_rel_volume=max_sweep_rel_volume,
+                        min_reversal_pressure_ratio=min_reversal_pressure_ratio,
+                        min_rejection_wick_ratio=min_rejection_wick_ratio,
+                        vol_sma=vol_sma,
+                    )
+                    active_setup.sweep_idx = i
+                    active_setup.sweep_reference_volume = reference_volume
+                    active_setup.sweep_reference_pressure = reference_pressure
+                    active_setup.sweep_exhaustion_confirmed = exhaustion_confirmed
                     trigger = low_i * (1.0 - trigger_buffer)
                     fill = None
                     if next_open <= trigger:
                         fill = next_open
                     elif next_low <= trigger:
                         fill = trigger
-                    if fill is not None:
+                    if fill is not None and ((not use_volume_exhaustion_filter) or exhaustion_confirmed):
                         entry_price = fill * (1.0 - slippage_rate)
                         stop_loss = high_i * (1.0 + stop_buffer)
                         take_profit = _compute_target("short", entry_price, stop_loss, active_setup.weak_level, rr_multiple)
@@ -612,24 +680,48 @@ def run_mtf_liquidity_flow_backtest(
                 recent_low = min(lows[max(0, i - max(liquidity_lookback_bars, 2)):i] or [low_i])
                 strong_liquidation = low_i < (recent_low * (1.0 - sweep_buffer)) and close_i > open_i
                 if strong_liquidation:
+                    exhaustion_confirmed, reference_volume, reference_pressure = _sweep_exhaustion_confirmed(
+                        direction="long",
+                        volumes=volumes,
+                        opens=opens,
+                        highs=highs,
+                        lows=lows,
+                        closes=closes,
+                        idx=i,
+                        lookback=max(exhaustion_lookback_bars, exec_factor * 4),
+                        max_sweep_rel_volume=max_sweep_rel_volume,
+                        min_reversal_pressure_ratio=min_reversal_pressure_ratio,
+                        min_rejection_wick_ratio=min_rejection_wick_ratio,
+                        vol_sma=vol_sma,
+                    )
+                    active_setup.sweep_idx = i
+                    active_setup.sweep_reference_volume = reference_volume
+                    active_setup.sweep_reference_pressure = reference_pressure
+                    active_setup.sweep_exhaustion_confirmed = exhaustion_confirmed
                     trigger = high_i * (1.0 + trigger_buffer)
                     fill = None
                     if next_open >= trigger:
                         fill = next_open
                     elif next_high >= trigger:
                         fill = trigger
-                    if fill is not None:
+                    if fill is not None and ((not use_volume_exhaustion_filter) or exhaustion_confirmed):
                         entry_price = fill * (1.0 + slippage_rate)
                         stop_loss = low_i * (1.0 - stop_buffer)
                         take_profit = _compute_target("long", entry_price, stop_loss, active_setup.weak_level, rr_multiple)
                         signal_model = "aggressive_liquidation"
                         stop_source = "liquidation_candle"
 
-        # Step 3B: conservative market-shift entry.
+        # Step 3B: conservative market-shift entry only after a prior sweep exists.
         if entry_price is None and entry_model in {"conservative", "hybrid"}:
             if active_setup.direction == "short":
                 weak_low = active_setup.weak_level
-                shifted = weak_low is not None and close_i < (weak_low * (1.0 - break_buffer))
+                shifted = (
+                    active_setup.sweep_idx is not None
+                    and i > active_setup.sweep_idx
+                    and weak_low is not None
+                    and close_i < (weak_low * (1.0 - break_buffer))
+                    and ((not use_volume_exhaustion_filter) or active_setup.sweep_exhaustion_confirmed)
+                )
                 if shifted:
                     entry_price = next_open * (1.0 - slippage_rate)
                     stop_loss = max(high_i, active_setup.zone_high) * (1.0 + stop_buffer)
@@ -638,7 +730,13 @@ def run_mtf_liquidity_flow_backtest(
                     stop_source = "shift_candle"
             else:
                 weak_high = active_setup.weak_level
-                shifted = weak_high is not None and close_i > (weak_high * (1.0 + break_buffer))
+                shifted = (
+                    active_setup.sweep_idx is not None
+                    and i > active_setup.sweep_idx
+                    and weak_high is not None
+                    and close_i > (weak_high * (1.0 + break_buffer))
+                    and ((not use_volume_exhaustion_filter) or active_setup.sweep_exhaustion_confirmed)
+                )
                 if shifted:
                     entry_price = next_open * (1.0 + slippage_rate)
                     stop_loss = min(low_i, active_setup.zone_low) * (1.0 - stop_buffer)
@@ -647,6 +745,8 @@ def run_mtf_liquidity_flow_backtest(
                     stop_source = "shift_candle"
 
         if entry_price is None or stop_loss is None or take_profit is None:
+            continue
+        if use_volume_filter and rel_volume < min_rel_volume:
             continue
 
         if active_setup.direction == "short":
@@ -696,6 +796,7 @@ def run_mtf_liquidity_flow_backtest(
             sizing_tier=sizing_tier,
             signal_quality="A" if signal_model == "aggressive_liquidation" else "B",
             stop_source=stop_source or "zone",
+            volume_exhaustion_confirmed=bool(exhaustion_confirmed),
         )
         active_setup = None
 
@@ -732,10 +833,17 @@ def run_mtf_liquidity_flow_backtest(
         "market_data_source": resolved_source,
         "market_data_symbol": resolved_symbol,
         "strategy_variant": "mtf_liquidity_flow",
+        "trend_alignment_mode": trend_alignment_mode,
+        "entry_session": "new_york" if entry_session == "ny" else ("overlap" if entry_session == "london_ny_overlap" else entry_session),
         "entry_model": entry_model,
         "use_chandelier_exit": use_chandelier_exit,
         "use_break_even_stop": use_break_even_stop,
         "break_even_trigger_r": break_even_trigger_r,
+        "use_volume_exhaustion_filter": use_volume_exhaustion_filter,
+        "max_sweep_rel_volume": max_sweep_rel_volume,
+        "min_reversal_pressure_ratio": min_reversal_pressure_ratio,
+        "min_rejection_wick_ratio": min_rejection_wick_ratio,
+        "exhaustion_lookback_bars": exhaustion_lookback_bars,
         "chandelier_period": chandelier_period,
         "chandelier_atr_period": chandelier_atr_period,
         "chandelier_atr_mult": chandelier_atr_mult,
@@ -789,6 +897,8 @@ def run_mtf_liquidity_flow_backtest(
                 "exit_fill_policy": t.exit_fill_policy,
                 "entry_rel_volume": t.entry_rel_volume,
                 "volume_confirmed": t.volume_confirmed,
+                "volume_exhaustion_confirmed": t.volume_exhaustion_confirmed,
+                "volume_divergence_confirmed": t.volume_exhaustion_confirmed,
                 "sizing_tier": t.sizing_tier,
                 "signal_quality": t.signal_quality,
                 "hold_days": t.hold_bars,

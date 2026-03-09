@@ -49,13 +49,14 @@
     .strategy-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,.9fr);gap:16px;margin-bottom:16px}
     .panel-group{border:1px solid var(--line);border-radius:12px;padding:12px;background:linear-gradient(180deg,#fcfefe 0%,#f7fbfb 100%);margin-bottom:12px}
     .section-kicker{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
-    .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
-    .field{display:flex;flex-direction:column;gap:6px}
+    .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:start}
+    .field{display:flex;flex-direction:column;gap:6px;min-width:0}
     .field input,.field select{width:100%}
     .field .muted{font-size:11px}
     .toggle-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}
-    .toggle-card{padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff}
-    .toggle-card label{display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px}
+    .toggle-card{padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;min-width:0}
+    .toggle-card label{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start;font-weight:600;font-size:13px;line-height:1.35}
+    .toggle-card label input{margin-top:2px}
     .toggle-card .muted{margin-top:6px;line-height:1.45}
     .guide-card{position:sticky;top:16px}
     .guide-title{margin:0 0 6px;font-size:18px}
@@ -264,12 +265,11 @@
               <label class="muted" for="stratPeriod">History window</label>
               <select id="stratPeriod"><option value="2y">2y</option><option value="5y" selected>5y</option><option value="10y">10y</option><option value="max">max</option></select>
             </div>
-            <div class="field">
-              <label class="muted">Price data</label>
-              <div class="toggle-card">
-                <label><input id="stratForceFetch" type="checkbox"> Force re-fetch prices</label>
-                <div class="muted">Pull fresh daily prices before the backtest instead of relying on cached data.</div>
-              </div>
+          </div>
+          <div class="toggle-grid" style="margin-top:10px">
+            <div class="toggle-card">
+              <label><input id="stratForceFetch" type="checkbox"> Force re-fetch prices</label>
+              <div class="muted">Pull fresh daily prices before the backtest instead of relying on cached data.</div>
             </div>
           </div>
         </div>
@@ -307,6 +307,16 @@
                 <option value="auto" selected>auto</option>
                 <option value="binance">binance</option>
                 <option value="yfinance">yfinance</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="muted" for="stratEntrySession">Entry session (UTC)</label>
+              <select id="stratEntrySession">
+                <option value="all" selected>all day</option>
+                <option value="asia">asia 00-08</option>
+                <option value="london">london 07-13</option>
+                <option value="new_york">new york 13-20</option>
+                <option value="overlap">overlap 13-16</option>
               </select>
             </div>
           </div>
@@ -384,24 +394,7 @@
         <p class="guide-summary" id="stratGuideSummary"></p>
         <ul class="guide-list" id="stratGuideBullets"></ul>
 
-        <div class="glossary">
-          <div class="term">
-            <strong>Williams Fractal</strong>
-            A local swing pattern. A high fractal forms when the middle candle has the highest high versus candles on both sides. A low fractal is the opposite.
-          </div>
-          <div class="term">
-            <strong>Fractal Breakout</strong>
-            Price must close through a confirmed fractal level before the strategy acts. This reduces early entries, but also reduces trade count.
-          </div>
-          <div class="term">
-            <strong>Break-Even Stop</strong>
-            Once the trade moves far enough in your favor, the active stop is pulled up to the entry price to remove initial downside.
-          </div>
-          <div class="term">
-            <strong>Chandelier Exit</strong>
-            A volatility-adjusted trailing stop that follows trend by referencing recent extremes and ATR.
-          </div>
-        </div>
+        <div class="glossary" id="stratGlossary"></div>
       </aside>
     </div>
     <div id="stratResults" style="display:none">
@@ -670,14 +663,25 @@ function drawCandlestickCanvas(canvasId, cfg){
   const bands=(cfg.bands||[]).filter(x=>x&&Number.isFinite(Number(x.low))&&Number.isFinite(Number(x.high)));
   const markers=(cfg.markers||[]).filter(x=>x&&Number.isFinite(Number(x.index))&&Number.isFinite(Number(x.value)));
   const series=(cfg.series||[]).filter(x=>x&&Array.isArray(x.values));
-  const values=[];
-  bars.forEach(b=>{values.push(Number(b.low),Number(b.high));});
-  lines.forEach(x=>values.push(Number(x.value)));
-  bands.forEach(x=>{values.push(Number(x.low),Number(x.high));});
-  markers.forEach(x=>values.push(Number(x.value)));
-  series.forEach(s=>s.values.forEach(v=>{if(Number.isFinite(Number(v)))values.push(Number(v));}));
+  const barValues=[];
+  bars.forEach(b=>{barValues.push(Number(b.low),Number(b.high));});
+  let baseMin=Math.min(...barValues),baseMax=Math.max(...barValues);
+  const baseSpan=Math.max(baseMax-baseMin,Math.abs(baseMax)*0.02,1);
+  const overlayFloor=baseMin-(baseSpan*1.5);
+  const overlayCeil=baseMax+(baseSpan*1.5);
+  const values=[...barValues];
+  lines.forEach(x=>{const v=Number(x.value);if(v>=overlayFloor&&v<=overlayCeil)values.push(v);});
+  bands.forEach(x=>{
+    const low=Number(x.low),high=Number(x.high);
+    if(high>=overlayFloor&&low<=overlayCeil)values.push(Math.max(low,overlayFloor),Math.min(high,overlayCeil));
+  });
+  markers.forEach(x=>{const v=Number(x.value);if(v>=overlayFloor&&v<=overlayCeil)values.push(v);});
+  series.forEach(s=>s.values.forEach(v=>{
+    const n=Number(v);
+    if(Number.isFinite(n)&&n>=overlayFloor&&n<=overlayCeil)values.push(n);
+  }));
   let minPrice=Math.min(...values),maxPrice=Math.max(...values);
-  const span=Math.max(maxPrice-minPrice,Math.abs(maxPrice)*0.02,1);
+  const span=Math.max(maxPrice-minPrice,baseSpan,Math.abs(maxPrice)*0.02,1);
   minPrice-=span*0.08;
   maxPrice+=span*0.08;
 
@@ -1169,7 +1173,8 @@ const DAILY_STRATEGY_GUIDE={
     "Use this when you want slower swing testing on end-of-day candles.",
     "Williams fractals are confirmed swing highs and lows, not predictive arrows.",
     "Fractal breakout reduces false starts, but it also reduces trade count."
-  ]
+  ],
+  terms:["fractal","fractal_breakout","break_even","chandelier"]
 };
 const INTRADAY_STRATEGY_GUIDES={
   fractal_breakout_ema200:{
@@ -1179,7 +1184,8 @@ const INTRADAY_STRATEGY_GUIDES={
       "Most mechanical intraday model.",
       "Good if you want a simple trend + breakout structure.",
       "Usually lower frequency than reversal-style engines."
-    ]
+    ],
+    terms:["fractal","fractal_breakout","break_even","chandelier"]
   },
   alligator_stoch_fractal:{
     title:"Alligator + Stoch fractal",
@@ -1188,7 +1194,8 @@ const INTRADAY_STRATEGY_GUIDES={
       "More selective than plain EMA breakout.",
       "Designed to catch pullbacks rather than pure momentum continuation.",
       "Can exit earlier on alligator line failure."
-    ]
+    ],
+    terms:["fractal","alligator","break_even","chandelier"]
   },
   price_action_3step:{
     title:"3-step price action",
@@ -1197,16 +1204,18 @@ const INTRADAY_STRATEGY_GUIDES={
       "Best if you care about structure and location more than indicator signals.",
       "Filters out 'middle of nowhere' trades.",
       "Uses higher-timeframe narrative with lower-timeframe execution."
-    ]
+    ],
+    terms:["point_of_interest","break_close","break_even","chandelier"]
   },
   mtf_liquidity_flow:{
     title:"MTF liquidity flow",
-    summary:"Multi-timeframe liquidity-sweep framework. It maps higher-timeframe bias, refines the internal range, then executes on liquidation or shift signals.",
+    summary:"Multi-timeframe sweep-reversal framework. It uses confirmed 4h trend bias, a 15m trading range, then waits for a 5m liquidity sweep and confirmation back with the trend.",
     bullets:[
-      "Designed for support / resistance sweeps and reversals.",
-      "Most context-heavy intraday strategy in the app.",
-      "Useful when you want 4h / 15m / execution alignment."
-    ]
+      "Designed for support / resistance sweeps that fail back into trend.",
+      "Requires 4h and 15m structure to agree before the 5m trigger is allowed.",
+      "Uses a sweep-exhaustion volume check to filter runaway breakout bars."
+    ],
+    terms:["htf_pivot","liquidity_sweep","internal_range","volume_exhaustion","break_even","chandelier"]
   },
   manipulation_ifvg:{
     title:"Manipulation + inverse FVG",
@@ -1214,9 +1223,24 @@ const INTRADAY_STRATEGY_GUIDES={
     bullets:[
       "Focused on stop hunts and reclaim behavior.",
       "Initial stop is anchored to the sweep wick.",
-      "Usually works better as a reversal engine than as a trend follower."
-    ]
+      "Now also supports a sweep-exhaustion volume filter on the stop-hunt bar."
+    ],
+    terms:["liquidity_sweep","ifvg","volume_exhaustion","break_even","chandelier"]
   }
+};
+const STRATEGY_TERM_LIBRARY={
+  fractal:{title:"Williams Fractal",body:"A confirmed local swing pattern. A high fractal forms when the middle candle has the highest high versus candles on both sides; a low fractal is the opposite."},
+  fractal_breakout:{title:"Fractal Breakout",body:"Price must close through a confirmed fractal level before the strategy acts. This reduces early entries, but also reduces trade count."},
+  alligator:{title:"Alligator Alignment",body:"The alligator lines are used as a trend-state filter. When the lines are stacked and opening in one direction, the market is treated as trending."},
+  point_of_interest:{title:"Point Of Interest",body:"A zone where the strategy expects price to matter: demand, supply, discount, premium, or a recent reaction area."},
+  break_close:{title:"Break / Close Confirmation",body:"The setup is only valid once price closes through the execution trigger, not just touches it with a wick."},
+  htf_pivot:{title:"Higher-Timeframe Pivot",body:"MTF liquidity flow uses confirmed pivot highs and lows to map the larger structural range. Those pivots are only accepted after the required right-side bars close, so the zone logic stays bias-safe. It does not use Williams fractals."},
+  liquidity_sweep:{title:"Liquidity Sweep",body:"Price pushes through an obvious high or low to collect stops and then either rejects or shifts structure. This is the core event for MTF and manipulation models."},
+  internal_range:{title:"Internal Range",body:"The nearer execution range inside the higher-timeframe bias. The strategy refines entries inside this range instead of trading the full chart."},
+  volume_exhaustion:{title:"Sweep Exhaustion",body:"The sweep bar must reject with a real wick, show enough reversal pressure, and avoid runaway breakout-volume expansion. This is a crypto-friendly fakeout filter for 5m data."},
+  ifvg:{title:"Inverse Fair Value Gap",body:"A fair value gap that is then reclaimed in the opposite direction. The manipulation model uses that reclaim as confirmation after the sweep."},
+  break_even:{title:"Break-Even Stop",body:"Once the trade moves far enough in your favor, the active stop is pulled up to the entry price to remove initial downside."},
+  chandelier:{title:"Chandelier Exit",body:"A volatility-adjusted trailing stop that follows trend by referencing recent extremes and ATR."},
 };
 
 function renderStrategyGuide(){
@@ -1244,13 +1268,18 @@ function renderStrategyGuide(){
   document.getElementById("strategyIntradayControls").style.display=isIntraday?"":"none";
   document.getElementById("strategyFractalCard").style.display=isIntraday?"none":"";
   document.getElementById("stratModeSummary").textContent=isIntraday
-    ? "Intraday / MTF mode uses bar-based logic. Use Binance when you need multi-year crypto history on 5m, 15m, or 60m bars."
+    ? "Intraday / MTF mode uses confirmed-pivot, next-bar execution logic. No future bars are used for zone confirmation or entries. Use Binance when you need multi-year crypto history on 5m, 15m, or 60m bars."
     : "Daily swing mode uses end-of-day candles and longer history windows. Fractal controls here refer to confirmed daily swing highs and lows.";
   document.getElementById("stratBreakoutLabelText").textContent=breakoutLabel;
   document.getElementById("stratBreakoutHelp").textContent=breakoutHelp;
   document.getElementById("stratGuideTitle").textContent=guide.title;
   document.getElementById("stratGuideSummary").textContent=guide.summary;
   document.getElementById("stratGuideBullets").innerHTML=(guide.bullets||[]).map(item=>`<li>${item}</li>`).join("");
+  document.getElementById("stratGlossary").innerHTML=(guide.terms||[]).map(key=>{
+    const term=STRATEGY_TERM_LIBRARY[key];
+    if(!term)return "";
+    return `<div class="term"><strong>${term.title}</strong>${term.body}</div>`;
+  }).join("");
 }
 
 // ---- Tab 4: Strategy ----
@@ -1263,6 +1292,7 @@ async function runStrategy(){
   const intradayVariant=document.getElementById("stratIntradayVariant").value;
   const intradayInterval=document.getElementById("stratIntradayInterval").value;
   const intradayYears=Number(document.getElementById("stratIntradayYears").value||2);
+  const entrySession=document.getElementById("stratEntrySession").value;
   const force=document.getElementById("stratForceFetch").checked;
   const useFractal=document.getElementById("stratUseFractal").checked;
   const fractalBreakout=document.getElementById("stratBreakout").checked;
@@ -1293,10 +1323,12 @@ async function runStrategy(){
           market_data_source:resolvedDataSource,
           market_data_symbol:resolvedDataSymbol,
           auto_adjust_for_yf_limits:true,
+          trend_alignment_mode:"aligned",
+          entry_session:entrySession,
           entry_model:"hybrid",
           allow_shorts:allowShorts,
           allow_longs:true,
-          rr_multiple:3.0,
+          rr_multiple:2.0,
           htf_pivot_window:3,
           internal_pivot_window:2,
           structure_search_bars:200,
@@ -1310,7 +1342,12 @@ async function runStrategy(){
           use_break_even_stop:useBreakEven,
           break_even_trigger_r:breakEvenTriggerR,
           use_volume_filter:false,
-          min_rel_volume:1.0
+          min_rel_volume:1.0,
+          use_volume_exhaustion_filter:true,
+          max_sweep_rel_volume:3.5,
+          min_reversal_pressure_ratio:0.25,
+          min_rejection_wick_ratio:0.15,
+          exhaustion_lookback_bars:24
           ,use_chandelier_exit:useChandelier
           ,chandelier_period:chandelierPeriod
           ,chandelier_atr_period:chandelierAtrPeriod
@@ -1340,6 +1377,11 @@ async function runStrategy(){
           break_even_trigger_r:breakEvenTriggerR,
           use_volume_filter:false,
           min_rel_volume:1.0,
+          use_volume_exhaustion_filter:true,
+          max_sweep_rel_volume:3.5,
+          min_reversal_pressure_ratio:0.25,
+          min_rejection_wick_ratio:0.15,
+          exhaustion_lookback_bars:24,
           use_chandelier_exit:useChandelier,
           chandelier_period:chandelierPeriod,
           chandelier_atr_period:chandelierAtrPeriod,

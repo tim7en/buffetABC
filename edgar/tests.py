@@ -17,6 +17,7 @@ from edgar.services.strategy import (
     _break_even_stop_candidate,
     _chandelier_stop_candidate,
     _resolve_bar_bracket_exit,
+    _sweep_exhaustion_confirmed,
     _stop_is_break_even_or_better,
     _williams_fractals,
     backtest_to_dict,
@@ -638,6 +639,58 @@ class DrfApiTests(TestCase):
         mock_manipulation.assert_called_once()
         self.assertEqual(mock_manipulation.call_args.kwargs["stop_buffer_bps"], 11.0)
 
+    @patch("edgar.services.manipulation_strategy.run_manipulation_backtest")
+    def test_strategy_intraday_endpoint_manipulation_passes_volume_exhaustion_options(self, mock_manipulation):
+        mock_manipulation.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "60m",
+            "strategy_variant": "manipulation_ifvg",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10400,
+            "total_return_pct": 4.0,
+            "total_trades": 6,
+            "long_trades": 3,
+            "short_trades": 3,
+            "winning_trades": 4,
+            "losing_trades": 2,
+            "win_rate": 66.7,
+            "max_drawdown_pct": 3.2,
+            "profit_factor": 1.8,
+            "cagr_pct": 2.1,
+            "avg_trade_return_pct": 0.5,
+            "exposure_pct": 8.4,
+            "total_fees": 8.1,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "60m",
+            "lookback_years": 2,
+            "strategy_variant": "manipulation_ifvg",
+            "use_volume_exhaustion_filter": True,
+            "max_sweep_rel_volume": 2.4,
+            "min_reversal_pressure_ratio": 0.4,
+            "min_rejection_wick_ratio": 0.3,
+            "exhaustion_lookback_bars": 18,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_manipulation.assert_called_once()
+        self.assertTrue(mock_manipulation.call_args.kwargs["use_volume_exhaustion_filter"])
+        self.assertEqual(mock_manipulation.call_args.kwargs["max_sweep_rel_volume"], 2.4)
+        self.assertEqual(mock_manipulation.call_args.kwargs["min_reversal_pressure_ratio"], 0.4)
+        self.assertEqual(mock_manipulation.call_args.kwargs["min_rejection_wick_ratio"], 0.3)
+        self.assertEqual(mock_manipulation.call_args.kwargs["exhaustion_lookback_bars"], 18)
+
     @patch("edgar.services.market_mechanics_strategy.run_market_mechanics_backtest")
     def test_strategy_intraday_endpoint_price_action_variant(self, mock_market_mechanics):
         mock_market_mechanics.return_value = {
@@ -738,6 +791,65 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_mtf_flow.call_args.kwargs["lookback_years"], 2.0)
         self.assertEqual(mock_mtf_flow.call_args.kwargs["market_data_source"], "auto")
         self.assertTrue(mock_mtf_flow.call_args.kwargs["auto_adjust_for_yf_limits"])
+
+    @patch("edgar.services.mtf_liquidity_flow_strategy.run_mtf_liquidity_flow_backtest")
+    def test_strategy_intraday_endpoint_mtf_passes_alignment_and_exhaustion_options(self, mock_mtf_flow):
+        mock_mtf_flow.return_value = {
+            "ticker": "AAPL",
+            "data_mode": "intraday",
+            "interval": "60m",
+            "strategy_variant": "mtf_liquidity_flow",
+            "entry_model": "hybrid",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10210,
+            "total_return_pct": 2.1,
+            "total_trades": 4,
+            "long_trades": 1,
+            "short_trades": 3,
+            "winning_trades": 2,
+            "losing_trades": 2,
+            "win_rate": 50.0,
+            "max_drawdown_pct": 1.9,
+            "profit_factor": 1.5,
+            "cagr_pct": 1.2,
+            "avg_trade_return_pct": 0.4,
+            "exposure_pct": 6.1,
+            "total_fees": 5.4,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "AAPL",
+            "initial_capital": 10000,
+            "interval": "60m",
+            "lookback_years": 2,
+            "strategy_variant": "mtf_liquidity_flow",
+            "trend_alignment_mode": "aligned",
+            "entry_session": "london",
+            "rr_multiple": 2.0,
+            "use_volume_exhaustion_filter": True,
+            "max_sweep_rel_volume": 2.5,
+            "min_reversal_pressure_ratio": 0.45,
+            "min_rejection_wick_ratio": 0.3,
+            "exhaustion_lookback_bars": 20,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        mock_mtf_flow.assert_called_once()
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["trend_alignment_mode"], "aligned")
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["entry_session"], "london")
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["rr_multiple"], 2.0)
+        self.assertTrue(mock_mtf_flow.call_args.kwargs["use_volume_exhaustion_filter"])
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["max_sweep_rel_volume"], 2.5)
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["min_reversal_pressure_ratio"], 0.45)
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["min_rejection_wick_ratio"], 0.3)
+        self.assertEqual(mock_mtf_flow.call_args.kwargs["exhaustion_lookback_bars"], 20)
 
     @patch("edgar.services.market_mechanics_strategy.run_market_mechanics_backtest")
     def test_strategy_intraday_endpoint_price_action_explicit_binance_source(self, mock_market_mechanics):
@@ -984,6 +1096,20 @@ class ManipulationStopLogicTests(TestCase):
         self.assertAlmostEqual(stop_loss, 104.104, places=6)
 
 
+class MtfLiquidityFlowValidationTests(TestCase):
+    def test_invalid_entry_session_raises(self):
+        from edgar.services.mtf_liquidity_flow_strategy import run_mtf_liquidity_flow_backtest
+
+        with self.assertRaises(ValueError):
+            run_mtf_liquidity_flow_backtest(
+                ticker="BTC-USD",
+                market_data_source="binance",
+                interval="5m",
+                lookback_years=2.0,
+                entry_session="tokyo_open",
+            )
+
+
 class StrategySerializationTests(TestCase):
     def test_break_even_helpers(self):
         self.assertEqual(
@@ -1004,6 +1130,26 @@ class StrategySerializationTests(TestCase):
                 active_stop=100.0,
             )
         )
+
+    def test_sweep_exhaustion_helper_detects_rejection_with_controlled_volume(self):
+        confirmed, reference_volume, reference_pressure = _sweep_exhaustion_confirmed(
+            direction="short",
+            volumes=[100.0, 110.0, 120.0, 130.0],
+            opens=[10.0, 10.5, 11.0, 11.4],
+            highs=[10.5, 11.0, 11.6, 12.3],
+            lows=[9.9, 10.4, 10.9, 11.0],
+            closes=[10.4, 10.9, 11.3, 11.1],
+            idx=3,
+            lookback=3,
+            max_sweep_rel_volume=2.0,
+            min_reversal_pressure_ratio=0.25,
+            min_rejection_wick_ratio=0.25,
+            vol_sma=[None, None, 100.0, 100.0],
+        )
+
+        self.assertTrue(confirmed)
+        self.assertAlmostEqual(reference_volume, 110.0, places=6)
+        self.assertGreater(reference_pressure, 0.0)
 
     def test_backtest_payload_uses_volume_fields_not_buffett_fields(self):
         trade = Trade(
