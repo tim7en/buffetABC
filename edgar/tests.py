@@ -796,6 +796,126 @@ class DrfApiTests(TestCase):
         self.assertTrue(mock_session_sfp.call_args.kwargs["use_target_room_filter"])
         self.assertEqual(mock_session_sfp.call_args.kwargs["min_target_room_ratio"], 1.0)
 
+    @patch("edgar.services.session_range_breakout_strategy.run_session_range_breakout_backtest")
+    def test_strategy_intraday_endpoint_session_range_breakout_variant(self, mock_session_breakout):
+        mock_session_breakout.return_value = {
+            "ticker": "BTC-USD",
+            "data_mode": "intraday",
+            "interval": "5m",
+            "strategy_variant": "session_range_breakout",
+            "entry_session": "new_york_equity_open_breakout",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10150,
+            "total_return_pct": 1.5,
+            "total_trades": 8,
+            "long_trades": 5,
+            "short_trades": 3,
+            "winning_trades": 4,
+            "losing_trades": 4,
+            "win_rate": 50.0,
+            "max_drawdown_pct": 1.1,
+            "profit_factor": 1.2,
+            "cagr_pct": 0.7,
+            "avg_trade_return_pct": 0.3,
+            "exposure_pct": 3.5,
+            "total_fees": 4.2,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "BTC-USD",
+            "initial_capital": 10000,
+            "interval": "5m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "session_range_breakout",
+            "market_data_source": "binance",
+            "session_open": "asia_open",
+            "range_lookback_minutes": 180,
+            "breakout_window_minutes": 90,
+            "breakout_buffer_bps": 2.0,
+            "breakout_close_buffer_bps": 5.0,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "BTC-USD")
+        self.assertEqual(payload["strategy_variant"], "session_range_breakout")
+        mock_session_breakout.assert_called_once()
+        self.assertEqual(mock_session_breakout.call_args.kwargs["market_data_source"], "binance")
+        self.assertEqual(mock_session_breakout.call_args.kwargs["session_open"], "asia_open")
+        self.assertEqual(mock_session_breakout.call_args.kwargs["range_lookback_minutes"], 180)
+        self.assertEqual(mock_session_breakout.call_args.kwargs["breakout_window_minutes"], 90)
+        self.assertEqual(mock_session_breakout.call_args.kwargs["breakout_buffer_bps"], 2.0)
+        self.assertEqual(mock_session_breakout.call_args.kwargs["breakout_close_buffer_bps"], 5.0)
+
+    @patch("edgar.services.orb_turtle_hybrid_strategy.run_orb_turtle_hybrid_backtest")
+    def test_strategy_intraday_endpoint_orb_turtle_variant(self, mock_orb_turtle):
+        mock_orb_turtle.return_value = {
+            "ticker": "ETH-USD",
+            "data_mode": "intraday",
+            "interval": "5m",
+            "strategy_variant": "orb_turtle_hybrid",
+            "strategy_name": "Opening Pressure + Turtle",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10320,
+            "total_return_pct": 3.2,
+            "total_trades": 11,
+            "long_trades": 6,
+            "short_trades": 5,
+            "winning_trades": 6,
+            "losing_trades": 5,
+            "win_rate": 54.5,
+            "max_drawdown_pct": 1.7,
+            "profit_factor": 1.4,
+            "cagr_pct": 1.7,
+            "avg_trade_return_pct": 0.5,
+            "exposure_pct": 5.0,
+            "total_fees": 6.0,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "ETH-USD",
+            "initial_capital": 10000,
+            "interval": "5m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "orb_turtle_hybrid",
+            "market_data_source": "binance",
+            "orb_window_minutes": 15,
+            "donchian_period": 200,
+            "min_rel_volume": 1.1,
+            "short_risk_pct": 0.03,
+            "long_risk_pct": 0.015,
+            "short_time_stop_minutes": 120,
+            "portfolio_gate_threshold_pct": -1.0,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "ETH-USD")
+        self.assertEqual(payload["strategy_variant"], "orb_turtle_hybrid")
+        mock_orb_turtle.assert_called_once()
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["market_data_source"], "binance")
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["orb_window_minutes"], 15)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["donchian_period"], 200)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["min_rel_volume"], 1.1)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["short_time_stop_minutes"], 120)
+        self.assertEqual(mock_orb_turtle.call_args.kwargs["portfolio_gate_threshold_pct"], -1.0)
+
     @patch("edgar.services.mtf_liquidity_flow_strategy.run_mtf_liquidity_flow_backtest")
     def test_strategy_intraday_endpoint_mtf_liquidity_flow_variant(self, mock_mtf_flow):
         mock_mtf_flow.return_value = {
@@ -1163,6 +1283,106 @@ class BinanceDataTests(TestCase):
         self.assertGreater(payload["bar_count"], 0)
         mock_binance_fetch.assert_called_once()
         mock_yf_fetch.assert_not_called()
+
+    @patch("edgar.services.session_range_breakout_strategy._fetch_intraday_bars")
+    @patch("edgar.services.session_range_breakout_strategy.fetch_binance_klines")
+    def test_session_range_breakout_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+        from edgar.services.session_range_breakout_strategy import run_session_range_breakout_backtest
+
+        start = datetime(2025, 1, 1)
+        bars = []
+        for i in range(2600):
+            ts = start + timedelta(minutes=5 * i)
+            px = 100.0 + ((i % 24) * 0.02)
+            bars.append(
+                {
+                    "timestamp": ts,
+                    "open": px,
+                    "high": px + 0.25,
+                    "low": px - 0.25,
+                    "close": px + (0.05 if i % 2 == 0 else -0.03),
+                    "volume": 1000.0 + (i % 40),
+                }
+            )
+
+        mock_binance_fetch.return_value = (bars, "BTCUSDT")
+        payload = run_session_range_breakout_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=0.2,
+            market_data_source="binance",
+            auto_adjust_for_yf_limits=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "binance")
+        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
+        self.assertEqual(payload["effective_interval"], "5m")
+        self.assertGreater(payload["bar_count"], 0)
+        mock_binance_fetch.assert_called_once()
+        mock_yf_fetch.assert_not_called()
+
+    @patch("edgar.services.orb_turtle_hybrid_strategy._fetch_intraday_bars")
+    @patch("edgar.services.orb_turtle_hybrid_strategy.fetch_binance_klines")
+    def test_orb_turtle_hybrid_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+        from edgar.services.orb_turtle_hybrid_strategy import run_orb_turtle_hybrid_backtest
+
+        start = datetime(2025, 1, 1)
+        bars = []
+        for i in range(3200):
+            ts = start + timedelta(minutes=5 * i)
+            px = 100.0 + (i * 0.01)
+            bars.append(
+                {
+                    "timestamp": ts,
+                    "open": px,
+                    "high": px + 0.4,
+                    "low": px - 0.4,
+                    "close": px + (0.1 if i % 4 else -0.05),
+                    "volume": 1000.0 + (i % 120),
+                }
+            )
+
+        mock_binance_fetch.return_value = (bars, "ETHUSDT")
+        payload = run_orb_turtle_hybrid_backtest(
+            ticker="ETH-USD",
+            interval="5m",
+            lookback_years=0.2,
+            market_data_source="binance",
+            auto_adjust_for_yf_limits=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "binance")
+        self.assertEqual(payload["market_data_symbol"], "ETHUSDT")
+        self.assertEqual(payload["effective_interval"], "5m")
+        self.assertGreater(payload["bar_count"], 0)
+        mock_binance_fetch.assert_called_once()
+        mock_yf_fetch.assert_not_called()
+
+    def test_session_range_breakout_pre_open_range_handles_asia_midnight_crossover(self):
+        from edgar.services.session_range_breakout_strategy import _pre_open_range
+
+        session_times = [
+            datetime(2025, 1, 1, 23, 45, tzinfo=timezone.utc),
+            datetime(2025, 1, 1, 23, 50, tzinfo=timezone.utc),
+            datetime(2025, 1, 1, 23, 55, tzinfo=timezone.utc),
+            datetime(2025, 1, 2, 0, 0, tzinfo=timezone.utc),
+            datetime(2025, 1, 2, 0, 5, tzinfo=timezone.utc),
+        ]
+        highs = [101.0, 102.0, 103.0, 104.0, 105.0]
+        lows = [99.0, 98.5, 98.0, 97.5, 97.0]
+
+        low, high, count = _pre_open_range(
+            session_times=session_times,
+            highs=highs,
+            lows=lows,
+            idx=4,
+            range_lookback_minutes=15,
+            session_open="asia_open",
+        )
+
+        self.assertEqual(count, 3)
+        self.assertEqual(low, 98.0)
+        self.assertEqual(high, 103.0)
 
     @patch("edgar.services.session_sfp_fvg_strategy._fetch_intraday_bars")
     @patch("edgar.services.session_sfp_fvg_strategy.fetch_binance_klines")
