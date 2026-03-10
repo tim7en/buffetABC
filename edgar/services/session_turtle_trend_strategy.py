@@ -13,6 +13,7 @@ from edgar.services.session_open_utils import (
     bars_per_day_24x7,
     minutes_since_session_open,
 )
+from edgar.services.intraday_strategy import _ema
 from edgar.services.strategy import (
     _atr,
     _break_even_stop_candidate,
@@ -70,6 +71,52 @@ def _bars_per_day_for_source(interval: str, source_label: str) -> int:
         if text == "15m":
             return 26
     return bars_per_day_24x7(interval)
+
+
+def _bucket_start(ts: datetime, interval_minutes: int) -> datetime:
+    total_minutes = ts.hour * 60 + ts.minute
+    bucket_minutes = (total_minutes // interval_minutes) * interval_minutes
+    return ts.replace(
+        hour=bucket_minutes // 60,
+        minute=bucket_minutes % 60,
+        second=0,
+        microsecond=0,
+    )
+
+
+def _aggregate_bars_with_index_mapping(
+    bars: list[dict],
+    interval_minutes: int,
+) -> tuple[list[dict], list[int]]:
+    aggregated: list[dict] = []
+    bar_to_bucket_idx: list[int] = []
+    current_bucket: datetime | None = None
+    current_bar: dict | None = None
+
+    for bar in bars:
+        bucket = _bucket_start(bar["timestamp"], interval_minutes)
+        if bucket != current_bucket:
+            if current_bar is not None:
+                aggregated.append(current_bar)
+            current_bucket = bucket
+            current_bar = {
+                "timestamp": bucket,
+                "open": float(bar["open"]),
+                "high": float(bar["high"]),
+                "low": float(bar["low"]),
+                "close": float(bar["close"]),
+                "volume": float(bar.get("volume", 0.0) or 0.0),
+            }
+        else:
+            current_bar["high"] = max(float(current_bar["high"]), float(bar["high"]))
+            current_bar["low"] = min(float(current_bar["low"]), float(bar["low"]))
+            current_bar["close"] = float(bar["close"])
+            current_bar["volume"] = float(current_bar["volume"]) + float(bar.get("volume", 0.0) or 0.0)
+        bar_to_bucket_idx.append(len(aggregated))
+
+    if current_bar is not None:
+        aggregated.append(current_bar)
+    return aggregated, bar_to_bucket_idx
 
 
 def _load_local_bars(
@@ -131,6 +178,7 @@ def run_session_turtle_trend_backtest(
     exit_channel_period: int | None = None,
     atr_period: int = 20,
     atr_stop_mult: float = 2.0,
+    fixed_stop_pct: float | None = None,
     entry_window_minutes: int = 480,
     entry_buffer_bps: float = 0.0,
     base_risk_pct: float = 0.01,
@@ -144,6 +192,9 @@ def run_session_turtle_trend_backtest(
     allow_shorts: bool = True,
     use_break_even_stop: bool = False,
     break_even_trigger_r: float = 1.0,
+    use_4h_trend_filter: bool = False,
+    trend_fast_period: int = 55,
+    trend_slow_period: int = 200,
     use_chandelier_exit: bool = False,
     chandelier_period: int = 22,
     chandelier_atr_period: int = 22,
@@ -167,11 +218,19 @@ def run_session_turtle_trend_backtest(
         raise ValueError("atr_period must be >= 5")
     if atr_stop_mult <= 0:
         raise ValueError("atr_stop_mult must be positive")
+    if fixed_stop_pct is not None and fixed_stop_pct <= 0:
+        raise ValueError("fixed_stop_pct must be positive when provided")
     if max_units < 1:
         raise ValueError("max_units must be >= 1")
+    if trend_fast_period < 2 or trend_slow_period < 2:
+        raise ValueError("trend_fast_period and trend_slow_period must be >= 2")
+    if trend_fast_period >= trend_slow_period:
+        raise ValueError("trend_fast_period must be smaller than trend_slow_period")
 
     exit_channel = exit_channel_period if exit_channel_period is not None else (10 if channel_period == 20 else 20)
     preload_warmup_days = max(channel_period + exit_channel + atr_period + 20, 75)
+    if use_4h_trend_filter:
+        preload_warmup_days = max(preload_warmup_days, trend_slow_period + 40)
 
     bars, resolved_symbol, resolved_source, market_data_path = _load_local_bars(
         ticker=ticker,
@@ -215,6 +274,10 @@ def run_session_turtle_trend_backtest(
     channel_lows = _rolling_lowest(session_lows, channel_period)
     exit_highs = _rolling_highest(session_highs, exit_channel)
     exit_lows = _rolling_lowest(session_lows, exit_channel)
+    trend_bars, bar_to_trend_idx = _aggregate_bars_with_index_mapping(bars, interval_minutes=240)
+    trend_closes = [float(bar["close"]) for bar in trend_bars]
+    trend_ema_fast = _ema(trend_closes, trend_fast_period) if use_4h_trend_filter else []
+    trend_ema_slow = _ema(trend_closes, trend_slow_period) if use_4h_trend_filter else []
     chandelier_atr_vals = _atr(highs, lows, closes, chandelier_atr_period) if use_chandelier_exit else []
     chandelier_highs = _rolling_highest(highs, chandelier_period) if use_chandelier_exit else []
     chandelier_lows = _rolling_lowest(lows, chandelier_period) if use_chandelier_exit else []
@@ -319,13 +382,14 @@ def run_session_turtle_trend_backtest(
                             ),
                             take_profit=None,
                         )
-                    trend_stop = open_trade.highest_price_since_entry - (atr_now * atr_stop_mult)
-                    next_stop = _tighten_stop(
-                        direction="long",
-                        current_stop=next_stop,
-                        candidate_stop=trend_stop,
-                        take_profit=None,
-                    )
+                    if fixed_stop_pct is None:
+                        trend_stop = open_trade.highest_price_since_entry - (atr_now * atr_stop_mult)
+                        next_stop = _tighten_stop(
+                            direction="long",
+                            current_stop=next_stop,
+                            candidate_stop=trend_stop,
+                            take_profit=None,
+                        )
                     tr_stop = None
                     if use_chandelier_exit:
                         tr_stop = _chandelier_stop_candidate(
@@ -445,13 +509,14 @@ def run_session_turtle_trend_backtest(
                             ),
                             take_profit=None,
                         )
-                    trend_stop = open_trade.lowest_price_since_entry + (atr_now * atr_stop_mult)
-                    next_stop = _tighten_stop(
-                        direction="short",
-                        current_stop=next_stop,
-                        candidate_stop=trend_stop,
-                        take_profit=None,
-                    )
+                    if fixed_stop_pct is None:
+                        trend_stop = open_trade.lowest_price_since_entry + (atr_now * atr_stop_mult)
+                        next_stop = _tighten_stop(
+                            direction="short",
+                            current_stop=next_stop,
+                            candidate_stop=trend_stop,
+                            take_profit=None,
+                        )
                     tr_stop = None
                     if use_chandelier_exit:
                         tr_stop = _chandelier_stop_candidate(
@@ -559,15 +624,29 @@ def run_session_turtle_trend_backtest(
         direction: str | None = None
         breakout_level: float | None = None
         exit_channel_level: float | None = None
+        allow_long_signal = allow_longs
+        allow_short_signal = allow_shorts
 
-        if allow_longs and long_breakout is not None:
+        if use_4h_trend_filter:
+            completed_trend_idx = bar_to_trend_idx[i] - 1
+            if completed_trend_idx < trend_slow_period - 1:
+                continue
+            fast_now = trend_ema_fast[completed_trend_idx]
+            slow_now = trend_ema_slow[completed_trend_idx]
+            trend_close = trend_closes[completed_trend_idx]
+            if fast_now is None or slow_now is None:
+                continue
+            allow_long_signal = allow_longs and trend_close > float(fast_now) and float(fast_now) > float(slow_now)
+            allow_short_signal = allow_shorts and trend_close < float(fast_now) and float(fast_now) < float(slow_now)
+
+        if allow_long_signal and long_breakout is not None:
             trigger_high = float(long_breakout) * (1.0 + entry_buffer)
             if close_i > trigger_high and prev_close <= trigger_high:
                 direction = "long"
                 breakout_level = float(long_breakout)
                 exit_channel_level = float(exit_channel_low) if exit_channel_low is not None else None
 
-        if direction is None and allow_shorts and short_breakout is not None:
+        if direction is None and allow_short_signal and short_breakout is not None:
             trigger_low = float(short_breakout) * (1.0 - entry_buffer)
             if close_i < trigger_low and prev_close >= trigger_low:
                 direction = "short"
@@ -578,9 +657,13 @@ def run_session_turtle_trend_backtest(
             continue
 
         next_open = opens[i + 1] if opens[i + 1] > 0 else closes[i + 1]
+        fixed_stop_rate = float(fixed_stop_pct) if fixed_stop_pct is not None else None
         if direction == "long":
             entry_price = next_open * (1.0 + slippage_rate)
-            stop_loss = entry_price - (float(atr_now) * atr_stop_mult)
+            if fixed_stop_rate is not None:
+                stop_loss = entry_price * (1.0 - fixed_stop_rate)
+            else:
+                stop_loss = entry_price - (float(atr_now) * atr_stop_mult)
             next_add_price = (
                 round(entry_price + (float(atr_now) * pyramid_add_atr), 4)
                 if enable_pyramiding and max_units > 1
@@ -588,7 +671,10 @@ def run_session_turtle_trend_backtest(
             )
         else:
             entry_price = next_open * (1.0 - slippage_rate)
-            stop_loss = entry_price + (float(atr_now) * atr_stop_mult)
+            if fixed_stop_rate is not None:
+                stop_loss = entry_price * (1.0 + fixed_stop_rate)
+            else:
+                stop_loss = entry_price + (float(atr_now) * atr_stop_mult)
             next_add_price = (
                 round(entry_price - (float(atr_now) * pyramid_add_atr), 4)
                 if enable_pyramiding and max_units > 1
@@ -612,6 +698,7 @@ def run_session_turtle_trend_backtest(
             continue
 
         entry_fee = position_size * commission_rate
+        stop_source = "fixed_pct_stop" if fixed_stop_rate is not None else "daily_atr_stop"
         open_trade = _Trade(
             direction=direction,
             entry_ts=timestamps[i + 1],
@@ -637,6 +724,7 @@ def run_session_turtle_trend_backtest(
             fees_paid=round(entry_fee, 4),
             sizing_tier=sizing_tier,
             signal_quality="A" if channel_period == 55 else "B",
+            stop_source=stop_source,
         )
 
     if open_trade is not None:
@@ -680,9 +768,14 @@ def run_session_turtle_trend_backtest(
         "exit_channel_period": exit_channel,
         "atr_period": atr_period,
         "atr_stop_mult": atr_stop_mult,
+        "fixed_stop_pct": fixed_stop_pct,
         "entry_window_minutes": entry_window_minutes,
         "allow_longs": allow_longs,
         "allow_shorts": allow_shorts,
+        "use_4h_trend_filter": use_4h_trend_filter,
+        "trend_filter_interval": "4h" if use_4h_trend_filter else None,
+        "trend_fast_period": trend_fast_period,
+        "trend_slow_period": trend_slow_period,
         "enable_pyramiding": enable_pyramiding,
         "pyramid_add_atr": pyramid_add_atr,
         "max_units": max_units,

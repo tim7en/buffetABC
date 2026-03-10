@@ -1817,6 +1817,87 @@ class BinanceDataTests(TestCase):
         self.assertGreater(payload["long_trades"], 0)
         self.assertGreater(payload["short_trades"], 0)
 
+    def test_session_turtle_trend_5m_uses_real_local_cache_with_4h_filter(self):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        self._require_real_local_cache("BTCUSDT")
+        payload = run_session_turtle_trend_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=2.0,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            channel_period=20,
+            use_4h_trend_filter=True,
+            trend_fast_period=55,
+            trend_slow_period=200,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_binance_cache")
+        self.assertTrue(payload["use_4h_trend_filter"])
+        self.assertEqual(payload["trend_filter_interval"], "4h")
+        self.assertEqual(payload["trend_fast_period"], 55)
+        self.assertEqual(payload["trend_slow_period"], 200)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertGreater(payload["long_trades"], 0)
+        self.assertGreater(payload["short_trades"], 0)
+
+    def test_session_turtle_trend_5m_uses_real_tiingo_cache_with_4h_filter(self):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        cache_file = self._require_real_tiingo_cache("COIN")
+        payload = run_session_turtle_trend_backtest(
+            ticker="COIN",
+            interval="5m",
+            lookback_years=2.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            channel_period=20,
+            use_4h_trend_filter=True,
+            trend_fast_period=55,
+            trend_slow_period=200,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_tiingo_cache")
+        self.assertEqual(payload["market_data_path"], str(cache_file))
+        self.assertTrue(payload["use_4h_trend_filter"])
+        self.assertEqual(payload["trend_filter_interval"], "4h")
+        self.assertEqual(payload["trend_fast_period"], 55)
+        self.assertEqual(payload["trend_slow_period"], 200)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertGreater(payload["long_trades"], 0)
+        self.assertGreater(payload["short_trades"], 0)
+
+    def test_session_turtle_trend_supports_fixed_stop_pct(self):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        self._require_real_local_cache("BTCUSDT")
+        payload = run_session_turtle_trend_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=2.0,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            channel_period=20,
+            base_risk_pct=0.05,
+            max_position_pct=0.90,
+            fixed_stop_pct=0.10,
+            use_4h_trend_filter=True,
+            trend_fast_period=55,
+            trend_slow_period=200,
+            enable_pyramiding=False,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["fixed_stop_pct"], 0.10)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertEqual(payload["trades"][0]["stop_source"], "fixed_pct_stop")
+
     def test_session_sfp_strategy_binance_source_path(self):
         from edgar.services.session_sfp_fvg_strategy import run_session_sfp_fvg_backtest
 

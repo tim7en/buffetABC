@@ -1,0 +1,16 @@
+ticker,source,session_open,return_pct,cagr_pct,max_drawdown_pct,trades,long_trades,short_trades
+BTC-USD,binance,new_york_equity_open,22.49,10.68362202650286,17.72,12,7,5
+ETH-USD,binance,new_york_equity_open,88.69,37.39366601128813,17.14,10,5,5
+SOL-USD,binance,hong_kong_open,4.66,2.3039018644066767,28.88,14,10,4
+PAXG-USD,binance,tokyo_open,16.09,7.75161969486271,13.59,8,8,0
+AMZN,tiingo,new_york_equity_open,-9.87,-5.067021227666412,15.69,10,8,2
+COIN,tiingo,new_york_equity_open,17.34,8.329978803163263,22.48,10,6,4
+CRCL,tiingo,new_york_equity_open,2.75,7.666391187761024,14.71,2,0,2
+GLD,tiingo,new_york_equity_open,44.61,20.269027732901577,10.15,5,5,0
+HOOD,tiingo,new_york_equity_open,87.18,36.84241564701895,22.6,8,6,2
+INTC,tiingo,new_york_equity_open,6.39,3.146527801528487,21.23,10,5,5
+MSTR,tiingo,new_york_equity_open,-10.83,-5.573510148096639,53.96,12,5,7
+PLTR,tiingo,new_york_equity_open,50.31,22.616192807588398,24.07,8,6,2
+PPLT,tiingo,new_york_equity_open,10.54,5.156814213747918,17.72,9,7,2
+SLV,tiingo,new_york_equity_open,47.42,21.432229236585275,30.12,6,6,0
+TSLA,tiingo,new_york_equity_open,11.26,5.481888721142036,17.56,8,6,2
