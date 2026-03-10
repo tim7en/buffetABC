@@ -29,9 +29,10 @@ DEFAULT_SESSION_TURTLE_UNIVERSE: tuple[tuple[str, str, str], ...] = (
     ("TSLA", "tiingo", "new_york_equity_open"),
 )
 
-CRYPTO_TICKERS = {"BTC-USD", "ETH-USD", "SOL-USD", "PAXG-USD"}
+CRYPTO_TICKERS = {"BTC-USD", "ETH-USD", "SOL-USD"}
+GOLD_TICKERS = {"PAXG-USD", "GLD"}
 EQUITY_TICKERS = {"AMZN", "COIN", "CRCL", "HOOD", "INTC", "MSTR", "PLTR", "TSLA"}
-METAL_TICKERS = {"GLD", "PPLT", "SLV"}
+METAL_TICKERS = {"PPLT", "SLV"}
 
 
 @dataclass
@@ -62,6 +63,8 @@ class _OpenTrade:
 def _asset_bucket(ticker: str) -> str:
     if ticker in CRYPTO_TICKERS:
         return "crypto"
+    if ticker in GOLD_TICKERS:
+        return "gold"
     if ticker in EQUITY_TICKERS:
         return "equity"
     if ticker in METAL_TICKERS:
@@ -195,6 +198,10 @@ def generate_session_turtle_shared_account_report(
     drawdown_exposure_mult_1: float = 1.5,
     drawdown_trigger_2_pct: float = 20.0,
     drawdown_exposure_mult_2: float = 1.0,
+    crypto_cap_mult: float | None = None,
+    gold_cap_mult: float | None = None,
+    metals_cap_mult: float | None = None,
+    equity_cap_mult: float | None = None,
     initial_capital: float = 1_000.0,
     lookback_years: float = 4.1,
     channel_period: int = 20,
@@ -217,6 +224,14 @@ def generate_session_turtle_shared_account_report(
         raise ValueError("drawdown_exposure_mult_1 must be <= exposure_mult")
     if drawdown_exposure_mult_2 > drawdown_exposure_mult_1:
         raise ValueError("drawdown_exposure_mult_2 must be <= drawdown_exposure_mult_1")
+    for label, cap_mult in (
+        ("crypto_cap_mult", crypto_cap_mult),
+        ("gold_cap_mult", gold_cap_mult),
+        ("metals_cap_mult", metals_cap_mult),
+        ("equity_cap_mult", equity_cap_mult),
+    ):
+        if cap_mult is not None and cap_mult <= 0:
+            raise ValueError(f"{label} must be positive when provided")
 
     candidates: list[dict] = []
     for combo_idx, (ticker, source, session_open) in enumerate(DEFAULT_SESSION_TURTLE_UNIVERSE):
@@ -273,6 +288,12 @@ def generate_session_turtle_shared_account_report(
     open_positions: list[_OpenTrade] = []
     executed_trades: list[dict] = []
     equity_curve: list[dict] = []
+    asset_class_caps = {
+        "crypto": crypto_cap_mult,
+        "gold": gold_cap_mult,
+        "metals": metals_cap_mult,
+        "equity": equity_cap_mult,
+    }
 
     def close_positions_up_to(timestamp: datetime) -> None:
         nonlocal capital, peak_capital, max_drawdown, open_positions
@@ -332,6 +353,16 @@ def generate_session_turtle_shared_account_report(
         portfolio_cap = capital * base_portfolio_cap_pct * active_exposure_mult
         used_notional = sum(position.scaled_position_size for position in open_positions)
         available_notional = max(portfolio_cap - used_notional, 0.0)
+        asset_bucket = str(candidate["asset_bucket"])
+        asset_class_cap_mult = asset_class_caps.get(asset_bucket)
+        if asset_class_cap_mult is not None:
+            class_cap = capital * base_portfolio_cap_pct * asset_class_cap_mult
+            used_class_notional = sum(
+                position.scaled_position_size
+                for position in open_positions
+                if position.asset_bucket == asset_bucket
+            )
+            available_notional = min(available_notional, max(class_cap - used_class_notional, 0.0))
         if available_notional <= 1e-9:
             skipped_no_capacity += 1
             continue
@@ -359,7 +390,7 @@ def generate_session_turtle_shared_account_report(
                 pnl=float(candidate["pnl"]),
                 risk_model=str(candidate["risk_model"]),
                 entry_rel_volume=float(candidate["entry_rel_volume"]),
-                asset_bucket=str(candidate["asset_bucket"]),
+                asset_bucket=asset_bucket,
                 entry_exposure_mult=active_exposure_mult,
                 scale=scale,
                 scaled_position_size=scaled_position_size,
@@ -404,6 +435,8 @@ def generate_session_turtle_shared_account_report(
     label = f"Session Turtle Trend x{exposure_mult:g}"
     if use_drawdown_governor:
         label += " With DD Governor"
+    if any(cap is not None for cap in asset_class_caps.values()):
+        label += " With Asset Class Caps"
 
     summary = {
         "strategy_variant": "session_turtle_trend_shared_account",
@@ -431,6 +464,10 @@ def generate_session_turtle_shared_account_report(
         "drawdown_exposure_mult_1": round(drawdown_exposure_mult_1, 4),
         "drawdown_trigger_2_pct": round(drawdown_trigger_2_pct, 2),
         "drawdown_exposure_mult_2": round(drawdown_exposure_mult_2, 4),
+        "crypto_cap_mult": crypto_cap_mult,
+        "gold_cap_mult": gold_cap_mult,
+        "metals_cap_mult": metals_cap_mult,
+        "equity_cap_mult": equity_cap_mult,
         "entries_at_base_exposure": exposure_counter[float(exposure_mult)],
         "entries_at_drawdown_exposure_1": exposure_counter[float(drawdown_exposure_mult_1)],
         "entries_at_drawdown_exposure_2": exposure_counter[float(drawdown_exposure_mult_2)],
@@ -441,9 +478,11 @@ def generate_session_turtle_shared_account_report(
         "trend_fast_period": trend_fast_period,
         "trend_slow_period": trend_slow_period,
         "crypto_trades": bucket_counter["crypto"],
+        "gold_trades": bucket_counter["gold"],
         "equity_trades": bucket_counter["equity"],
         "metals_trades": bucket_counter["metals"],
         "crypto_pnl": round(bucket_pnl["crypto"], 4),
+        "gold_pnl": round(bucket_pnl["gold"], 4),
         "equity_pnl": round(bucket_pnl["equity"], 4),
         "metals_pnl": round(bucket_pnl["metals"], 4),
     }

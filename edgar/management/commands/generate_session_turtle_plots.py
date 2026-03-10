@@ -55,6 +55,30 @@ class Command(BaseCommand):
             default=1.0,
             help="Exposure multiplier to use after the second drawdown threshold.",
         )
+        parser.add_argument(
+            "--crypto-cap-mult",
+            type=float,
+            default=None,
+            help="Optional cap for the crypto asset class, expressed as an exposure multiplier.",
+        )
+        parser.add_argument(
+            "--gold-cap-mult",
+            type=float,
+            default=None,
+            help="Optional cap for the gold asset class, expressed as an exposure multiplier.",
+        )
+        parser.add_argument(
+            "--metals-cap-mult",
+            type=float,
+            default=None,
+            help="Optional cap for the metals asset class, expressed as an exposure multiplier.",
+        )
+        parser.add_argument(
+            "--equity-cap-mult",
+            type=float,
+            default=None,
+            help="Optional cap for the equity asset class, expressed as an exposure multiplier.",
+        )
 
     def handle(self, *args, **options):
         output_dir = Path(options["output_dir"]).resolve()
@@ -68,6 +92,10 @@ class Command(BaseCommand):
             drawdown_exposure_mult_1=float(options["drawdown_exposure_mult_1"]),
             drawdown_trigger_2_pct=float(options["drawdown_trigger_2_pct"]),
             drawdown_exposure_mult_2=float(options["drawdown_exposure_mult_2"]),
+            crypto_cap_mult=float(options["crypto_cap_mult"]) if options["crypto_cap_mult"] is not None else None,
+            gold_cap_mult=float(options["gold_cap_mult"]) if options["gold_cap_mult"] is not None else None,
+            metals_cap_mult=float(options["metals_cap_mult"]) if options["metals_cap_mult"] is not None else None,
+            equity_cap_mult=float(options["equity_cap_mult"]) if options["equity_cap_mult"] is not None else None,
         )
         summary = report["summary"]
 

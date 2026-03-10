@@ -134,9 +134,11 @@ class CommandPersistenceTests(TestCase):
                 "directional_volume_risk_pct": 0.07,
                 "trend_fast_period": 55,
                 "trend_slow_period": 200,
+                "gold_trades": 0,
                 "crypto_trades": 1,
                 "equity_trades": 0,
                 "metals_trades": 0,
+                "gold_pnl": 0.0,
                 "crypto_pnl": 125.0,
                 "equity_pnl": 0.0,
                 "metals_pnl": 0.0,
@@ -246,6 +248,37 @@ class CommandPersistenceTests(TestCase):
         self.assertEqual(mock_report.call_args.kwargs["drawdown_exposure_mult_1"], 1.5)
         self.assertEqual(mock_report.call_args.kwargs["drawdown_trigger_2_pct"], 20.0)
         self.assertEqual(mock_report.call_args.kwargs["drawdown_exposure_mult_2"], 1.0)
+
+    @patch("edgar.management.commands.generate_session_turtle_plots.generate_session_turtle_shared_account_report")
+    def test_generate_session_turtle_plots_forwards_asset_class_caps(self, mock_report):
+        mock_report.return_value = {
+            "summary": {
+                "label": "Session Turtle Trend x2 With Asset Class Caps",
+                "initial_capital": 1000.0,
+            },
+            "equity_curve": [
+                {"date": "2024-01-02T10:00:00", "equity": 1000.0},
+                {"date": "2024-01-10T10:00:00", "equity": 1125.0},
+            ],
+            "trades": [{"ticker": "BTC-USD"}],
+            "yearly_returns": [{"year": 2024, "pnl": 125.0}],
+            "asset_summary": [{"ticker": "BTC-USD", "pnl": 125.0}],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            call_command(
+                "generate_session_turtle_plots",
+                f"--output-dir={temp_dir}",
+                "--crypto-cap-mult=1.0",
+                "--gold-cap-mult=1.0",
+                "--metals-cap-mult=1.0",
+                "--equity-cap-mult=1.0",
+            )
+
+        self.assertEqual(mock_report.call_args.kwargs["crypto_cap_mult"], 1.0)
+        self.assertEqual(mock_report.call_args.kwargs["gold_cap_mult"], 1.0)
+        self.assertEqual(mock_report.call_args.kwargs["metals_cap_mult"], 1.0)
+        self.assertEqual(mock_report.call_args.kwargs["equity_cap_mult"], 1.0)
 
 
 class ApiTests(TestCase):
