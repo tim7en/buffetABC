@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
 from edgar.services.binance_data import load_local_binance_klines
@@ -20,6 +20,7 @@ from edgar.services.strategy import (
     _chandelier_stop_candidate,
     _rolling_highest,
     _rolling_lowest,
+    _sma,
     _stop_is_break_even_or_better,
     _stop_is_trailed,
     _tighten_stop,
@@ -61,6 +62,13 @@ class _Trade:
     hold_bars: int = 0
     stop_source: str = "daily_atr_stop"
     strategy_leg: str = "session_turtle_trend"
+    entry_rel_volume: float = 1.0
+    volume_risk_scale: float = 1.0
+    directional_volume_confirmed: bool = False
+    risk_model: str = "base"
+    initial_shares: float = 0.0
+    initial_position_size: float = 0.0
+    add_events: list[dict] = field(default_factory=list)
 
 
 def _bars_per_day_for_source(interval: str, source_label: str) -> int:
@@ -183,6 +191,14 @@ def run_session_turtle_trend_backtest(
     entry_buffer_bps: float = 0.0,
     base_risk_pct: float = 0.01,
     max_position_pct: float = 0.30,
+    use_volume_risk_scaling: bool = False,
+    volume_period: int = 40,
+    volume_risk_floor: float = 0.5,
+    volume_risk_cap: float = 1.5,
+    use_directional_volume_risk_boost: bool = False,
+    directional_volume_min_rel_volume: float = 1.25,
+    directional_volume_close_location_threshold: float = 0.65,
+    directional_volume_risk_pct: float = 0.07,
     enable_pyramiding: bool = False,
     pyramid_add_atr: float = 0.5,
     max_units: int = 4,
@@ -216,10 +232,22 @@ def run_session_turtle_trend_backtest(
         raise ValueError("channel_period must be 20 or 55")
     if atr_period < 5:
         raise ValueError("atr_period must be >= 5")
+    if volume_period < 2:
+        raise ValueError("volume_period must be >= 2")
     if atr_stop_mult <= 0:
         raise ValueError("atr_stop_mult must be positive")
     if fixed_stop_pct is not None and fixed_stop_pct <= 0:
         raise ValueError("fixed_stop_pct must be positive when provided")
+    if volume_risk_floor <= 0:
+        raise ValueError("volume_risk_floor must be positive")
+    if volume_risk_cap < volume_risk_floor:
+        raise ValueError("volume_risk_cap must be >= volume_risk_floor")
+    if directional_volume_min_rel_volume <= 0:
+        raise ValueError("directional_volume_min_rel_volume must be positive")
+    if not 0.5 <= directional_volume_close_location_threshold <= 1.0:
+        raise ValueError("directional_volume_close_location_threshold must be between 0.5 and 1.0")
+    if directional_volume_risk_pct < base_risk_pct:
+        raise ValueError("directional_volume_risk_pct must be >= base_risk_pct")
     if max_units < 1:
         raise ValueError("max_units must be >= 1")
     if trend_fast_period < 2 or trend_slow_period < 2:
@@ -274,6 +302,7 @@ def run_session_turtle_trend_backtest(
     channel_lows = _rolling_lowest(session_lows, channel_period)
     exit_highs = _rolling_highest(session_highs, exit_channel)
     exit_lows = _rolling_lowest(session_lows, exit_channel)
+    vol_sma = _sma(volumes, volume_period)
     trend_bars, bar_to_trend_idx = _aggregate_bars_with_index_mapping(bars, interval_minutes=240)
     trend_closes = [float(bar["close"]) for bar in trend_bars]
     trend_ema_fast = _ema(trend_closes, trend_fast_period) if use_4h_trend_filter else []
@@ -447,6 +476,15 @@ def run_session_turtle_trend_backtest(
                                 open_trade.fees_paid = round(open_trade.fees_paid + fee, 4)
                                 open_trade.unit_count += 1
                                 open_trade.add_count += 1
+                                open_trade.add_events.append(
+                                    {
+                                        "timestamp": timestamps[i + 1],
+                                        "entry_price": round(add_entry, 4),
+                                        "shares": round(add_shares, 6),
+                                        "notional": round(add_notional, 4),
+                                        "fee": round(fee, 4),
+                                    }
+                                )
                                 open_trade.next_add_price = (
                                     round(add_entry + (atr_add * pyramid_add_atr), 4)
                                     if open_trade.unit_count < max_units
@@ -574,6 +612,15 @@ def run_session_turtle_trend_backtest(
                                 open_trade.fees_paid = round(open_trade.fees_paid + fee, 4)
                                 open_trade.unit_count += 1
                                 open_trade.add_count += 1
+                                open_trade.add_events.append(
+                                    {
+                                        "timestamp": timestamps[i + 1],
+                                        "entry_price": round(add_entry, 4),
+                                        "shares": round(add_shares, 6),
+                                        "notional": round(add_notional, 4),
+                                        "fee": round(fee, 4),
+                                    }
+                                )
                                 open_trade.next_add_price = (
                                     round(add_entry - (atr_add * pyramid_add_atr), 4)
                                     if open_trade.unit_count < max_units
@@ -656,6 +703,27 @@ def run_session_turtle_trend_backtest(
         if direction is None or breakout_level is None:
             continue
 
+        rel_volume = 1.0
+        if vol_sma[i] is not None and float(vol_sma[i]) > 0:
+            rel_volume = float(volumes[i]) / float(vol_sma[i])
+        volume_risk_scale = 1.0
+        if use_volume_risk_scaling:
+            volume_risk_scale = min(max(rel_volume, volume_risk_floor), volume_risk_cap)
+        bar_range = max(high_i - low_i, 1e-8)
+        close_location = (close_i - low_i) / bar_range
+        directional_volume_confirmed = rel_volume >= directional_volume_min_rel_volume and (
+            close_location >= directional_volume_close_location_threshold
+            if direction == "long"
+            else close_location <= (1.0 - directional_volume_close_location_threshold)
+        )
+        target_risk_pct = base_risk_pct * volume_risk_scale
+        risk_model = "base"
+        if use_volume_risk_scaling and volume_risk_scale != 1.0:
+            risk_model = "rvol_scaled"
+        if use_directional_volume_risk_boost and directional_volume_confirmed:
+            target_risk_pct = max(target_risk_pct, directional_volume_risk_pct)
+            risk_model = "directional_volume_boost"
+
         next_open = opens[i + 1] if opens[i + 1] > 0 else closes[i + 1]
         fixed_stop_rate = float(fixed_stop_pct) if fixed_stop_pct is not None else None
         if direction == "long":
@@ -684,7 +752,7 @@ def run_session_turtle_trend_backtest(
         sl_distance = abs(entry_price - stop_loss)
         if sl_distance <= 0:
             continue
-        risk_amount = capital * base_risk_pct
+        risk_amount = capital * target_risk_pct
         shares = risk_amount / sl_distance
         position_size = shares * entry_price
         max_notional = capital * max_position_pct
@@ -725,6 +793,12 @@ def run_session_turtle_trend_backtest(
             sizing_tier=sizing_tier,
             signal_quality="A" if channel_period == 55 else "B",
             stop_source=stop_source,
+            entry_rel_volume=round(rel_volume, 4),
+            volume_risk_scale=round(volume_risk_scale, 4),
+            directional_volume_confirmed=directional_volume_confirmed,
+            risk_model=risk_model,
+            initial_shares=round(shares, 6),
+            initial_position_size=round(position_size, 4),
         )
 
     if open_trade is not None:
@@ -776,6 +850,14 @@ def run_session_turtle_trend_backtest(
         "trend_filter_interval": "4h" if use_4h_trend_filter else None,
         "trend_fast_period": trend_fast_period,
         "trend_slow_period": trend_slow_period,
+        "use_volume_risk_scaling": use_volume_risk_scaling,
+        "volume_period": volume_period,
+        "volume_risk_floor": volume_risk_floor,
+        "volume_risk_cap": volume_risk_cap,
+        "use_directional_volume_risk_boost": use_directional_volume_risk_boost,
+        "directional_volume_min_rel_volume": directional_volume_min_rel_volume,
+        "directional_volume_close_location_threshold": directional_volume_close_location_threshold,
+        "directional_volume_risk_pct": directional_volume_risk_pct,
         "enable_pyramiding": enable_pyramiding,
         "pyramid_add_atr": pyramid_add_atr,
         "max_units": max_units,
@@ -837,15 +919,31 @@ def run_session_turtle_trend_backtest(
                 "signal_quality": t.signal_quality,
                 "hold_days": t.hold_bars,
                 "stop_source": t.stop_source,
+                "entry_rel_volume": t.entry_rel_volume,
+                "volume_risk_scale": t.volume_risk_scale,
+                "directional_volume_confirmed": t.directional_volume_confirmed,
+                "risk_model": t.risk_model,
                 "session_label": t.session_label,
                 "breakout_level": t.breakout_level,
                 "exit_channel_level": t.exit_channel_level,
                 "atr_at_entry": t.atr_at_entry,
                 "highest_price_since_entry": t.highest_price_since_entry,
                 "lowest_price_since_entry": t.lowest_price_since_entry,
+                "initial_shares": t.initial_shares,
+                "initial_position_size": t.initial_position_size,
                 "unit_count": t.unit_count,
                 "add_count": t.add_count,
                 "next_add_price": t.next_add_price,
+                "add_events": [
+                    {
+                        "timestamp": event["timestamp"].isoformat(),
+                        "entry_price": event["entry_price"],
+                        "shares": event["shares"],
+                        "notional": event["notional"],
+                        "fee": event["fee"],
+                    }
+                    for event in t.add_events
+                ],
             }
             for t in trades
         ],

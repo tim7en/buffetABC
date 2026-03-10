@@ -1,0 +1,11 @@
+scenario_id,year,carry_start_equity,end_equity,year_return_pct,event_count
+baseline,2022,1000.0,1327.9,32.79,46
+baseline,2023,1327.9,1868.89,40.74,63
+baseline,2024,1868.89,4271.15,128.54,85
+baseline,2025,4271.15,5275.89,23.52,64
+baseline,2026,5275.89,5866.94,11.2,16
+volume_scaled,2022,1000.0,1201.93,20.19,46
+volume_scaled,2023,1201.93,1714.74,42.66,60
+volume_scaled,2024,1714.74,4506.06,162.78,76
+volume_scaled,2025,4506.06,5696.43,26.42,64
+volume_scaled,2026,5696.43,6305.2,10.69,16

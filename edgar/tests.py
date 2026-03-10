@@ -1898,6 +1898,88 @@ class BinanceDataTests(TestCase):
         self.assertGreater(payload["total_trades"], 0)
         self.assertEqual(payload["trades"][0]["stop_source"], "fixed_pct_stop")
 
+    def test_session_turtle_trend_supports_volume_risk_scaling(self):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        self._require_real_local_cache("BTCUSDT")
+        baseline = run_session_turtle_trend_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=2.0,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            channel_period=20,
+            base_risk_pct=0.05,
+            max_position_pct=0.90,
+            fixed_stop_pct=0.10,
+            use_4h_trend_filter=True,
+            trend_fast_period=55,
+            trend_slow_period=200,
+            enable_pyramiding=False,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+        scaled = run_session_turtle_trend_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=2.0,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            channel_period=20,
+            base_risk_pct=0.05,
+            max_position_pct=0.90,
+            fixed_stop_pct=0.10,
+            use_4h_trend_filter=True,
+            trend_fast_period=55,
+            trend_slow_period=200,
+            use_volume_risk_scaling=True,
+            volume_period=40,
+            volume_risk_floor=0.5,
+            volume_risk_cap=1.5,
+            enable_pyramiding=False,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertTrue(scaled["use_volume_risk_scaling"])
+        self.assertEqual(scaled["volume_period"], 40)
+        self.assertEqual(scaled["total_trades"], baseline["total_trades"])
+        self.assertTrue(any(abs(t["volume_risk_scale"] - 1.0) > 1e-6 for t in scaled["trades"]))
+
+    def test_session_turtle_trend_supports_directional_volume_boost_and_pyramiding(self):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        self._require_real_local_cache("BTCUSDT")
+        payload = run_session_turtle_trend_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=2.0,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            channel_period=20,
+            base_risk_pct=0.05,
+            max_position_pct=0.90,
+            fixed_stop_pct=0.10,
+            use_4h_trend_filter=True,
+            trend_fast_period=55,
+            trend_slow_period=200,
+            use_directional_volume_risk_boost=True,
+            directional_volume_min_rel_volume=1.25,
+            directional_volume_close_location_threshold=0.65,
+            directional_volume_risk_pct=0.07,
+            enable_pyramiding=True,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertTrue(payload["use_directional_volume_risk_boost"])
+        self.assertEqual(payload["directional_volume_risk_pct"], 0.07)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertTrue(any(t["directional_volume_confirmed"] for t in payload["trades"]))
+        self.assertTrue(any(t["risk_model"] == "directional_volume_boost" for t in payload["trades"]))
+        self.assertTrue(any(t["add_count"] > 0 for t in payload["trades"]))
+        self.assertTrue(any(len(t["add_events"]) > 0 for t in payload["trades"]))
+
     def test_session_ma_crossover_uses_real_local_cache_data(self):
         from edgar.services.session_ma_crossover_strategy import run_session_ma_crossover_backtest
 

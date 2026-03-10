@@ -1,0 +1,5 @@
+scenario_id,label,start_date,end_date,candidate_trades,candidate_adds,executed_parent_trades,executed_adds,executed_lots,long_parent_trades,short_parent_trades,skipped_same_ticker,skipped_no_capacity,skipped_add_no_parent,final_equity,total_return_pct,cagr_pct,max_realized_drawdown_pct
+directional_boost,Directional Volume 5% to 7%,2022-02-20T03:35:00,2026-03-02T16:25:00,514,0,250,0,250,157,93,77,187,0,6784.26,578.43,60.84,21.0
+baseline,Baseline,2022-02-20T03:35:00,2026-03-02T16:25:00,514,0,268,0,268,171,97,80,166,0,5375.93,437.59,51.81,18.1
+directional_boost_pyramiding,Directional Volume + Pyramiding,2022-02-20T03:35:00,2026-03-02T16:25:00,534,719,170,52,222,106,64,51,508,472,4126.59,312.66,42.17,17.67
+pyramiding,Pyramiding,2022-02-20T03:35:00,2026-03-02T16:25:00,535,713,161,47,208,101,60,48,519,473,1691.78,69.18,13.94,28.16
