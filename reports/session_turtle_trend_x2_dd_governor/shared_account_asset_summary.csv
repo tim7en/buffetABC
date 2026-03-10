@@ -1,0 +1,16 @@
+ticker,source,asset_bucket,trades,long_trades,short_trades,pnl,pnl_share_pct,long_pnl,short_pnl
+SOL-USD,binance,crypto,43,21,22,2307.0703,25.07,2033.4006,273.6697
+HOOD,tiingo,equity,19,14,5,1532.7772,16.66,1354.9475,177.8297
+COIN,tiingo,equity,17,11,6,1215.5152,13.21,1049.3167,166.1985
+PLTR,tiingo,equity,18,16,2,965.416,10.49,818.6822,146.7338
+MSTR,tiingo,equity,13,5,8,790.8757,8.59,1169.3422,-378.4665
+TSLA,tiingo,equity,17,10,7,536.487,5.83,674.6802,-138.1932
+SLV,tiingo,metals,16,12,4,370.5955,4.03,446.5464,-75.9509
+GLD,tiingo,metals,17,15,2,360.3278,3.92,359.5292,0.7986
+CRCL,tiingo,equity,2,0,2,330.4247,3.59,0.0,330.4247
+PAXG-USD,binance,crypto,33,23,10,265.0711,2.88,269.945,-4.8739
+BTC-USD,binance,crypto,47,24,23,228.6635,2.48,460.7901,-232.1266
+PPLT,tiingo,metals,19,13,6,186.4225,2.03,268.0591,-81.6366
+ETH-USD,binance,crypto,38,20,18,97.6295,1.06,78.7676,18.8619
+INTC,tiingo,equity,15,8,7,90.5942,0.98,-88.3933,178.9875
+AMZN,tiingo,equity,20,17,3,-75.4163,-0.82,-34.351,-41.0653

@@ -52,6 +52,7 @@ class _OpenTrade:
     risk_model: str
     entry_rel_volume: float
     asset_bucket: str
+    entry_exposure_mult: float
     scale: float
     scaled_position_size: float
     scaled_shares: float
@@ -66,6 +67,33 @@ def _asset_bucket(ticker: str) -> str:
     if ticker in METAL_TICKERS:
         return "metals"
     return "other"
+
+
+def _realized_drawdown_pct(capital: float, peak_capital: float) -> float:
+    if peak_capital <= 0:
+        return 0.0
+    return (peak_capital - capital) / peak_capital * 100.0
+
+
+def _active_exposure_mult(
+    *,
+    base_exposure_mult: float,
+    capital: float,
+    peak_capital: float,
+    use_drawdown_governor: bool,
+    drawdown_trigger_1_pct: float,
+    drawdown_exposure_mult_1: float,
+    drawdown_trigger_2_pct: float,
+    drawdown_exposure_mult_2: float,
+) -> float:
+    if not use_drawdown_governor:
+        return base_exposure_mult
+    drawdown_pct = _realized_drawdown_pct(capital=capital, peak_capital=peak_capital)
+    if drawdown_pct >= drawdown_trigger_2_pct:
+        return drawdown_exposure_mult_2
+    if drawdown_pct >= drawdown_trigger_1_pct:
+        return drawdown_exposure_mult_1
+    return base_exposure_mult
 
 
 def _build_yearly_rows(executed_trades: list[dict], initial_capital: float) -> list[dict]:
@@ -162,6 +190,11 @@ def _build_asset_rows(executed_trades: list[dict], total_pnl: float) -> list[dic
 def generate_session_turtle_shared_account_report(
     *,
     exposure_mult: float = 2.0,
+    use_drawdown_governor: bool = False,
+    drawdown_trigger_1_pct: float = 10.0,
+    drawdown_exposure_mult_1: float = 1.5,
+    drawdown_trigger_2_pct: float = 20.0,
+    drawdown_exposure_mult_2: float = 1.0,
     initial_capital: float = 1_000.0,
     lookback_years: float = 4.1,
     channel_period: int = 20,
@@ -172,6 +205,19 @@ def generate_session_turtle_shared_account_report(
     trend_slow_period: int = 200,
     base_portfolio_cap_pct: float = 0.90,
 ) -> dict:
+    if exposure_mult <= 0:
+        raise ValueError("exposure_mult must be positive")
+    if drawdown_trigger_1_pct < 0 or drawdown_trigger_2_pct < 0:
+        raise ValueError("drawdown triggers must be non-negative")
+    if drawdown_trigger_2_pct <= drawdown_trigger_1_pct:
+        raise ValueError("drawdown_trigger_2_pct must be greater than drawdown_trigger_1_pct")
+    if drawdown_exposure_mult_1 <= 0 or drawdown_exposure_mult_2 <= 0:
+        raise ValueError("drawdown exposure multipliers must be positive")
+    if drawdown_exposure_mult_1 > exposure_mult:
+        raise ValueError("drawdown_exposure_mult_1 must be <= exposure_mult")
+    if drawdown_exposure_mult_2 > drawdown_exposure_mult_1:
+        raise ValueError("drawdown_exposure_mult_2 must be <= drawdown_exposure_mult_1")
+
     candidates: list[dict] = []
     for combo_idx, (ticker, source, session_open) in enumerate(DEFAULT_SESSION_TURTLE_UNIVERSE):
         payload = run_session_turtle_trend_backtest(
@@ -258,6 +304,7 @@ def generate_session_turtle_shared_account_report(
                     "exit_price": round(position.exit_price, 4),
                     "shares": round(position.scaled_shares, 6),
                     "notional": round(position.scaled_position_size, 4),
+                    "entry_exposure_mult": round(position.entry_exposure_mult, 4),
                     "scale": round(position.scale, 6),
                     "entry_rel_volume": round(position.entry_rel_volume, 4),
                     "risk_model": position.risk_model,
@@ -272,7 +319,17 @@ def generate_session_turtle_shared_account_report(
             skipped_same_ticker += 1
             continue
 
-        portfolio_cap = capital * base_portfolio_cap_pct * exposure_mult
+        active_exposure_mult = _active_exposure_mult(
+            base_exposure_mult=exposure_mult,
+            capital=capital,
+            peak_capital=peak_capital,
+            use_drawdown_governor=use_drawdown_governor,
+            drawdown_trigger_1_pct=drawdown_trigger_1_pct,
+            drawdown_exposure_mult_1=drawdown_exposure_mult_1,
+            drawdown_trigger_2_pct=drawdown_trigger_2_pct,
+            drawdown_exposure_mult_2=drawdown_exposure_mult_2,
+        )
+        portfolio_cap = capital * base_portfolio_cap_pct * active_exposure_mult
         used_notional = sum(position.scaled_position_size for position in open_positions)
         available_notional = max(portfolio_cap - used_notional, 0.0)
         if available_notional <= 1e-9:
@@ -303,6 +360,7 @@ def generate_session_turtle_shared_account_report(
                 risk_model=str(candidate["risk_model"]),
                 entry_rel_volume=float(candidate["entry_rel_volume"]),
                 asset_bucket=str(candidate["asset_bucket"]),
+                entry_exposure_mult=active_exposure_mult,
                 scale=scale,
                 scaled_position_size=scaled_position_size,
                 scaled_shares=float(candidate["shares"]) * scale,
@@ -338,12 +396,18 @@ def generate_session_turtle_shared_account_report(
     asset_rows = _build_asset_rows(executed_trades, total_pnl)
     bucket_counter = Counter(trade["asset_bucket"] for trade in executed_trades)
     bucket_pnl = Counter()
+    exposure_counter = Counter()
     for trade in executed_trades:
         bucket_pnl[trade["asset_bucket"]] += float(trade["net_pnl"])
+        exposure_counter[float(trade["entry_exposure_mult"])] += 1
+
+    label = f"Session Turtle Trend x{exposure_mult:g}"
+    if use_drawdown_governor:
+        label += " With DD Governor"
 
     summary = {
         "strategy_variant": "session_turtle_trend_shared_account",
-        "label": f"Session Turtle Trend x{exposure_mult:g}",
+        "label": label,
         "start_date": start_date,
         "end_date": end_date,
         "candidate_trades": len(candidates),
@@ -362,6 +426,14 @@ def generate_session_turtle_shared_account_report(
         "win_rate_pct": round((len(winning_trades) / len(executed_trades) * 100.0) if executed_trades else 0.0, 2),
         "profit_factor": round(profit_factor, 2),
         "exposure_mult": exposure_mult,
+        "use_drawdown_governor": use_drawdown_governor,
+        "drawdown_trigger_1_pct": round(drawdown_trigger_1_pct, 2),
+        "drawdown_exposure_mult_1": round(drawdown_exposure_mult_1, 4),
+        "drawdown_trigger_2_pct": round(drawdown_trigger_2_pct, 2),
+        "drawdown_exposure_mult_2": round(drawdown_exposure_mult_2, 4),
+        "entries_at_base_exposure": exposure_counter[float(exposure_mult)],
+        "entries_at_drawdown_exposure_1": exposure_counter[float(drawdown_exposure_mult_1)],
+        "entries_at_drawdown_exposure_2": exposure_counter[float(drawdown_exposure_mult_2)],
         "channel_period": channel_period,
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,

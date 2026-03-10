@@ -212,6 +212,41 @@ class CommandPersistenceTests(TestCase):
                 self.assertTrue((Path(temp_dir) / name).exists(), name)
                 self.assertGreater((Path(temp_dir) / name).stat().st_size, 0, name)
 
+    @patch("edgar.management.commands.generate_session_turtle_plots.generate_session_turtle_shared_account_report")
+    def test_generate_session_turtle_plots_forwards_drawdown_governor_settings(self, mock_report):
+        mock_report.return_value = {
+            "summary": {
+                "label": "Session Turtle Trend x2 With DD Governor",
+                "initial_capital": 1000.0,
+            },
+            "equity_curve": [
+                {"date": "2024-01-02T10:00:00", "equity": 1000.0},
+                {"date": "2024-01-10T10:00:00", "equity": 1125.0},
+            ],
+            "trades": [{"ticker": "BTC-USD"}],
+            "yearly_returns": [{"year": 2024, "pnl": 125.0}],
+            "asset_summary": [{"ticker": "BTC-USD", "pnl": 125.0}],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            call_command(
+                "generate_session_turtle_plots",
+                f"--output-dir={temp_dir}",
+                "--exposure-mult=2",
+                "--use-drawdown-governor",
+                "--drawdown-trigger-1-pct=10",
+                "--drawdown-exposure-mult-1=1.5",
+                "--drawdown-trigger-2-pct=20",
+                "--drawdown-exposure-mult-2=1.0",
+            )
+
+        self.assertEqual(mock_report.call_args.kwargs["exposure_mult"], 2.0)
+        self.assertTrue(mock_report.call_args.kwargs["use_drawdown_governor"])
+        self.assertEqual(mock_report.call_args.kwargs["drawdown_trigger_1_pct"], 10.0)
+        self.assertEqual(mock_report.call_args.kwargs["drawdown_exposure_mult_1"], 1.5)
+        self.assertEqual(mock_report.call_args.kwargs["drawdown_trigger_2_pct"], 20.0)
+        self.assertEqual(mock_report.call_args.kwargs["drawdown_exposure_mult_2"], 1.0)
+
 
 class ApiTests(TestCase):
     def setUp(self):

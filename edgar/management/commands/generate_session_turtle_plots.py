@@ -26,13 +26,49 @@ class Command(BaseCommand):
             default=2.0,
             help="Shared-account gross exposure multiplier (default: 2.0).",
         )
+        parser.add_argument(
+            "--use-drawdown-governor",
+            action="store_true",
+            help="Reduce exposure after realized drawdown thresholds are hit.",
+        )
+        parser.add_argument(
+            "--drawdown-trigger-1-pct",
+            type=float,
+            default=10.0,
+            help="First realized drawdown threshold in percent.",
+        )
+        parser.add_argument(
+            "--drawdown-exposure-mult-1",
+            type=float,
+            default=1.5,
+            help="Exposure multiplier to use after the first drawdown threshold.",
+        )
+        parser.add_argument(
+            "--drawdown-trigger-2-pct",
+            type=float,
+            default=20.0,
+            help="Second realized drawdown threshold in percent.",
+        )
+        parser.add_argument(
+            "--drawdown-exposure-mult-2",
+            type=float,
+            default=1.0,
+            help="Exposure multiplier to use after the second drawdown threshold.",
+        )
 
     def handle(self, *args, **options):
         output_dir = Path(options["output_dir"]).resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
 
         exposure_mult = float(options["exposure_mult"])
-        report = generate_session_turtle_shared_account_report(exposure_mult=exposure_mult)
+        report = generate_session_turtle_shared_account_report(
+            exposure_mult=exposure_mult,
+            use_drawdown_governor=bool(options["use_drawdown_governor"]),
+            drawdown_trigger_1_pct=float(options["drawdown_trigger_1_pct"]),
+            drawdown_exposure_mult_1=float(options["drawdown_exposure_mult_1"]),
+            drawdown_trigger_2_pct=float(options["drawdown_trigger_2_pct"]),
+            drawdown_exposure_mult_2=float(options["drawdown_exposure_mult_2"]),
+        )
         summary = report["summary"]
 
         self._write_csv(output_dir / "shared_account_summary.csv", [summary])
@@ -41,7 +77,7 @@ class Command(BaseCommand):
         self._write_csv(output_dir / "shared_account_yearly_returns.csv", report["yearly_returns"])
         self._write_csv(output_dir / "shared_account_asset_summary.csv", report["asset_summary"])
 
-        label = f"Session Turtle Trend x{exposure_mult:g}"
+        label = str(summary["label"])
         plot_equity_and_drawdown(
             report["equity_curve"],
             output_dir / "shared_account_equity_drawdown.png",
