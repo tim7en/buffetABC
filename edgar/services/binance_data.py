@@ -185,6 +185,29 @@ def _load_local_cache_payload(
     return ([bar for bar in bars if bar["timestamp"] >= cutoff], symbol)
 
 
+def load_local_binance_klines(
+    ticker: str,
+    interval: str,
+    lookback_years: float,
+    warmup_days: int,
+    market_data_symbol: str | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    payload = _load_local_cache_payload(
+        ticker=ticker,
+        interval=interval,
+        lookback_years=lookback_years,
+        warmup_days=warmup_days,
+        market_data_symbol=market_data_symbol,
+    )
+    if payload is None or not payload[0]:
+        symbol = resolve_binance_symbol(ticker=ticker, explicit_symbol=market_data_symbol)
+        raise FileNotFoundError(
+            f"No local Binance cache is available for {symbol} interval={interval}. "
+            "Expected it under cache/binance_asia_orb/."
+        )
+    return payload
+
+
 def resolve_binance_symbol(ticker: str, explicit_symbol: str | None = None) -> str:
     if explicit_symbol:
         return explicit_symbol.strip().upper()

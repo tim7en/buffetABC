@@ -283,8 +283,10 @@
                 <option value="fractal_breakout_ema200" selected>EMA200 + fractal breakout</option>
                 <option value="alligator_stoch_fractal">Alligator + Stoch fractal</option>
                 <option value="opening_shock_fade">Opening shock fade</option>
+                <option value="opening_range_breakdown_short">Opening-range breakdown short</option>
                 <option value="hourly_sfp_fvg">Hourly SFP + FVG</option>
                 <option value="session_range_breakout">Session range breakout</option>
+                <option value="asia_turtle_short">Asia Turtle short</option>
                 <option value="orb_turtle_hybrid">Opening Pressure + Turtle</option>
                 <option value="price_action_3step">3-step price action</option>
                 <option value="mtf_liquidity_flow">MTF liquidity flow</option>
@@ -394,6 +396,57 @@
               <input id="stratOpeningMaxHoldMinutes" type="number" min="30" step="15" value="180">
             </div>
           </div>
+          <div class="field-grid" id="strategyOpeningRangeBreakdownFields" style="display:none;margin-top:10px">
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownSessionOpen">Session open</label>
+              <select id="stratOrbBreakdownSessionOpen">
+                <option value="tokyo_open" selected>Tokyo open (00:00 UTC)</option>
+                <option value="hong_kong_open">Hong Kong open (01:30 UTC)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownRangeMinutes">Opening range (min)</label>
+              <input id="stratOrbBreakdownRangeMinutes" type="number" min="10" step="5" value="30">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownEntryWindowMinutes">Entry window (min)</label>
+              <input id="stratOrbBreakdownEntryWindowMinutes" type="number" min="30" step="5" value="90">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownBufferBps">Low-break buffer (bps)</label>
+              <input id="stratOrbBreakdownBufferBps" type="number" min="0" step="0.5" value="2">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownCloseBufferBps">Close-through buffer (bps)</label>
+              <input id="stratOrbBreakdownCloseBufferBps" type="number" min="0" step="0.5" value="3">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownFilterMode">Bearish filter</label>
+              <select id="stratOrbBreakdownFilterMode">
+                <option value="ema20_and_lower_highs" selected>Below EMA20 + lower highs</option>
+                <option value="below_20d_low_and_lower_highs">Below 20D low + lower highs</option>
+                <option value="below_20d_low">Below 20D low</option>
+                <option value="below_ema20">Below EMA20</option>
+                <option value="lower_highs">Lower highs</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownDailyEma">Daily EMA period</label>
+              <input id="stratOrbBreakdownDailyEma" type="number" min="5" step="1" value="20">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownLowPeriod">Low-structure period</label>
+              <input id="stratOrbBreakdownLowPeriod" type="number" min="10" step="5" value="20">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownStopBufferBps">Stop buffer (bps)</label>
+              <input id="stratOrbBreakdownStopBufferBps" type="number" min="0" step="0.5" value="5">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOrbBreakdownMaxHoldMinutes">Max hold (min)</label>
+              <input id="stratOrbBreakdownMaxHoldMinutes" type="number" min="60" step="30" value="240">
+            </div>
+          </div>
           <div class="field-grid" id="strategySessionRangeFields" style="display:none;margin-top:10px">
             <div class="field">
               <label class="muted" for="stratSessionOpen">Session open</label>
@@ -438,6 +491,53 @@
             <div class="field">
               <label class="muted" for="stratOrbMinRelVolume">Min RVOL</label>
               <input id="stratOrbMinRelVolume" type="number" min="0.5" step="0.1" value="1.0">
+            </div>
+          </div>
+          <div class="field-grid" id="strategyAsiaTurtleFields" style="display:none;margin-top:10px">
+            <div class="field">
+              <label class="muted" for="stratAsiaTurtleSessionOpen">Session open</label>
+              <select id="stratAsiaTurtleSessionOpen">
+                <option value="tokyo_open" selected>Tokyo open (00:00 UTC)</option>
+                <option value="hong_kong_open">Hong Kong open (01:30 UTC)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="muted" for="stratAsiaTurtleChannelPeriod">Breakdown channel</label>
+              <select id="stratAsiaTurtleChannelPeriod">
+                <option value="20" selected>20-day low</option>
+                <option value="55">55-day low</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="muted" for="stratAsiaTurtleExitChannelPeriod">Exit channel</label>
+              <input id="stratAsiaTurtleExitChannelPeriod" type="number" min="5" step="5" value="10">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratAsiaTurtleAtrPeriod">ATR period</label>
+              <input id="stratAsiaTurtleAtrPeriod" type="number" min="5" step="1" value="20">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratAsiaTurtleAtrStopMult">ATR stop multiple</label>
+              <input id="stratAsiaTurtleAtrStopMult" type="number" min="0.5" step="0.1" value="2.0">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratAsiaTurtleEntryWindowMinutes">Asia entry window (min)</label>
+              <input id="stratAsiaTurtleEntryWindowMinutes" type="number" min="60" step="30" value="480">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratAsiaTurtlePyramidAddAtr">Pyramid add step (ATR)</label>
+              <input id="stratAsiaTurtlePyramidAddAtr" type="number" min="0.1" step="0.1" value="0.5">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratAsiaTurtleMaxUnits">Max units</label>
+              <input id="stratAsiaTurtleMaxUnits" type="number" min="1" step="1" value="4">
+            </div>
+            <div class="field" style="align-self:end">
+              <label class="muted" for="stratAsiaTurtlePyramiding">Pyramiding</label>
+              <select id="stratAsiaTurtlePyramiding">
+                <option value="0" selected>Off</option>
+                <option value="1">On</option>
+              </select>
             </div>
           </div>
         </div>
@@ -1195,7 +1295,7 @@ function renderReplay(){
   const tr=replayState.trades[replayState.tradeIndex];
   const s=replayState.startIdx,e=replayState.pointerIdx;
   const visibleBars=replayState.bars.slice(s,e+1);
-  const showExecutionBand=["manipulation_ifvg","price_action_3step","mtf_liquidity_flow","hourly_sfp_fvg","opening_shock_fade","session_range_breakout"].includes(replayState.config.strategy_variant||"");
+  const showExecutionBand=["manipulation_ifvg","price_action_3step","mtf_liquidity_flow","hourly_sfp_fvg","opening_shock_fade","opening_range_breakdown_short","session_range_breakout"].includes(replayState.config.strategy_variant||"");
   const executionBand=showExecutionBand&&Number.isFinite(tr.zoneLow)&&Number.isFinite(tr.zoneHigh)
     ? {low:Math.min(tr.zoneLow,tr.zoneHigh),high:Math.max(tr.zoneLow,tr.zoneHigh),fill:"rgba(245,158,11,.08)",stroke:"rgba(245,158,11,.45)"}
     : null;
@@ -1443,6 +1543,16 @@ const INTRADAY_STRATEGY_GUIDES={
     ],
     terms:["opening_shock","session_vwap","break_even","chandelier"]
   },
+  opening_range_breakdown_short:{
+    title:"Opening-range breakdown short",
+    summary:"Asia-session continuation short. It defines the first opening range, requires a completed daily bearish filter, then shorts the first decisive break back below that range with the stop above the range or session VWAP.",
+    bullets:[
+      "Cleaner than a pure fade because it waits for weakness to confirm instead of trying to pick the top.",
+      "The higher-timeframe filter can require below-EMA structure, lower highs, or a fresh 20-day low break.",
+      "Still vulnerable to choppy opens that break the low, bounce, and reclaim the range."
+    ],
+    terms:["opening_range","session_vwap","break_even","chandelier"]
+  },
   hourly_sfp_fvg:{
     title:"Hourly SFP + FVG",
     summary:"Session-timed liquidity model. Bias comes from the previous two completed New York sessions, then the strategy waits for a raid of a confirmed hourly swing around the New York open and executes on the first 5m fair value gap retest in that direction.",
@@ -1463,6 +1573,16 @@ const INTRADAY_STRATEGY_GUIDES={
       "Uses wick-based invalidation on the breakout candle and can trade both long and short."
     ],
     terms:["ny_open","pre_open_range","session_breakout","break_even","chandelier"]
+  },
+  asia_turtle_short:{
+    title:"Asia Turtle short",
+    summary:"Trend-following short framework. It waits for a completed 20-day or 55-day session low break, sizes from daily ATR, and only enters or adds during the Asia session window.",
+    bullets:[
+      "This is the most robust of the three short ideas because it trades established weakness instead of early-session reversal noise.",
+      "The stop is volatility-based, and optional pyramiding adds only after the trend extends by another ATR fraction.",
+      "Best fit when you want fewer trades with more multi-session holding time."
+    ],
+    terms:["donchian","break_even","chandelier"]
   },
   orb_turtle_hybrid:{
     title:"Opening Pressure + Turtle",
@@ -1514,7 +1634,7 @@ const STRATEGY_TERM_LIBRARY={
   ny_open:{title:"New York Open",body:"This strategy anchors its trigger to the New York equity open in real `America/New_York` time, not a fixed UTC hour, so daylight-saving shifts are handled correctly."},
   pre_open_range:{title:"Pre-open Range",body:"The breakout model measures the price range immediately before the New York open. That range becomes the reference box that price must escape cleanly."},
   session_breakout:{title:"Session Breakout",body:"A trade only triggers when price closes outside the pre-open range during the opening breakout window. Entry is on the next bar, and the stop is set beyond the breakout candle wick."},
-  opening_range:{title:"Opening Range Breakdown",body:"The short leg watches the first U.S. cash-session range, then only acts on the first decisive close below that box. The stop sits above the breakdown wick or OR high, whichever is tighter against the position."},
+  opening_range:{title:"Opening Range Breakdown",body:"The short leg watches the first range of the selected session open, then only acts on the first decisive close below that box. The stop sits above the breakdown wick or the opening range high, whichever is tighter against the position."},
   donchian:{title:"Turtle Donchian Breakout",body:"The long leg waits for a completed 15m bar to close above the highest high of the prior 200 completed 15m bars. That breakout is only one gate in the stack; the trade also requires the New York window, EMA filter, positive 5-day slope, and RVOL confirmation. Entry is on the next execution bar, so the breakout is confirmed before the trade exists."},
   rvol:{title:"Relative Volume",body:"RVOL is current bar volume divided by its moving average. Here it confirms that the 15m breakout is happening with enough participation instead of drifting through the level."},
   portfolio_gate:{title:"Portfolio Gate",body:"If the recent combined U.S. and Asia-session trade performance drops below threshold, new risk is cut in half. The short side also has an extra meta-gate that cuts risk after recent short losses."},
@@ -1544,6 +1664,14 @@ function renderStrategyGuide(){
     const intervalEl=document.getElementById("stratIntradayInterval");
     if(intervalEl.value!=="5m")intervalEl.value="5m";
   }
+  if(isIntraday&&variant==="opening_range_breakdown_short"){
+    const intervalEl=document.getElementById("stratIntradayInterval");
+    if(intervalEl.value!=="5m")intervalEl.value="5m";
+  }
+  if(isIntraday&&variant==="asia_turtle_short"){
+    const intervalEl=document.getElementById("stratIntradayInterval");
+    if(!["5m","15m"].includes(intervalEl.value))intervalEl.value="15m";
+  }
   if(isIntraday&&variant==="orb_turtle_hybrid"){
     const intervalEl=document.getElementById("stratIntradayInterval");
     if(!["5m","15m"].includes(intervalEl.value))intervalEl.value="5m";
@@ -1557,6 +1685,10 @@ function renderStrategyGuide(){
       breakoutHelp="Require a cleaner close through the last confirmed fractal swing before the entry is accepted.";
     }else if(variant==="opening_shock_fade"){
       breakoutHelp="Requires a deeper close back below the opening-range midpoint and session VWAP before the short is allowed.";
+    }else if(variant==="opening_range_breakdown_short"){
+      breakoutHelp="Requires a clearer close through the opening-range low before the short is allowed, so weak undercuts are ignored.";
+    }else if(variant==="asia_turtle_short"){
+      breakoutHelp="Adds a small buffer below the 20-day or 55-day breakdown level before the trend short arms.";
     }else if(variant==="hourly_sfp_fvg"){
       breakoutHelp="Adds a stricter reclaim buffer on the hourly swing-failure and the FVG retest, so the NY-open reversal has to prove itself more clearly.";
     }else if(variant==="session_range_breakout"){
@@ -1578,11 +1710,13 @@ function renderStrategyGuide(){
   document.getElementById("strategyFractalCard").style.display=isIntraday?"none":"";
   document.getElementById("strategyHourlySfpFields").style.display=isIntraday&&variant==="hourly_sfp_fvg"?"grid":"none";
   document.getElementById("strategyOpeningShockFields").style.display=isIntraday&&variant==="opening_shock_fade"?"grid":"none";
+  document.getElementById("strategyOpeningRangeBreakdownFields").style.display=isIntraday&&variant==="opening_range_breakdown_short"?"grid":"none";
   document.getElementById("strategySessionRangeFields").style.display=isIntraday&&variant==="session_range_breakout"?"grid":"none";
+  document.getElementById("strategyAsiaTurtleFields").style.display=isIntraday&&variant==="asia_turtle_short"?"grid":"none";
   document.getElementById("strategyOrbTurtleFields").style.display=isIntraday&&variant==="orb_turtle_hybrid"?"grid":"none";
   document.getElementById("strategyHourlyTargetCard").style.display=isIntraday&&["hourly_sfp_fvg","session_range_breakout"].includes(variant)?"":"none";
   document.getElementById("strategyOrbTurtleRiskFields").style.display=isIntraday&&variant==="orb_turtle_hybrid"?"grid":"none";
-  document.getElementById("stratEntrySessionField").style.display=isIntraday&&["hourly_sfp_fvg","opening_shock_fade","session_range_breakout","orb_turtle_hybrid"].includes(variant)?"none":"";
+  document.getElementById("stratEntrySessionField").style.display=isIntraday&&["hourly_sfp_fvg","opening_shock_fade","opening_range_breakdown_short","session_range_breakout","asia_turtle_short","orb_turtle_hybrid"].includes(variant)?"none":"";
   document.getElementById("stratModeSummary").textContent=isIntraday
     ? "Intraday / MTF mode uses confirmed-pivot, next-bar execution logic. No future bars are used for zone confirmation or entries. Use Binance when you need multi-year crypto history on 5m, 15m, or 60m bars."
     : "Daily swing mode uses end-of-day candles and longer history windows. Fractal controls here refer to confirmed daily swing highs and lows.";
@@ -1625,11 +1759,30 @@ async function runStrategy(){
   const minShockAtr=Number(document.getElementById("stratMinShockAtr").value||0.8);
   const openingStopBufferBps=Number(document.getElementById("stratOpeningStopBufferBps").value||5);
   const openingMaxHoldMinutes=Number(document.getElementById("stratOpeningMaxHoldMinutes").value||180);
+  const orbBreakdownSessionOpen=document.getElementById("stratOrbBreakdownSessionOpen").value;
+  const orbBreakdownRangeMinutes=Number(document.getElementById("stratOrbBreakdownRangeMinutes").value||30);
+  const orbBreakdownEntryWindowMinutes=Number(document.getElementById("stratOrbBreakdownEntryWindowMinutes").value||90);
+  const orbBreakdownBufferBps=Number(document.getElementById("stratOrbBreakdownBufferBps").value||2);
+  const orbBreakdownCloseBufferBps=Number(document.getElementById("stratOrbBreakdownCloseBufferBps").value||3);
+  const orbBreakdownFilterMode=document.getElementById("stratOrbBreakdownFilterMode").value;
+  const orbBreakdownDailyEma=Number(document.getElementById("stratOrbBreakdownDailyEma").value||20);
+  const orbBreakdownLowPeriod=Number(document.getElementById("stratOrbBreakdownLowPeriod").value||20);
+  const orbBreakdownStopBufferBps=Number(document.getElementById("stratOrbBreakdownStopBufferBps").value||5);
+  const orbBreakdownMaxHoldMinutes=Number(document.getElementById("stratOrbBreakdownMaxHoldMinutes").value||240);
   const sessionOpen=document.getElementById("stratSessionOpen").value;
   const rangeLookbackMinutes=Number(document.getElementById("stratRangeLookbackMinutes").value||180);
   const breakoutWindowMinutes=Number(document.getElementById("stratBreakoutWindowMinutes").value||90);
   const rangeBreakoutBufferBps=Number(document.getElementById("stratRangeBreakoutBufferBps").value||0);
   const rangeStopBufferBps=Number(document.getElementById("stratRangeStopBufferBps").value||5);
+  const asiaTurtleSessionOpen=document.getElementById("stratAsiaTurtleSessionOpen").value;
+  const asiaTurtleChannelPeriod=Number(document.getElementById("stratAsiaTurtleChannelPeriod").value||20);
+  const asiaTurtleExitChannelPeriod=Number(document.getElementById("stratAsiaTurtleExitChannelPeriod").value||10);
+  const asiaTurtleAtrPeriod=Number(document.getElementById("stratAsiaTurtleAtrPeriod").value||20);
+  const asiaTurtleAtrStopMult=Number(document.getElementById("stratAsiaTurtleAtrStopMult").value||2.0);
+  const asiaTurtleEntryWindowMinutes=Number(document.getElementById("stratAsiaTurtleEntryWindowMinutes").value||480);
+  const asiaTurtlePyramiding=document.getElementById("stratAsiaTurtlePyramiding").value==="1";
+  const asiaTurtlePyramidAddAtr=Number(document.getElementById("stratAsiaTurtlePyramidAddAtr").value||0.5);
+  const asiaTurtleMaxUnits=Number(document.getElementById("stratAsiaTurtleMaxUnits").value||4);
   const orbWindowMinutes=Number(document.getElementById("stratOrbWindowMinutes").value||15);
   const orbEntryWindowMinutes=Number(document.getElementById("stratOrbEntryWindowMinutes").value||120);
   const donchianPeriod=Number(document.getElementById("stratDonchianPeriod").value||200);
@@ -1648,10 +1801,12 @@ async function runStrategy(){
   const chandelierAtrPeriod=Number(document.getElementById("stratChandelierAtrPeriod").value||22);
   const chandelierAtrMult=Number(document.getElementById("stratChandelierAtrMult").value||3);
   const exitFillPolicy=document.getElementById("stratExitFillPolicy").value;
-  const variantUsesLocalBinance=intradayVariant==="opening_shock_fade";
+  const variantUsesLocalBinance=["opening_shock_fade","opening_range_breakdown_short","asia_turtle_short"].includes(intradayVariant);
   const resolvedDataSource=variantUsesLocalBinance?"binance":resolveStrategyDataSource(dataSourceChoice, tk);
   const resolvedDataSymbol=resolvedDataSource==="binance"?deriveBinanceSymbol(tk):null;
-  const resolvedIntradayInterval=variantUsesLocalBinance?"5m":(resolvedDataSource==="binance"&&intradayInterval==="90m"?"60m":intradayInterval);
+  const resolvedIntradayInterval=intradayVariant==="asia_turtle_short"
+    ? (["5m","15m"].includes(intradayInterval)?intradayInterval:"15m")
+    : (variantUsesLocalBinance?"5m":(resolvedDataSource==="binance"&&intradayInterval==="90m"?"60m":intradayInterval));
   const btn=document.getElementById("stratRunBtn");
   btn.disabled=true;btn.textContent="Running...";
   try{
@@ -1763,6 +1918,40 @@ async function runStrategy(){
           commission_bps:1.0,
           exit_fill_policy:exitFillPolicy
         }
+      : intradayVariant==="opening_range_breakdown_short"
+      ? {
+          ticker:tk,
+          initial_capital:capital,
+          interval:"5m",
+          lookback_years:intradayYears,
+          strategy_variant:intradayVariant,
+          market_data_source:"binance",
+          market_data_symbol:resolvedDataSymbol,
+          session_open:orbBreakdownSessionOpen,
+          opening_range_minutes:orbBreakdownRangeMinutes,
+          entry_window_minutes:orbBreakdownEntryWindowMinutes,
+          breakdown_buffer_bps:orbBreakdownBufferBps,
+          breakdown_close_buffer_bps:orbBreakdownCloseBufferBps,
+          require_wick_retest:true,
+          retest_tolerance_bps:fractalBreakout?7:5,
+          trend_filter_mode:orbBreakdownFilterMode,
+          daily_ema_period:orbBreakdownDailyEma,
+          lookback_low_period:orbBreakdownLowPeriod,
+          stop_buffer_bps:orbBreakdownStopBufferBps,
+          rr_multiple:2.0,
+          max_hold_minutes:orbBreakdownMaxHoldMinutes,
+          use_break_even_stop:useBreakEven,
+          break_even_trigger_r:breakEvenTriggerR,
+          use_chandelier_exit:useChandelier,
+          chandelier_period:chandelierPeriod,
+          chandelier_atr_period:chandelierAtrPeriod,
+          chandelier_atr_mult:chandelierAtrMult,
+          allow_shorts:allowShorts,
+          allow_longs:true,
+          slippage_bps:2.0,
+          commission_bps:1.0,
+          exit_fill_policy:exitFillPolicy
+        }
       : intradayVariant==="hourly_sfp_fvg"
       ? {
           ticker:tk,
@@ -1828,6 +2017,36 @@ async function runStrategy(){
           chandelier_period:chandelierPeriod,
           chandelier_atr_period:chandelierAtrPeriod,
           chandelier_atr_mult:chandelierAtrMult,
+          exit_fill_policy:exitFillPolicy
+        }
+      : intradayVariant==="asia_turtle_short"
+      ? {
+          ticker:tk,
+          initial_capital:capital,
+          interval:resolvedIntradayInterval,
+          lookback_years:intradayYears,
+          strategy_variant:intradayVariant,
+          market_data_source:"binance",
+          market_data_symbol:resolvedDataSymbol,
+          session_open:asiaTurtleSessionOpen,
+          channel_period:asiaTurtleChannelPeriod,
+          exit_channel_period:asiaTurtleExitChannelPeriod,
+          atr_period:asiaTurtleAtrPeriod,
+          atr_stop_mult:asiaTurtleAtrStopMult,
+          entry_window_minutes:asiaTurtleEntryWindowMinutes,
+          enable_pyramiding:asiaTurtlePyramiding,
+          pyramid_add_atr:asiaTurtlePyramidAddAtr,
+          max_units:asiaTurtleMaxUnits,
+          use_break_even_stop:useBreakEven,
+          break_even_trigger_r:breakEvenTriggerR,
+          use_chandelier_exit:useChandelier,
+          chandelier_period:chandelierPeriod,
+          chandelier_atr_period:chandelierAtrPeriod,
+          chandelier_atr_mult:chandelierAtrMult,
+          allow_shorts:allowShorts,
+          allow_longs:true,
+          slippage_bps:2.0,
+          commission_bps:1.0,
           exit_fill_policy:exitFillPolicy
         }
       : intradayVariant==="orb_turtle_hybrid"

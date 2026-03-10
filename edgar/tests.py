@@ -924,6 +924,144 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_opening_shock.call_args.kwargs["max_hold_minutes"], 150)
         self.assertEqual(mock_opening_shock.call_args.kwargs["slippage_bps"], 2.0)
 
+    @patch("edgar.services.opening_range_breakdown_strategy.run_opening_range_breakdown_backtest")
+    def test_strategy_intraday_endpoint_opening_range_breakdown_short_variant(self, mock_orb_breakdown):
+        mock_orb_breakdown.return_value = {
+            "ticker": "BTC-USD",
+            "data_mode": "intraday",
+            "interval": "5m",
+            "strategy_variant": "opening_range_breakdown_short",
+            "entry_session": "tokyo_open",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10040,
+            "total_return_pct": 0.4,
+            "total_trades": 7,
+            "long_trades": 0,
+            "short_trades": 7,
+            "winning_trades": 3,
+            "losing_trades": 4,
+            "win_rate": 42.9,
+            "max_drawdown_pct": 1.8,
+            "profit_factor": 1.1,
+            "cagr_pct": 0.2,
+            "avg_trade_return_pct": 0.1,
+            "exposure_pct": 2.0,
+            "total_fees": 3.1,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "BTC-USD",
+            "initial_capital": 10000,
+            "interval": "5m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "opening_range_breakdown_short",
+            "market_data_source": "binance",
+            "session_open": "hong_kong_open",
+            "opening_range_minutes": 25,
+            "entry_window_minutes": 80,
+            "breakdown_buffer_bps": 4.0,
+            "breakdown_close_buffer_bps": 6.0,
+            "require_wick_retest": True,
+            "retest_tolerance_bps": 7.0,
+            "trend_filter_mode": "below_20d_low_and_lower_highs",
+            "daily_ema_period": 18,
+            "lookback_low_period": 20,
+            "max_hold_minutes": 210,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "BTC-USD")
+        self.assertEqual(payload["strategy_variant"], "opening_range_breakdown_short")
+        mock_orb_breakdown.assert_called_once()
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["market_data_source"], "binance")
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["session_open"], "hong_kong_open")
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["opening_range_minutes"], 25)
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["entry_window_minutes"], 80)
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["breakdown_buffer_bps"], 4.0)
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["breakdown_close_buffer_bps"], 6.0)
+        self.assertTrue(mock_orb_breakdown.call_args.kwargs["require_wick_retest"])
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["retest_tolerance_bps"], 7.0)
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["trend_filter_mode"], "below_20d_low_and_lower_highs")
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["daily_ema_period"], 18)
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["lookback_low_period"], 20)
+        self.assertEqual(mock_orb_breakdown.call_args.kwargs["max_hold_minutes"], 210)
+
+    @patch("edgar.services.asia_turtle_short_strategy.run_asia_turtle_short_backtest")
+    def test_strategy_intraday_endpoint_asia_turtle_short_variant(self, mock_turtle_short):
+        mock_turtle_short.return_value = {
+            "ticker": "ETH-USD",
+            "data_mode": "intraday",
+            "interval": "15m",
+            "strategy_variant": "asia_turtle_short",
+            "entry_session": "tokyo_open",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10120,
+            "total_return_pct": 1.2,
+            "total_trades": 5,
+            "long_trades": 0,
+            "short_trades": 5,
+            "winning_trades": 2,
+            "losing_trades": 3,
+            "win_rate": 40.0,
+            "max_drawdown_pct": 2.4,
+            "profit_factor": 1.3,
+            "cagr_pct": 0.6,
+            "avg_trade_return_pct": 0.4,
+            "exposure_pct": 14.0,
+            "total_fees": 2.5,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "ETH-USD",
+            "initial_capital": 10000,
+            "interval": "15m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "asia_turtle_short",
+            "market_data_source": "binance",
+            "session_open": "tokyo_open",
+            "channel_period": 55,
+            "exit_channel_period": 20,
+            "atr_period": 21,
+            "atr_stop_mult": 2.2,
+            "entry_window_minutes": 360,
+            "enable_pyramiding": True,
+            "pyramid_add_atr": 0.6,
+            "max_units": 3,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "ETH-USD")
+        self.assertEqual(payload["strategy_variant"], "asia_turtle_short")
+        mock_turtle_short.assert_called_once()
+        self.assertEqual(mock_turtle_short.call_args.kwargs["market_data_source"], "binance")
+        self.assertEqual(mock_turtle_short.call_args.kwargs["session_open"], "tokyo_open")
+        self.assertEqual(mock_turtle_short.call_args.kwargs["channel_period"], 55)
+        self.assertEqual(mock_turtle_short.call_args.kwargs["exit_channel_period"], 20)
+        self.assertEqual(mock_turtle_short.call_args.kwargs["atr_period"], 21)
+        self.assertEqual(mock_turtle_short.call_args.kwargs["atr_stop_mult"], 2.2)
+        self.assertEqual(mock_turtle_short.call_args.kwargs["entry_window_minutes"], 360)
+        self.assertTrue(mock_turtle_short.call_args.kwargs["enable_pyramiding"])
+        self.assertEqual(mock_turtle_short.call_args.kwargs["pyramid_add_atr"], 0.6)
+        self.assertEqual(mock_turtle_short.call_args.kwargs["max_units"], 3)
+
     @patch("edgar.services.orb_turtle_hybrid_strategy.run_orb_turtle_hybrid_backtest")
     def test_strategy_intraday_endpoint_orb_turtle_variant(self, mock_orb_turtle):
         mock_orb_turtle.return_value = {
@@ -1500,6 +1638,51 @@ class BinanceDataTests(TestCase):
         self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
         self.assertEqual(payload["strategy_variant"], "opening_shock_fade")
         self.assertEqual(payload["market_data_path"], str(cache_file))
+        self.assertGreater(payload["bar_count"], 0)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertEqual(payload["short_trades"], payload["total_trades"])
+        self.assertEqual(payload["trades"][0]["direction"], "short")
+
+    def test_opening_range_breakdown_uses_real_local_cache_data(self):
+        from edgar.services.opening_range_breakdown_strategy import run_opening_range_breakdown_backtest
+
+        self._require_real_local_cache("BTCUSDT")
+        payload = run_opening_range_breakdown_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=0.5,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_binance_cache")
+        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
+        self.assertEqual(payload["strategy_variant"], "opening_range_breakdown_short")
+        self.assertGreater(payload["bar_count"], 0)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertEqual(payload["short_trades"], payload["total_trades"])
+        self.assertEqual(payload["trades"][0]["direction"], "short")
+
+    def test_asia_turtle_short_uses_real_local_cache_data(self):
+        from edgar.services.asia_turtle_short_strategy import run_asia_turtle_short_backtest
+
+        self._require_real_local_cache("BTCUSDT")
+        payload = run_asia_turtle_short_backtest(
+            ticker="BTC-USD",
+            interval="15m",
+            lookback_years=1.0,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            channel_period=20,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_binance_cache")
+        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
+        self.assertEqual(payload["strategy_variant"], "asia_turtle_short")
         self.assertGreater(payload["bar_count"], 0)
         self.assertGreater(payload["total_trades"], 0)
         self.assertEqual(payload["short_trades"], payload["total_trades"])
