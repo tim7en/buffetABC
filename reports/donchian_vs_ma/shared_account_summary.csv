@@ -1,0 +1,6 @@
+scenario_id,label,start_date,end_date,candidate_signals,executed_trades,long_trades,short_trades,skipped_same_ticker,skipped_no_capacity,final_equity,total_return_pct,cagr_pct,max_realized_drawdown_pct
+donchian_20_plus_ma,Donchian 20 + 4h EMA Filter,2022-02-20T03:35:00,2026-03-02T16:25:00,514,137,81,56,49,328,5866.94,486.69,55.14,19.45
+donchian_55_plus_ma,Donchian 55 + 4h EMA Filter,2022-05-02T13:50:00,2026-02-27T20:55:00,294,68,36,32,31,195,3508.23,250.82,38.83,28.93
+ma_cross_55_200,EMA 55/200 Cross,2022-02-09T16:05:00,2026-02-27T20:55:00,507,141,69,72,104,262,3410.69,241.07,35.39,26.35
+donchian_20_pure,Donchian 20,2022-02-20T03:35:00,2026-03-02T16:25:00,738,167,93,74,48,523,1622.4,62.24,12.76,44.07
+donchian_55_pure,Donchian 55,2022-05-02T13:50:00,2026-02-27T20:55:00,320,79,39,40,28,213,1619.22,61.92,13.43,29.24

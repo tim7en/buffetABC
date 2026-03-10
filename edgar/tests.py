@@ -1898,6 +1898,58 @@ class BinanceDataTests(TestCase):
         self.assertGreater(payload["total_trades"], 0)
         self.assertEqual(payload["trades"][0]["stop_source"], "fixed_pct_stop")
 
+    def test_session_ma_crossover_uses_real_local_cache_data(self):
+        from edgar.services.session_ma_crossover_strategy import run_session_ma_crossover_backtest
+
+        self._require_real_local_cache("BTCUSDT")
+        payload = run_session_ma_crossover_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=2.0,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            trend_fast_period=55,
+            trend_slow_period=200,
+            fixed_stop_pct=0.10,
+            base_risk_pct=0.05,
+            max_position_pct=0.90,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_binance_cache")
+        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
+        self.assertEqual(payload["strategy_variant"], "session_ma_crossover")
+        self.assertEqual(payload["trend_fast_period"], 55)
+        self.assertEqual(payload["trend_slow_period"], 200)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertGreater(payload["long_trades"], 0)
+        self.assertGreater(payload["short_trades"], 0)
+
+    def test_session_ma_crossover_uses_real_tiingo_cache_data(self):
+        from edgar.services.session_ma_crossover_strategy import run_session_ma_crossover_backtest
+
+        cache_file = self._require_real_tiingo_cache("COIN")
+        payload = run_session_ma_crossover_backtest(
+            ticker="COIN",
+            interval="5m",
+            lookback_years=2.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            trend_fast_period=55,
+            trend_slow_period=200,
+            fixed_stop_pct=0.10,
+            base_risk_pct=0.05,
+            max_position_pct=0.90,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_tiingo_cache")
+        self.assertEqual(payload["market_data_path"], str(cache_file))
+        self.assertEqual(payload["strategy_variant"], "session_ma_crossover")
+        self.assertEqual(payload["trend_fast_period"], 55)
+        self.assertEqual(payload["trend_slow_period"], 200)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertGreater(payload["long_trades"], 0)
+        self.assertGreater(payload["short_trades"], 0)
+
     def test_session_sfp_strategy_binance_source_path(self):
         from edgar.services.session_sfp_fvg_strategy import run_session_sfp_fvg_backtest
 
