@@ -573,6 +573,7 @@ class StrategyViewSet(viewsets.ViewSet):
         from edgar.services.market_mechanics_strategy import run_market_mechanics_backtest
         from edgar.services.manipulation_strategy import run_manipulation_backtest
         from edgar.services.mtf_liquidity_flow_strategy import run_mtf_liquidity_flow_backtest
+        from edgar.services.opening_shock_fade_strategy import run_opening_shock_fade_backtest
         from edgar.services.orb_turtle_hybrid_strategy import run_orb_turtle_hybrid_backtest
         from edgar.services.session_range_breakout_strategy import run_session_range_breakout_backtest
         from edgar.services.session_sfp_fvg_strategy import run_session_sfp_fvg_backtest
@@ -671,6 +672,41 @@ class StrategyViewSet(viewsets.ViewSet):
                     max_position_pct=float(request.data.get("max_position_pct", 0.30)),
                     slippage_bps=float(request.data.get("slippage_bps", 4.0)),
                     commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    use_break_even_stop=use_break_even_stop,
+                    break_even_trigger_r=break_even_trigger_r,
+                    use_chandelier_exit=use_chandelier_exit,
+                    chandelier_period=chandelier_period,
+                    chandelier_atr_period=chandelier_atr_period,
+                    chandelier_atr_mult=chandelier_atr_mult,
+                    exit_fill_policy=exit_fill_policy,
+                )
+            elif strategy_variant == "opening_shock_fade":
+                payload = run_opening_shock_fade_backtest(
+                    ticker=ticker,
+                    initial_capital=capital,
+                    interval=interval,
+                    lookback_years=lookback_years,
+                    market_data_source=(request.data.get("market_data_source") or "binance").strip().lower(),
+                    market_data_symbol=(request.data.get("market_data_symbol") or "").strip().upper() or None,
+                    session_open=(request.data.get("session_open") or "tokyo_open").strip().lower(),
+                    opening_range_minutes=int(request.data.get("opening_range_minutes", 15)),
+                    shock_window_minutes=int(request.data.get("shock_window_minutes", 30)),
+                    entry_window_minutes=int(request.data.get("entry_window_minutes", 60)),
+                    min_shock_bps=float(request.data.get("min_shock_bps", 35.0)),
+                    min_shock_atr_mult=float(request.data.get("min_shock_atr_mult", 0.8)),
+                    reclaim_buffer_bps=float(request.data.get("reclaim_buffer_bps", 0.0)),
+                    shock_atr_period=int(request.data.get("shock_atr_period", 20)),
+                    volume_period=int(request.data.get("volume_period", 40)),
+                    use_volume_filter=_as_bool(request.data.get("use_volume_filter"), False),
+                    min_rel_volume=float(request.data.get("min_rel_volume", 1.0)),
+                    base_risk_pct=float(request.data.get("base_risk_pct", 0.01)),
+                    max_position_pct=float(request.data.get("max_position_pct", 0.30)),
+                    stop_buffer_bps=float(request.data.get("stop_buffer_bps", 5.0)),
+                    max_hold_minutes=int(request.data.get("max_hold_minutes", 180)),
+                    slippage_bps=float(request.data.get("slippage_bps", 2.0)),
+                    commission_bps=float(request.data.get("commission_bps", 1.0)),
+                    allow_longs=allow_longs,
+                    allow_shorts=allow_shorts,
                     use_break_even_stop=use_break_even_stop,
                     break_even_trigger_r=break_even_trigger_r,
                     use_chandelier_exit=use_chandelier_exit,

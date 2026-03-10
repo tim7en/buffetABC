@@ -282,6 +282,7 @@
               <select id="stratIntradayVariant">
                 <option value="fractal_breakout_ema200" selected>EMA200 + fractal breakout</option>
                 <option value="alligator_stoch_fractal">Alligator + Stoch fractal</option>
+                <option value="opening_shock_fade">Opening shock fade</option>
                 <option value="hourly_sfp_fvg">Hourly SFP + FVG</option>
                 <option value="session_range_breakout">Session range breakout</option>
                 <option value="orb_turtle_hybrid">Opening Pressure + Turtle</option>
@@ -323,7 +324,7 @@
               </select>
             </div>
           </div>
-          <p class="muted" style="margin:10px 0 0">Yahoo supports only short lower-timeframe windows. Binance supports multi-year crypto intraday history for supported pairs like `BTCUSDT`, `ETHUSDT`, and `PAXGUSDT`. Repeated Binance 5m requests are cached locally so you do not re-download the same bars every run.</p>
+          <p class="muted" style="margin:10px 0 0">Yahoo supports only short lower-timeframe windows. Binance supports multi-year crypto intraday history for supported pairs like `BTCUSDT`, `ETHUSDT`, `PAXGUSDT`, and `SOLUSDT`. The opening-shock fade model reads the existing local Binance cache files directly instead of pulling fresh network data.</p>
         </div>
 
         <div class="panel-group">
@@ -354,6 +355,43 @@
             <div class="field">
               <label class="muted" for="stratWickStopBufferBps">Wick stop buffer (bps)</label>
               <input id="stratWickStopBufferBps" type="number" min="0" step="0.5" value="5">
+            </div>
+          </div>
+          <div class="field-grid" id="strategyOpeningShockFields" style="display:none;margin-top:10px">
+            <div class="field">
+              <label class="muted" for="stratOpeningShockSessionOpen">Session open</label>
+              <select id="stratOpeningShockSessionOpen">
+                <option value="tokyo_open" selected>Tokyo open (00:00 UTC)</option>
+                <option value="hong_kong_open">Hong Kong open (01:30 UTC)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOpeningRangeMinutes">Opening range (min)</label>
+              <input id="stratOpeningRangeMinutes" type="number" min="5" step="5" value="15">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratShockWindowMinutes">Shock window (min)</label>
+              <input id="stratShockWindowMinutes" type="number" min="10" step="5" value="30">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOpeningEntryWindowMinutes">Entry window (min)</label>
+              <input id="stratOpeningEntryWindowMinutes" type="number" min="15" step="5" value="60">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratMinShockBps">Min shock (bps)</label>
+              <input id="stratMinShockBps" type="number" min="5" step="5" value="35">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratMinShockAtr">Min shock (ATR x)</label>
+              <input id="stratMinShockAtr" type="number" min="0.1" step="0.1" value="0.8">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOpeningStopBufferBps">Spike stop buffer (bps)</label>
+              <input id="stratOpeningStopBufferBps" type="number" min="0" step="0.5" value="5">
+            </div>
+            <div class="field">
+              <label class="muted" for="stratOpeningMaxHoldMinutes">Max hold (min)</label>
+              <input id="stratOpeningMaxHoldMinutes" type="number" min="30" step="15" value="180">
             </div>
           </div>
           <div class="field-grid" id="strategySessionRangeFields" style="display:none;margin-top:10px">
@@ -531,11 +569,12 @@
   <div id="tab-binance" class="tab-panel">
     <div class="card" style="margin-bottom:16px">
       <h2>Binance Market Calls</h2>
-      <p class="muted">Public Binance spot candles for BTC, ETH, and PAXG. Use this tab to inspect raw market structure before sending the symbol into strategy backtests.</p>
+      <p class="muted">Public Binance spot candles for BTC, ETH, PAXG, and SOL. Use this tab to inspect raw market structure before sending the symbol into strategy backtests.</p>
       <div class="row">
         <button class="secondary binance-preset-btn" data-ticker="BTC-USD">BTC</button>
         <button class="secondary binance-preset-btn" data-ticker="ETH-USD">ETH</button>
         <button class="secondary binance-preset-btn" data-ticker="PAXG-USD">PAXG</button>
+        <button class="secondary binance-preset-btn" data-ticker="SOL-USD">SOL</button>
         <input id="binanceTicker" value="BTC-USD" placeholder="Ticker or symbol" style="width:120px">
         <label class="muted">Interval</label>
         <select id="binanceInterval">
@@ -1156,7 +1195,7 @@ function renderReplay(){
   const tr=replayState.trades[replayState.tradeIndex];
   const s=replayState.startIdx,e=replayState.pointerIdx;
   const visibleBars=replayState.bars.slice(s,e+1);
-  const showExecutionBand=["manipulation_ifvg","price_action_3step","mtf_liquidity_flow","hourly_sfp_fvg","session_range_breakout"].includes(replayState.config.strategy_variant||"");
+  const showExecutionBand=["manipulation_ifvg","price_action_3step","mtf_liquidity_flow","hourly_sfp_fvg","opening_shock_fade","session_range_breakout"].includes(replayState.config.strategy_variant||"");
   const executionBand=showExecutionBand&&Number.isFinite(tr.zoneLow)&&Number.isFinite(tr.zoneHigh)
     ? {low:Math.min(tr.zoneLow,tr.zoneHigh),high:Math.max(tr.zoneLow,tr.zoneHigh),fill:"rgba(245,158,11,.08)",stroke:"rgba(245,158,11,.45)"}
     : null;
@@ -1350,6 +1389,7 @@ function deriveBinanceSymbol(ticker){
   if(t.startsWith("BTC"))return "BTCUSDT";
   if(t.startsWith("ETH"))return "ETHUSDT";
   if(t.startsWith("PAXG"))return "PAXGUSDT";
+  if(t.startsWith("SOL"))return "SOLUSDT";
   if(t.endsWith("-USD")&&t.length>4)return `${t.slice(0,-4)}USDT`;
   if(t.endsWith("USD")&&t.length>3)return `${t.slice(0,-3)}USDT`;
   return t;
@@ -1358,7 +1398,7 @@ function resolveStrategyDataSource(choice, ticker){
   const c=(choice||"auto").trim().toLowerCase();
   if(c==="binance"||c==="yfinance")return c;
   const t=(ticker||"").trim().toUpperCase();
-  if(t.startsWith("BTC")||t.startsWith("ETH")||t.startsWith("PAXG"))return "binance";
+  if(t.startsWith("BTC")||t.startsWith("ETH")||t.startsWith("PAXG")||t.startsWith("SOL"))return "binance";
   return "yfinance";
 }
 
@@ -1392,6 +1432,16 @@ const INTRADAY_STRATEGY_GUIDES={
       "Can exit earlier on alligator line failure."
     ],
     terms:["fractal","alligator","break_even","chandelier"]
+  },
+  opening_shock_fade:{
+    title:"Opening shock fade",
+    summary:"Asia-session short-only reversal model. It looks for a strong early upside burst out of the Tokyo or Hong Kong open, then shorts the failure when price loses the opening-range midpoint and session VWAP.",
+    bullets:[
+      "Built to use the existing local Binance 5-minute cache directly, so it can be tested without pulling fresh market data.",
+      "Best fit for liquid cached crypto pairs where session opens still create a visible early impulse.",
+      "This is a fade model, so it is most vulnerable on genuine trend-continuation days."
+    ],
+    terms:["opening_shock","session_vwap","break_even","chandelier"]
   },
   hourly_sfp_fvg:{
     title:"Hourly SFP + FVG",
@@ -1459,6 +1509,8 @@ const STRATEGY_TERM_LIBRARY={
   fractal:{title:"Williams Fractal",body:"A confirmed local swing pattern. A high fractal forms when the middle candle has the highest high versus candles on both sides; a low fractal is the opposite."},
   fractal_breakout:{title:"Fractal Breakout",body:"Price must close through a confirmed fractal level before the strategy acts. This reduces early entries, but also reduces trade count."},
   alligator:{title:"Alligator Alignment",body:"The alligator lines are used as a trend-state filter. When the lines are stacked and opening in one direction, the market is treated as trending."},
+  opening_shock:{title:"Opening Shock Failure",body:"The setup needs a real early-session upside burst first. The short only becomes valid after that push fails and price loses the opening-range midpoint plus the running session VWAP."},
+  session_vwap:{title:"Session VWAP",body:"VWAP is the running volume-weighted average price since the selected session open. In this model it acts as a mean-reversion line and failure filter, not as a higher-timeframe bias input."},
   ny_open:{title:"New York Open",body:"This strategy anchors its trigger to the New York equity open in real `America/New_York` time, not a fixed UTC hour, so daylight-saving shifts are handled correctly."},
   pre_open_range:{title:"Pre-open Range",body:"The breakout model measures the price range immediately before the New York open. That range becomes the reference box that price must escape cleanly."},
   session_breakout:{title:"Session Breakout",body:"A trade only triggers when price closes outside the pre-open range during the opening breakout window. Entry is on the next bar, and the stop is set beyond the breakout candle wick."},
@@ -1488,6 +1540,10 @@ function renderStrategyGuide(){
     const intervalEl=document.getElementById("stratIntradayInterval");
     if(["60m","90m"].includes(intervalEl.value))intervalEl.value="5m";
   }
+  if(isIntraday&&variant==="opening_shock_fade"){
+    const intervalEl=document.getElementById("stratIntradayInterval");
+    if(intervalEl.value!=="5m")intervalEl.value="5m";
+  }
   if(isIntraday&&variant==="orb_turtle_hybrid"){
     const intervalEl=document.getElementById("stratIntradayInterval");
     if(!["5m","15m"].includes(intervalEl.value))intervalEl.value="5m";
@@ -1499,6 +1555,8 @@ function renderStrategyGuide(){
     breakoutLabel=variant==="fractal_breakout_ema200"?"Require fractal breakout":"Use tighter breakout trigger";
     if(variant==="fractal_breakout_ema200"){
       breakoutHelp="Require a cleaner close through the last confirmed fractal swing before the entry is accepted.";
+    }else if(variant==="opening_shock_fade"){
+      breakoutHelp="Requires a deeper close back below the opening-range midpoint and session VWAP before the short is allowed.";
     }else if(variant==="hourly_sfp_fvg"){
       breakoutHelp="Adds a stricter reclaim buffer on the hourly swing-failure and the FVG retest, so the NY-open reversal has to prove itself more clearly.";
     }else if(variant==="session_range_breakout"){
@@ -1519,11 +1577,12 @@ function renderStrategyGuide(){
   document.getElementById("strategyIntradayControls").style.display=isIntraday?"":"none";
   document.getElementById("strategyFractalCard").style.display=isIntraday?"none":"";
   document.getElementById("strategyHourlySfpFields").style.display=isIntraday&&variant==="hourly_sfp_fvg"?"grid":"none";
+  document.getElementById("strategyOpeningShockFields").style.display=isIntraday&&variant==="opening_shock_fade"?"grid":"none";
   document.getElementById("strategySessionRangeFields").style.display=isIntraday&&variant==="session_range_breakout"?"grid":"none";
   document.getElementById("strategyOrbTurtleFields").style.display=isIntraday&&variant==="orb_turtle_hybrid"?"grid":"none";
   document.getElementById("strategyHourlyTargetCard").style.display=isIntraday&&["hourly_sfp_fvg","session_range_breakout"].includes(variant)?"":"none";
   document.getElementById("strategyOrbTurtleRiskFields").style.display=isIntraday&&variant==="orb_turtle_hybrid"?"grid":"none";
-  document.getElementById("stratEntrySessionField").style.display=isIntraday&&["hourly_sfp_fvg","session_range_breakout","orb_turtle_hybrid"].includes(variant)?"none":"";
+  document.getElementById("stratEntrySessionField").style.display=isIntraday&&["hourly_sfp_fvg","opening_shock_fade","session_range_breakout","orb_turtle_hybrid"].includes(variant)?"none":"";
   document.getElementById("stratModeSummary").textContent=isIntraday
     ? "Intraday / MTF mode uses confirmed-pivot, next-bar execution logic. No future bars are used for zone confirmation or entries. Use Binance when you need multi-year crypto history on 5m, 15m, or 60m bars."
     : "Daily swing mode uses end-of-day candles and longer history windows. Fractal controls here refer to confirmed daily swing highs and lows.";
@@ -1558,6 +1617,14 @@ async function runStrategy(){
   const sessionWickMinutes=Number(document.getElementById("stratSessionWickMinutes").value||60);
   const sweepBufferBps=Number(document.getElementById("stratSweepBufferBps").value||3);
   const wickStopBufferBps=Number(document.getElementById("stratWickStopBufferBps").value||5);
+  const openingShockSessionOpen=document.getElementById("stratOpeningShockSessionOpen").value;
+  const openingRangeMinutes=Number(document.getElementById("stratOpeningRangeMinutes").value||15);
+  const shockWindowMinutes=Number(document.getElementById("stratShockWindowMinutes").value||30);
+  const openingEntryWindowMinutes=Number(document.getElementById("stratOpeningEntryWindowMinutes").value||60);
+  const minShockBps=Number(document.getElementById("stratMinShockBps").value||35);
+  const minShockAtr=Number(document.getElementById("stratMinShockAtr").value||0.8);
+  const openingStopBufferBps=Number(document.getElementById("stratOpeningStopBufferBps").value||5);
+  const openingMaxHoldMinutes=Number(document.getElementById("stratOpeningMaxHoldMinutes").value||180);
   const sessionOpen=document.getElementById("stratSessionOpen").value;
   const rangeLookbackMinutes=Number(document.getElementById("stratRangeLookbackMinutes").value||180);
   const breakoutWindowMinutes=Number(document.getElementById("stratBreakoutWindowMinutes").value||90);
@@ -1581,9 +1648,10 @@ async function runStrategy(){
   const chandelierAtrPeriod=Number(document.getElementById("stratChandelierAtrPeriod").value||22);
   const chandelierAtrMult=Number(document.getElementById("stratChandelierAtrMult").value||3);
   const exitFillPolicy=document.getElementById("stratExitFillPolicy").value;
-  const resolvedDataSource=resolveStrategyDataSource(dataSourceChoice, tk);
+  const variantUsesLocalBinance=intradayVariant==="opening_shock_fade";
+  const resolvedDataSource=variantUsesLocalBinance?"binance":resolveStrategyDataSource(dataSourceChoice, tk);
   const resolvedDataSymbol=resolvedDataSource==="binance"?deriveBinanceSymbol(tk):null;
-  const resolvedIntradayInterval=resolvedDataSource==="binance"&&intradayInterval==="90m"?"60m":intradayInterval;
+  const resolvedIntradayInterval=variantUsesLocalBinance?"5m":(resolvedDataSource==="binance"&&intradayInterval==="90m"?"60m":intradayInterval);
   const btn=document.getElementById("stratRunBtn");
   btn.disabled=true;btn.textContent="Running...";
   try{
@@ -1663,6 +1731,36 @@ async function runStrategy(){
           chandelier_period:chandelierPeriod,
           chandelier_atr_period:chandelierAtrPeriod,
           chandelier_atr_mult:chandelierAtrMult,
+          exit_fill_policy:exitFillPolicy
+        }
+      : intradayVariant==="opening_shock_fade"
+      ? {
+          ticker:tk,
+          initial_capital:capital,
+          interval:"5m",
+          lookback_years:intradayYears,
+          strategy_variant:intradayVariant,
+          market_data_source:"binance",
+          market_data_symbol:resolvedDataSymbol,
+          session_open:openingShockSessionOpen,
+          opening_range_minutes:openingRangeMinutes,
+          shock_window_minutes:shockWindowMinutes,
+          entry_window_minutes:openingEntryWindowMinutes,
+          min_shock_bps:minShockBps,
+          min_shock_atr_mult:minShockAtr,
+          reclaim_buffer_bps:fractalBreakout?3:0,
+          stop_buffer_bps:openingStopBufferBps,
+          max_hold_minutes:openingMaxHoldMinutes,
+          use_break_even_stop:useBreakEven,
+          break_even_trigger_r:breakEvenTriggerR,
+          use_chandelier_exit:useChandelier,
+          chandelier_period:chandelierPeriod,
+          chandelier_atr_period:chandelierAtrPeriod,
+          chandelier_atr_mult:chandelierAtrMult,
+          allow_shorts:allowShorts,
+          allow_longs:true,
+          slippage_bps:2.0,
+          commission_bps:1.0,
           exit_fill_policy:exitFillPolicy
         }
       : intradayVariant==="hourly_sfp_fvg"

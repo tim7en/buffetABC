@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -855,6 +856,74 @@ class DrfApiTests(TestCase):
         self.assertEqual(mock_session_breakout.call_args.kwargs["breakout_buffer_bps"], 2.0)
         self.assertEqual(mock_session_breakout.call_args.kwargs["breakout_close_buffer_bps"], 5.0)
 
+    @patch("edgar.services.opening_shock_fade_strategy.run_opening_shock_fade_backtest")
+    def test_strategy_intraday_endpoint_opening_shock_fade_variant(self, mock_opening_shock):
+        mock_opening_shock.return_value = {
+            "ticker": "BTC-USD",
+            "data_mode": "intraday",
+            "interval": "5m",
+            "strategy_variant": "opening_shock_fade",
+            "entry_session": "hong_kong_open",
+            "start_date": "2024-01-01T00:00:00",
+            "end_date": "2026-01-01T00:00:00",
+            "initial_capital": 10000,
+            "final_capital": 10080,
+            "total_return_pct": 0.8,
+            "total_trades": 6,
+            "long_trades": 0,
+            "short_trades": 6,
+            "winning_trades": 4,
+            "losing_trades": 2,
+            "win_rate": 66.7,
+            "max_drawdown_pct": 1.3,
+            "profit_factor": 1.4,
+            "cagr_pct": 0.4,
+            "avg_trade_return_pct": 0.2,
+            "exposure_pct": 1.8,
+            "total_fees": 2.4,
+            "trades": [],
+            "equity_curve": [],
+        }
+        body = {
+            "ticker": "BTC-USD",
+            "initial_capital": 10000,
+            "interval": "5m",
+            "lookback_years": 2,
+            "allow_shorts": True,
+            "strategy_variant": "opening_shock_fade",
+            "market_data_source": "binance",
+            "session_open": "hong_kong_open",
+            "opening_range_minutes": 20,
+            "shock_window_minutes": 35,
+            "entry_window_minutes": 65,
+            "min_shock_bps": 40.0,
+            "min_shock_atr_mult": 0.9,
+            "reclaim_buffer_bps": 3.0,
+            "stop_buffer_bps": 6.0,
+            "max_hold_minutes": 150,
+        }
+        res = self.client.post(
+            "/api/edgar/drf/strategy/backtest-intraday/",
+            data=json.dumps(body),
+            content_type="application/json",
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.json()
+        self.assertEqual(payload["ticker"], "BTC-USD")
+        self.assertEqual(payload["strategy_variant"], "opening_shock_fade")
+        mock_opening_shock.assert_called_once()
+        self.assertEqual(mock_opening_shock.call_args.kwargs["market_data_source"], "binance")
+        self.assertEqual(mock_opening_shock.call_args.kwargs["session_open"], "hong_kong_open")
+        self.assertEqual(mock_opening_shock.call_args.kwargs["opening_range_minutes"], 20)
+        self.assertEqual(mock_opening_shock.call_args.kwargs["shock_window_minutes"], 35)
+        self.assertEqual(mock_opening_shock.call_args.kwargs["entry_window_minutes"], 65)
+        self.assertEqual(mock_opening_shock.call_args.kwargs["min_shock_bps"], 40.0)
+        self.assertEqual(mock_opening_shock.call_args.kwargs["min_shock_atr_mult"], 0.9)
+        self.assertEqual(mock_opening_shock.call_args.kwargs["reclaim_buffer_bps"], 3.0)
+        self.assertEqual(mock_opening_shock.call_args.kwargs["stop_buffer_bps"], 6.0)
+        self.assertEqual(mock_opening_shock.call_args.kwargs["max_hold_minutes"], 150)
+        self.assertEqual(mock_opening_shock.call_args.kwargs["slippage_bps"], 2.0)
+
     @patch("edgar.services.orb_turtle_hybrid_strategy.run_orb_turtle_hybrid_backtest")
     def test_strategy_intraday_endpoint_orb_turtle_variant(self, mock_orb_turtle):
         mock_orb_turtle.return_value = {
@@ -1142,6 +1211,7 @@ class BinanceDataTests(TestCase):
         self.assertEqual(resolve_binance_symbol("BTC-USD"), "BTCUSDT")
         self.assertEqual(resolve_binance_symbol("ETH-USD"), "ETHUSDT")
         self.assertEqual(resolve_binance_symbol("PAXG-USD"), "PAXGUSDT")
+        self.assertEqual(resolve_binance_symbol("SOL-USD"), "SOLUSDT")
 
     @patch("edgar.services.binance_data.fetch_binance_klines")
     def test_binance_klines_chart_endpoint(self, mock_fetch):
@@ -1424,6 +1494,42 @@ class BinanceDataTests(TestCase):
         self.assertEqual(count, 3)
         self.assertEqual(low, 98.0)
         self.assertEqual(high, 103.0)
+
+    def test_opening_shock_session_anchor_handles_hk_pre_open_crossover(self):
+        from edgar.services.opening_shock_fade_strategy import _session_anchor_for_ts
+
+        before_open = _session_anchor_for_ts(datetime(2025, 1, 2, 0, 55), "hong_kong_open")
+        after_open = _session_anchor_for_ts(datetime(2025, 1, 2, 1, 35), "hong_kong_open")
+
+        self.assertEqual(before_open, datetime(2025, 1, 1, 1, 30))
+        self.assertEqual(after_open, datetime(2025, 1, 2, 1, 30))
+
+    def test_opening_shock_fade_uses_real_local_cache_data(self):
+        from django.conf import settings
+        from edgar.services.opening_shock_fade_strategy import run_opening_shock_fade_backtest
+
+        cache_file = Path(settings.BASE_DIR) / "cache" / "binance_asia_orb" / "BTCUSDT_2022-01-01_2026-02-25_5m.csv.gz"
+        if not cache_file.exists():
+            self.skipTest("real BTCUSDT local cache file is not available")
+
+        payload = run_opening_shock_fade_backtest(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=0.25,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_binance_cache")
+        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
+        self.assertEqual(payload["strategy_variant"], "opening_shock_fade")
+        self.assertEqual(payload["market_data_path"], str(cache_file))
+        self.assertGreater(payload["bar_count"], 0)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertEqual(payload["short_trades"], payload["total_trades"])
+        self.assertEqual(payload["trades"][0]["direction"], "short")
 
     @patch("edgar.services.session_sfp_fvg_strategy._fetch_intraday_bars")
     @patch("edgar.services.session_sfp_fvg_strategy.fetch_binance_klines")
