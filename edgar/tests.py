@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -102,6 +103,114 @@ class CommandPersistenceTests(TestCase):
         doc = EdgarDocument.objects.first()
         self.assertFalse(doc.success)
         self.assertIn("boom", doc.error_message)
+
+    @patch("edgar.management.commands.generate_session_turtle_plots.generate_session_turtle_shared_account_report")
+    def test_generate_session_turtle_plots_writes_csv_and_png_outputs(self, mock_report):
+        mock_report.return_value = {
+            "summary": {
+                "strategy_variant": "session_turtle_trend_shared_account",
+                "label": "Session Turtle Trend x2",
+                "start_date": "2024-01-02T10:00:00",
+                "end_date": "2024-01-10T10:00:00",
+                "candidate_trades": 2,
+                "executed_trades": 1,
+                "long_trades": 1,
+                "short_trades": 0,
+                "winning_trades": 1,
+                "losing_trades": 0,
+                "skipped_same_ticker": 0,
+                "skipped_no_capacity": 1,
+                "initial_capital": 1000.0,
+                "final_equity": 1125.0,
+                "total_return_pct": 12.5,
+                "cagr_pct": 12.5,
+                "max_realized_drawdown_pct": 0.0,
+                "win_rate_pct": 100.0,
+                "profit_factor": 999.0,
+                "exposure_mult": 2.0,
+                "channel_period": 20,
+                "lookback_years": 4.1,
+                "base_risk_pct": 0.05,
+                "directional_volume_risk_pct": 0.07,
+                "trend_fast_period": 55,
+                "trend_slow_period": 200,
+                "crypto_trades": 1,
+                "equity_trades": 0,
+                "metals_trades": 0,
+                "crypto_pnl": 125.0,
+                "equity_pnl": 0.0,
+                "metals_pnl": 0.0,
+            },
+            "equity_curve": [
+                {"date": "2024-01-02T10:00:00", "equity": 1000.0},
+                {"date": "2024-01-10T10:00:00", "equity": 1125.0},
+            ],
+            "trades": [
+                {
+                    "ticker": "BTC-USD",
+                    "source": "binance",
+                    "session_open": "new_york_equity_open",
+                    "asset_bucket": "crypto",
+                    "direction": "long",
+                    "entry_ts": "2024-01-02T10:00:00",
+                    "exit_ts": "2024-01-10T10:00:00",
+                    "entry_price": 100.0,
+                    "exit_price": 112.5,
+                    "shares": 10.0,
+                    "notional": 1000.0,
+                    "scale": 1.0,
+                    "entry_rel_volume": 1.8,
+                    "risk_model": "directional_volume_boost",
+                    "net_pnl": 125.0,
+                    "equity_after_exit": 1125.0,
+                }
+            ],
+            "yearly_returns": [
+                {
+                    "year": 2024,
+                    "start_equity": 1000.0,
+                    "end_equity": 1125.0,
+                    "pnl": 125.0,
+                    "return_pct": 12.5,
+                    "trades": 1,
+                    "long_trades": 1,
+                    "short_trades": 0,
+                    "win_rate_pct": 100.0,
+                }
+            ],
+            "asset_summary": [
+                {
+                    "ticker": "BTC-USD",
+                    "source": "binance",
+                    "asset_bucket": "crypto",
+                    "trades": 1,
+                    "long_trades": 1,
+                    "short_trades": 0,
+                    "pnl": 125.0,
+                    "pnl_share_pct": 100.0,
+                    "long_pnl": 125.0,
+                    "short_pnl": 0.0,
+                }
+            ],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            out = StringIO()
+            call_command("generate_session_turtle_plots", f"--output-dir={temp_dir}", stdout=out)
+
+            expected = [
+                "shared_account_summary.csv",
+                "shared_account_equity_curve.csv",
+                "shared_account_trades.csv",
+                "shared_account_yearly_returns.csv",
+                "shared_account_asset_summary.csv",
+                "shared_account_equity_drawdown.png",
+                "shared_account_yearly_pnl.png",
+                "shared_account_asset_pnl.png",
+            ]
+            for name in expected:
+                self.assertTrue((Path(temp_dir) / name).exists(), name)
+                self.assertGreater((Path(temp_dir) / name).stat().st_size, 0, name)
 
 
 class ApiTests(TestCase):
