@@ -1,0 +1,11 @@
+scenario_id,year,carry_start_equity,end_equity,year_return_pct,event_count
+base_25_pyramid,2022,1000.0,1042.05,4.2,87
+base_25_pyramid,2023,1042.05,1092.46,4.84,131
+base_25_pyramid,2024,1092.46,1348.48,23.43,149
+base_25_pyramid,2025,1348.48,1325.26,-1.72,139
+base_25_pyramid,2026,1325.26,1391.42,4.99,24
+boost_25_35_pyramid,2022,1000.0,1053.73,5.37,77
+boost_25_35_pyramid,2023,1053.73,1125.94,6.85,122
+boost_25_35_pyramid,2024,1125.94,1245.54,10.62,138
+boost_25_35_pyramid,2025,1245.54,1348.11,8.24,127
+boost_25_35_pyramid,2026,1348.11,1418.37,5.21,26
