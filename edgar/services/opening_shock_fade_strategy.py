@@ -1,8 +1,9 @@
-"""Opening-shock fade short strategy using the local Binance cache.
+"""Opening-shock fade short strategy using only local real-market caches.
 
 Design:
-1) Read only the cached 5-minute Binance spot files already stored in `cache/binance_asia_orb/`.
-2) Anchor a session open at Tokyo 09:00 (00:00 UTC) or Hong Kong 09:30 (01:30 UTC).
+1) Read only the cached 5-minute local market files already stored on disk.
+2) Anchor a session open at Tokyo 09:00 (00:00 UTC), Hong Kong 09:30 (01:30 UTC),
+   or the U.S. cash open for Tiingo equities.
 3) Measure the first opening range, then require a strong upside shock in the early session.
 4) Short the failure when price loses the opening-range midpoint and the running session VWAP.
 5) Stop above the opening spike high and target the nearest lower mean-reversion level
@@ -11,7 +12,7 @@ Design:
 Notes:
 - This is intentionally a short-only research model.
 - It uses next-bar execution and never reads future bars for the trigger.
-- It is tied to the existing local Binance cache so the backtest can run without
+- It is tied to the existing local caches so the backtest can run without
   fresh network data.
 """
 
@@ -24,6 +25,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from edgar.services.binance_data import resolve_binance_symbol
+from edgar.services.local_tiingo_data import load_local_tiingo_klines
+from edgar.services.session_open_utils import (
+    SESSION_OPEN_UTC,
+    bars_per_day_24x7,
+    minutes_since_session_open as _shared_minutes_since_session_open,
+    session_anchor_for_ts as _shared_session_anchor_for_ts,
+)
 from edgar.services.strategy import (
     _atr,
     _break_even_stop_candidate,
@@ -37,12 +45,7 @@ from edgar.services.strategy import (
     _tighten_stop,
 )
 
-
-_SESSION_OPEN_UTC: dict[str, tuple[int, int]] = {
-    "tokyo_open": (0, 0),
-    "asia_open": (0, 0),
-    "hong_kong_open": (1, 30),
-}
+_SESSION_OPEN_UTC: dict[str, tuple[int, int]] = dict(SESSION_OPEN_UTC)
 
 
 @dataclass
@@ -84,10 +87,12 @@ class _Trade:
     strategy_leg: str = "opening_shock_short"
 
 
-def _bars_per_day_24x7(interval: str) -> int:
+def _bars_per_day_for_source(interval: str, source_label: str) -> int:
     if (interval or "").strip().lower() != "5m":
         raise ValueError("opening_shock_fade uses only 5m local cache data")
-    return 288
+    if source_label == "local_tiingo_cache":
+        return 78
+    return bars_per_day_24x7(interval)
 
 
 def _project_root() -> Path:
@@ -159,16 +164,58 @@ def _load_cached_binance_bars(
 
 
 def _session_anchor_for_ts(ts: datetime, session_open: str) -> datetime:
-    open_hour, open_minute = _SESSION_OPEN_UTC[session_open]
-    anchor = ts.replace(hour=open_hour, minute=open_minute, second=0, microsecond=0)
-    if (ts.hour, ts.minute) < (open_hour, open_minute):
-        anchor -= timedelta(days=1)
-    return anchor
+    return _shared_session_anchor_for_ts(ts, session_open)
 
 
 def _minutes_since_session_open(ts: datetime, session_open: str) -> int:
-    anchor = _session_anchor_for_ts(ts, session_open)
-    return int((ts - anchor).total_seconds() / 60)
+    return _shared_minutes_since_session_open(ts, session_open)
+
+
+def _load_local_bars(
+    ticker: str,
+    interval: str,
+    lookback_years: float,
+    warmup_days: int,
+    market_data_source: str,
+    market_data_symbol: str | None,
+) -> tuple[list[dict], str, str, str]:
+    source = (market_data_source or "auto").strip().lower()
+    if source in {"binance", "local_binance_cache"}:
+        bars, symbol, path = _load_cached_binance_bars(
+            ticker=ticker,
+            interval=interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+        return bars, symbol, "local_binance_cache", path
+    if source in {"tiingo", "local_tiingo_cache"}:
+        bars, symbol, path = load_local_tiingo_klines(
+            ticker=ticker,
+            interval=interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+        return bars, symbol, "local_tiingo_cache", path
+    try:
+        bars, symbol, path = _load_cached_binance_bars(
+            ticker=ticker,
+            interval=interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+        return bars, symbol, "local_binance_cache", path
+    except Exception:
+        bars, symbol, path = load_local_tiingo_klines(
+            ticker=ticker,
+            interval=interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+        return bars, symbol, "local_tiingo_cache", path
 
 
 def _session_target_candidates(
@@ -196,7 +243,7 @@ def run_opening_shock_fade_backtest(
     initial_capital: float = 10_000.0,
     interval: str = "5m",
     lookback_years: float = 2.0,
-    market_data_source: str = "binance",
+    market_data_source: str = "auto",
     market_data_symbol: str | None = None,
     session_open: str = "tokyo_open",
     opening_range_minutes: int = 15,
@@ -226,11 +273,12 @@ def run_opening_shock_fade_backtest(
     exit_fill_policy: str = "stop_first",
 ) -> dict:
     del allow_longs
-    source = (market_data_source or "binance").strip().lower()
+    source = (market_data_source or "auto").strip().lower()
     if source in {"yfinance", "yf"}:
-        raise ValueError("opening_shock_fade uses only the local Binance cache, not Yahoo Finance")
-    if session_open not in _SESSION_OPEN_UTC:
-        raise ValueError(f"session_open must be one of {sorted(_SESSION_OPEN_UTC)}")
+        raise ValueError("opening_shock_fade uses only local cached market data")
+    valid_sessions = sorted(list(_SESSION_OPEN_UTC) + ["new_york_equity_open"])
+    if session_open not in _SESSION_OPEN_UTC and session_open != "new_york_equity_open":
+        raise ValueError(f"session_open must be one of {valid_sessions}")
     if interval.strip().lower() != "5m":
         raise ValueError("opening_shock_fade requires interval='5m' because the local cache is 5-minute only")
     if not allow_shorts:
@@ -250,7 +298,7 @@ def run_opening_shock_fade_backtest(
     if chandelier_period < 2 or chandelier_atr_period < 2:
         raise ValueError("chandelier periods must be >= 2")
 
-    bars_per_day = _bars_per_day_24x7(interval)
+    preload_bars_per_day = 78
     warmup_bars = max(
         shock_atr_period * 3,
         volume_period * 2,
@@ -259,17 +307,29 @@ def run_opening_shock_fade_backtest(
         int(entry_window_minutes / 5) * 4,
         144,
     )
-    warmup_days = max(int(warmup_bars / bars_per_day) + 5, 7)
+    warmup_days = max(int(warmup_bars / preload_bars_per_day) + 5, 7)
 
-    bars, resolved_symbol, cache_path = _load_cached_binance_bars(
+    bars, resolved_symbol, resolved_source, cache_path = _load_local_bars(
         ticker=ticker,
         interval=interval,
         lookback_years=lookback_years,
         warmup_days=warmup_days,
+        market_data_source=market_data_source,
         market_data_symbol=market_data_symbol,
     )
+    if resolved_source == "local_tiingo_cache" and session_open != "new_york_equity_open":
+        raise ValueError("Local Tiingo equity cache only supports session_open='new_york_equity_open'")
+    bars_per_day = _bars_per_day_for_source(interval=interval, source_label=resolved_source)
+    warmup_bars = max(
+        shock_atr_period * 3,
+        volume_period * 2,
+        chandelier_period + 5,
+        chandelier_atr_period + 5,
+        int(entry_window_minutes / 5) * 4,
+        max(int(bars_per_day / 2), 72),
+    )
     if len(bars) < warmup_bars + 30:
-        raise ValueError(f"Insufficient cached Binance data for {ticker}: {len(bars)} bars")
+        raise ValueError(f"Insufficient cached market data for {ticker}: {len(bars)} bars")
 
     timestamps = [b["timestamp"] for b in bars]
     opens = [b["open"] for b in bars]
@@ -596,7 +656,7 @@ def run_opening_shock_fade_backtest(
         "requested_interval": interval,
         "effective_interval": "5m",
         "interval_adjustment": None,
-        "market_data_source": "local_binance_cache",
+        "market_data_source": resolved_source,
         "market_data_symbol": resolved_symbol,
         "market_data_path": cache_path,
         "strategy_variant": "opening_shock_fade",

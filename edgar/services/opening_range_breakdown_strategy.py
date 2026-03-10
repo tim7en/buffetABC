@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from edgar.services.binance_data import load_local_binance_klines
+from edgar.services.local_tiingo_data import load_local_tiingo_klines
 from edgar.services.session_open_utils import (
     SESSION_OPEN_UTC,
     aggregate_session_bars,
@@ -118,12 +119,73 @@ def _quality_from_snapshot(snapshot: dict[str, bool]) -> str:
     return "C"
 
 
+def _bars_per_day_for_source(interval: str, source_label: str) -> int:
+    if source_label == "local_tiingo_cache":
+        text = (interval or "").strip().lower()
+        if text == "5m":
+            return 78
+        if text == "15m":
+            return 26
+        if text == "30m":
+            return 13
+        if text == "60m":
+            return 7
+    return bars_per_day_24x7(interval)
+
+
+def _load_local_bars(
+    ticker: str,
+    interval: str,
+    lookback_years: float,
+    warmup_days: int,
+    market_data_source: str,
+    market_data_symbol: str | None,
+) -> tuple[list[dict], str, str, str]:
+    source = (market_data_source or "auto").strip().lower()
+    if source in {"binance", "local_binance_cache"}:
+        bars, symbol = load_local_binance_klines(
+            ticker=ticker,
+            interval=interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+        return bars, symbol, "local_binance_cache", ""
+    if source in {"tiingo", "local_tiingo_cache"}:
+        bars, symbol, path = load_local_tiingo_klines(
+            ticker=ticker,
+            interval=interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+        return bars, symbol, "local_tiingo_cache", path
+    try:
+        bars, symbol = load_local_binance_klines(
+            ticker=ticker,
+            interval=interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+        return bars, symbol, "local_binance_cache", ""
+    except Exception:
+        bars, symbol, path = load_local_tiingo_klines(
+            ticker=ticker,
+            interval=interval,
+            lookback_years=lookback_years,
+            warmup_days=warmup_days,
+            market_data_symbol=market_data_symbol,
+        )
+        return bars, symbol, "local_tiingo_cache", path
+
+
 def run_opening_range_breakdown_backtest(
     ticker: str,
     initial_capital: float = 10_000.0,
     interval: str = "5m",
     lookback_years: float = 2.0,
-    market_data_source: str = "binance",
+    market_data_source: str = "auto",
     market_data_symbol: str | None = None,
     session_open: str = "hong_kong_open",
     opening_range_minutes: int = 30,
@@ -156,11 +218,12 @@ def run_opening_range_breakdown_backtest(
     exit_fill_policy: str = "stop_first",
 ) -> dict:
     del allow_longs
-    source = (market_data_source or "binance").strip().lower()
+    source = (market_data_source or "auto").strip().lower()
     if source in {"yfinance", "yf"}:
-        raise ValueError("opening_range_breakdown_short uses only the local Binance cache")
-    if session_open not in SESSION_OPEN_UTC:
-        raise ValueError(f"session_open must be one of {sorted(SESSION_OPEN_UTC)}")
+        raise ValueError("opening_range_breakdown_short uses only local cached market data")
+    valid_sessions = sorted(list(SESSION_OPEN_UTC) + ["new_york_equity_open"])
+    if session_open not in SESSION_OPEN_UTC and session_open != "new_york_equity_open":
+        raise ValueError(f"session_open must be one of {valid_sessions}")
     if trend_filter_mode not in _VALID_FILTERS:
         raise ValueError(f"trend_filter_mode must be one of {sorted(_VALID_FILTERS)}")
     if interval.strip().lower() != "5m":
@@ -174,7 +237,19 @@ def run_opening_range_breakdown_backtest(
     if rr_multiple <= 0:
         raise ValueError("rr_multiple must be positive")
 
-    bars_per_day = bars_per_day_24x7(interval)
+    preload_warmup_days = max(daily_ema_period + lookback_low_period + 25, 60)
+
+    bars, resolved_symbol, resolved_source, market_data_path = _load_local_bars(
+        ticker=ticker,
+        interval=interval,
+        lookback_years=lookback_years,
+        warmup_days=preload_warmup_days,
+        market_data_source=market_data_source,
+        market_data_symbol=market_data_symbol,
+    )
+    bars_per_day = _bars_per_day_for_source(interval=interval, source_label=resolved_source)
+    if resolved_source == "local_tiingo_cache" and session_open != "new_york_equity_open":
+        raise ValueError("Local Tiingo equity cache only supports session_open='new_york_equity_open'")
     warmup_bars = max(
         (daily_ema_period + lookback_low_period) * bars_per_day,
         volume_period * 3,
@@ -182,17 +257,8 @@ def run_opening_range_breakdown_backtest(
         chandelier_atr_period + 10,
         1200,
     )
-    warmup_days = max(int(warmup_bars / bars_per_day) + 10, 45)
-
-    bars, resolved_symbol = load_local_binance_klines(
-        ticker=ticker,
-        interval=interval,
-        lookback_years=lookback_years,
-        warmup_days=warmup_days,
-        market_data_symbol=market_data_symbol,
-    )
     if len(bars) < warmup_bars + 30:
-        raise ValueError(f"Insufficient cached Binance data for {ticker}: {len(bars)} bars")
+        raise ValueError(f"Insufficient cached market data for {ticker}: {len(bars)} bars")
 
     timestamps = [b["timestamp"] for b in bars]
     opens = [float(b["open"]) for b in bars]
@@ -501,8 +567,9 @@ def run_opening_range_breakdown_backtest(
         "requested_interval": interval,
         "effective_interval": "5m",
         "interval_adjustment": None,
-        "market_data_source": "local_binance_cache",
+        "market_data_source": resolved_source,
         "market_data_symbol": resolved_symbol,
+        "market_data_path": market_data_path,
         "strategy_variant": "opening_range_breakdown_short",
         "bias_model": trend_filter_mode,
         "entry_session": session_open,

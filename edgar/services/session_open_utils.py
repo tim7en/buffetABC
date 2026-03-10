@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 
 SESSION_OPEN_UTC: dict[str, tuple[int, int]] = {
@@ -9,6 +10,7 @@ SESSION_OPEN_UTC: dict[str, tuple[int, int]] = {
     "asia_open": (0, 0),
     "hong_kong_open": (1, 30),
 }
+_NY_TZ = ZoneInfo("America/New_York")
 
 
 @dataclass
@@ -33,8 +35,15 @@ def bars_per_day_24x7(interval: str) -> int:
 
 
 def session_anchor_for_ts(ts: datetime, session_open: str) -> datetime:
+    if session_open == "new_york_equity_open":
+        aware_utc = ts.replace(tzinfo=timezone.utc)
+        local = aware_utc.astimezone(_NY_TZ)
+        anchor_local = local.replace(hour=9, minute=30, second=0, microsecond=0)
+        if (local.hour, local.minute) < (9, 30):
+            anchor_local -= timedelta(days=1)
+        return anchor_local.astimezone(timezone.utc).replace(tzinfo=None)
     if session_open not in SESSION_OPEN_UTC:
-        raise ValueError(f"session_open must be one of {sorted(SESSION_OPEN_UTC)}")
+        raise ValueError(f"session_open must be one of {sorted(list(SESSION_OPEN_UTC) + ['new_york_equity_open'])}")
     open_hour, open_minute = SESSION_OPEN_UTC[session_open]
     anchor = ts.replace(hour=open_hour, minute=open_minute, second=0, microsecond=0)
     if (ts.hour, ts.minute) < (open_hour, open_minute):

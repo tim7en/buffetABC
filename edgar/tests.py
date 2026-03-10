@@ -1374,6 +1374,18 @@ class BinanceDataTests(TestCase):
             self.skipTest(f"real {symbol} local cache file is not available")
         return cache_file
 
+    def _real_tiingo_cache_file(self, symbol: str) -> Path | None:
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR) / "cache" / "cache" / "tiingo" / f"{symbol}_5m.parquet"
+        return path if path.exists() else None
+
+    def _require_real_tiingo_cache(self, symbol: str) -> Path:
+        cache_file = self._real_tiingo_cache_file(symbol)
+        if cache_file is None:
+            self.skipTest(f"real {symbol} Tiingo cache file is not available")
+        return cache_file
+
     def _assert_real_binance_strategy_smoke(
         self,
         *,
@@ -1687,6 +1699,123 @@ class BinanceDataTests(TestCase):
         self.assertGreater(payload["total_trades"], 0)
         self.assertEqual(payload["short_trades"], payload["total_trades"])
         self.assertEqual(payload["trades"][0]["direction"], "short")
+
+    def test_opening_shock_fade_uses_real_tiingo_cache_data(self):
+        from edgar.services.opening_shock_fade_strategy import run_opening_shock_fade_backtest
+
+        cache_file = self._require_real_tiingo_cache("COIN")
+        payload = run_opening_shock_fade_backtest(
+            ticker="COIN",
+            interval="5m",
+            lookback_years=1.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_tiingo_cache")
+        self.assertEqual(payload["market_data_symbol"], "COIN")
+        self.assertEqual(payload["strategy_variant"], "opening_shock_fade")
+        self.assertEqual(payload["market_data_path"], str(cache_file))
+        self.assertGreater(payload["bar_count"], 0)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertEqual(payload["short_trades"], payload["total_trades"])
+        self.assertEqual(payload["trades"][0]["direction"], "short")
+
+    def test_opening_range_breakdown_uses_real_tiingo_cache_data(self):
+        from edgar.services.opening_range_breakdown_strategy import run_opening_range_breakdown_backtest
+
+        cache_file = self._require_real_tiingo_cache("MSTR")
+        payload = run_opening_range_breakdown_backtest(
+            ticker="MSTR",
+            interval="5m",
+            lookback_years=1.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_tiingo_cache")
+        self.assertEqual(payload["market_data_symbol"], "MSTR")
+        self.assertEqual(payload["strategy_variant"], "opening_range_breakdown_short")
+        self.assertEqual(payload["market_data_path"], str(cache_file))
+        self.assertGreater(payload["bar_count"], 0)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertEqual(payload["short_trades"], payload["total_trades"])
+        self.assertEqual(payload["trades"][0]["direction"], "short")
+
+    def test_asia_turtle_short_uses_real_tiingo_cache_data(self):
+        from edgar.services.asia_turtle_short_strategy import run_asia_turtle_short_backtest
+
+        cache_file = self._require_real_tiingo_cache("MSTR")
+        payload = run_asia_turtle_short_backtest(
+            ticker="MSTR",
+            interval="15m",
+            lookback_years=1.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            channel_period=20,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_tiingo_cache")
+        self.assertEqual(payload["market_data_symbol"], "MSTR")
+        self.assertEqual(payload["strategy_variant"], "asia_turtle_short")
+        self.assertEqual(payload["market_data_path"], str(cache_file))
+        self.assertGreater(payload["bar_count"], 0)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertEqual(payload["short_trades"], payload["total_trades"])
+        self.assertEqual(payload["trades"][0]["direction"], "short")
+
+    def test_session_turtle_trend_uses_real_local_cache_data(self):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        self._require_real_local_cache("BTCUSDT")
+        payload = run_session_turtle_trend_backtest(
+            ticker="BTC-USD",
+            interval="15m",
+            lookback_years=1.0,
+            market_data_source="binance",
+            session_open="tokyo_open",
+            channel_period=20,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_binance_cache")
+        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
+        self.assertEqual(payload["strategy_variant"], "session_turtle_trend")
+        self.assertGreater(payload["bar_count"], 0)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertGreater(payload["long_trades"], 0)
+        self.assertGreater(payload["short_trades"], 0)
+
+    def test_session_turtle_trend_uses_real_tiingo_cache_data(self):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        cache_file = self._require_real_tiingo_cache("COIN")
+        payload = run_session_turtle_trend_backtest(
+            ticker="COIN",
+            interval="15m",
+            lookback_years=1.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            channel_period=55,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertEqual(payload["market_data_source"], "local_tiingo_cache")
+        self.assertEqual(payload["market_data_symbol"], "COIN")
+        self.assertEqual(payload["strategy_variant"], "session_turtle_trend")
+        self.assertEqual(payload["market_data_path"], str(cache_file))
+        self.assertGreater(payload["bar_count"], 0)
+        self.assertGreater(payload["total_trades"], 0)
+        self.assertGreater(payload["long_trades"], 0)
+        self.assertGreater(payload["short_trades"], 0)
 
     def test_session_sfp_strategy_binance_source_path(self):
         from edgar.services.session_sfp_fvg_strategy import run_session_sfp_fvg_backtest
