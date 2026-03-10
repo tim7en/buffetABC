@@ -1213,6 +1213,61 @@ class BinanceDataTests(TestCase):
         self.assertEqual(resolve_binance_symbol("PAXG-USD"), "PAXGUSDT")
         self.assertEqual(resolve_binance_symbol("SOL-USD"), "SOLUSDT")
 
+    def _real_local_cache_file(self, symbol: str) -> Path | None:
+        from django.conf import settings
+
+        roots = [
+            Path(settings.BASE_DIR) / "cache" / "binance_asia_orb",
+            Path(settings.BASE_DIR) / "cache" / "cache" / "cache" / "binance_asia_orb",
+        ]
+        best_match: Path | None = None
+        for root in roots:
+            matches = sorted(root.glob(f"{symbol}_*_5m.csv.gz"))
+            if not matches:
+                continue
+            candidate = max(matches, key=lambda path: path.stat().st_size)
+            if best_match is None or candidate.stat().st_size > best_match.stat().st_size:
+                best_match = candidate
+        return best_match
+
+    def _require_real_local_cache(self, symbol: str) -> Path:
+        cache_file = self._real_local_cache_file(symbol)
+        if cache_file is None:
+            self.skipTest(f"real {symbol} local cache file is not available")
+        return cache_file
+
+    def _assert_real_binance_strategy_smoke(
+        self,
+        *,
+        runner,
+        ticker: str,
+        symbol: str,
+        yfinance_patch: str,
+        interval: str = "5m",
+        lookback_years: float = 0.1,
+        **kwargs,
+    ) -> dict:
+        self._require_real_local_cache(symbol)
+
+        with patch(yfinance_patch, side_effect=AssertionError("yfinance path should not be used")), patch(
+            "requests.sessions.Session.get",
+            side_effect=AssertionError("live Binance API should not be used when local cache exists"),
+        ):
+            payload = runner(
+                ticker=ticker,
+                interval=interval,
+                lookback_years=lookback_years,
+                market_data_source="binance",
+                auto_adjust_for_yf_limits=False,
+                **kwargs,
+            )
+
+        self.assertEqual(payload["market_data_source"], "binance")
+        self.assertEqual(payload["market_data_symbol"], symbol)
+        self.assertEqual(payload["effective_interval"], interval)
+        self.assertGreater(payload["bar_count"], 0)
+        return payload
+
     @patch("edgar.services.binance_data.fetch_binance_klines")
     def test_binance_klines_chart_endpoint(self, mock_fetch):
         start = datetime(2025, 1, 1)
@@ -1269,170 +1324,92 @@ class BinanceDataTests(TestCase):
         mock_get.side_effect = [first_response, second_response]
 
         bars1, symbol1 = fetch_binance_klines(
-            ticker="ETH-USD",
+            ticker="BNB-USD",
             interval="5m",
             lookback_years=0.1,
             warmup_days=5,
         )
         bars2, symbol2 = fetch_binance_klines(
-            ticker="ETH-USD",
+            ticker="BNB-USD",
             interval="5m",
             lookback_years=0.1,
             warmup_days=5,
         )
 
-        self.assertEqual(symbol1, "ETHUSDT")
-        self.assertEqual(symbol2, "ETHUSDT")
+        self.assertEqual(symbol1, "BNBUSDT")
+        self.assertEqual(symbol2, "BNBUSDT")
         self.assertEqual(bars1, bars2)
         self.assertEqual(mock_get.call_count, 1)
 
-    @patch("edgar.services.mtf_liquidity_flow_strategy._fetch_intraday_bars")
-    @patch("edgar.services.mtf_liquidity_flow_strategy.fetch_binance_klines")
-    def test_mtf_strategy_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+    @patch("edgar.services.binance_data.requests.Session.get")
+    def test_fetch_binance_klines_prefers_real_local_cache_when_available(self, mock_get):
+        from edgar.services.binance_data import fetch_binance_klines
+
+        self._require_real_local_cache("BTCUSDT")
+        mock_get.side_effect = AssertionError("live Binance API should not be used when local cache exists")
+
+        bars, symbol = fetch_binance_klines(
+            ticker="BTC-USD",
+            interval="5m",
+            lookback_years=0.05,
+            warmup_days=5,
+            use_cache=False,
+        )
+
+        self.assertEqual(symbol, "BTCUSDT")
+        self.assertGreater(len(bars), 0)
+        self.assertLess(bars[0]["timestamp"], bars[-1]["timestamp"])
+        self.assertEqual(mock_get.call_count, 0)
+
+    def test_mtf_strategy_binance_source_path(self):
         from edgar.services.mtf_liquidity_flow_strategy import run_mtf_liquidity_flow_backtest
 
-        start = datetime(2025, 1, 1)
-        bars = []
-        for i in range(1400):
-            ts = start + timedelta(minutes=5 * i)
-            px = 100.0 + (i * 0.01)
-            bars.append(
-                {
-                    "timestamp": ts,
-                    "open": px,
-                    "high": px + 0.2,
-                    "low": px - 0.2,
-                    "close": px + 0.05,
-                    "volume": 1000.0 + i,
-                }
-            )
-
-        mock_binance_fetch.return_value = (bars, "BTCUSDT")
-        payload = run_mtf_liquidity_flow_backtest(
+        payload = self._assert_real_binance_strategy_smoke(
+            runner=run_mtf_liquidity_flow_backtest,
             ticker="BTC-USD",
-            interval="5m",
-            lookback_years=0.1,
-            market_data_source="binance",
-            auto_adjust_for_yf_limits=False,
+            symbol="BTCUSDT",
+            yfinance_patch="edgar.services.mtf_liquidity_flow_strategy._fetch_intraday_bars",
         )
 
-        self.assertEqual(payload["market_data_source"], "binance")
-        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
-        self.assertEqual(payload["effective_interval"], "5m")
-        self.assertGreater(payload["bar_count"], 0)
-        mock_binance_fetch.assert_called_once()
-        mock_yf_fetch.assert_not_called()
+        self.assertEqual(payload["strategy_variant"], "mtf_liquidity_flow")
 
-    @patch("edgar.services.intraday_strategy._fetch_intraday_bars")
-    @patch("edgar.services.intraday_strategy.fetch_binance_klines")
-    def test_intraday_strategy_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+    def test_intraday_strategy_binance_source_path(self):
         from edgar.services.intraday_strategy import run_intraday_backtest
 
-        start = datetime(2025, 1, 1)
-        bars = []
-        for i in range(2200):
-            ts = start + timedelta(minutes=5 * i)
-            px = 100.0 + (i * 0.02)
-            bars.append(
-                {
-                    "timestamp": ts,
-                    "open": px,
-                    "high": px + 0.3,
-                    "low": px - 0.3,
-                    "close": px + 0.1,
-                    "volume": 1000.0 + i,
-                }
-            )
-
-        mock_binance_fetch.return_value = (bars, "BTCUSDT")
-        payload = run_intraday_backtest(
+        payload = self._assert_real_binance_strategy_smoke(
+            runner=run_intraday_backtest,
             ticker="BTC-USD",
-            interval="5m",
-            lookback_years=0.1,
-            market_data_source="binance",
-            auto_adjust_for_yf_limits=False,
+            symbol="BTCUSDT",
+            yfinance_patch="edgar.services.intraday_strategy._fetch_intraday_bars",
         )
 
-        self.assertEqual(payload["market_data_source"], "binance")
-        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
-        self.assertEqual(payload["effective_interval"], "5m")
-        self.assertGreater(payload["bar_count"], 0)
-        mock_binance_fetch.assert_called_once()
-        mock_yf_fetch.assert_not_called()
+        self.assertEqual(payload["strategy_variant"], "fractal_breakout_ema200")
 
-    @patch("edgar.services.session_range_breakout_strategy._fetch_intraday_bars")
-    @patch("edgar.services.session_range_breakout_strategy.fetch_binance_klines")
-    def test_session_range_breakout_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+    def test_session_range_breakout_binance_source_path(self):
         from edgar.services.session_range_breakout_strategy import run_session_range_breakout_backtest
 
-        start = datetime(2025, 1, 1)
-        bars = []
-        for i in range(2600):
-            ts = start + timedelta(minutes=5 * i)
-            px = 100.0 + ((i % 24) * 0.02)
-            bars.append(
-                {
-                    "timestamp": ts,
-                    "open": px,
-                    "high": px + 0.25,
-                    "low": px - 0.25,
-                    "close": px + (0.05 if i % 2 == 0 else -0.03),
-                    "volume": 1000.0 + (i % 40),
-                }
-            )
-
-        mock_binance_fetch.return_value = (bars, "BTCUSDT")
-        payload = run_session_range_breakout_backtest(
+        payload = self._assert_real_binance_strategy_smoke(
+            runner=run_session_range_breakout_backtest,
             ticker="BTC-USD",
-            interval="5m",
+            symbol="BTCUSDT",
+            yfinance_patch="edgar.services.session_range_breakout_strategy._fetch_intraday_bars",
             lookback_years=0.2,
-            market_data_source="binance",
-            auto_adjust_for_yf_limits=False,
         )
 
-        self.assertEqual(payload["market_data_source"], "binance")
-        self.assertEqual(payload["market_data_symbol"], "BTCUSDT")
-        self.assertEqual(payload["effective_interval"], "5m")
-        self.assertGreater(payload["bar_count"], 0)
-        mock_binance_fetch.assert_called_once()
-        mock_yf_fetch.assert_not_called()
+        self.assertEqual(payload["strategy_variant"], "session_range_breakout")
 
-    @patch("edgar.services.orb_turtle_hybrid_strategy._fetch_intraday_bars")
-    @patch("edgar.services.orb_turtle_hybrid_strategy.fetch_binance_klines")
-    def test_orb_turtle_hybrid_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+    def test_orb_turtle_hybrid_binance_source_path(self):
         from edgar.services.orb_turtle_hybrid_strategy import run_orb_turtle_hybrid_backtest
 
-        start = datetime(2025, 1, 1)
-        bars = []
-        for i in range(3200):
-            ts = start + timedelta(minutes=5 * i)
-            px = 100.0 + (i * 0.01)
-            bars.append(
-                {
-                    "timestamp": ts,
-                    "open": px,
-                    "high": px + 0.4,
-                    "low": px - 0.4,
-                    "close": px + (0.1 if i % 4 else -0.05),
-                    "volume": 1000.0 + (i % 120),
-                }
-            )
-
-        mock_binance_fetch.return_value = (bars, "ETHUSDT")
-        payload = run_orb_turtle_hybrid_backtest(
+        payload = self._assert_real_binance_strategy_smoke(
+            runner=run_orb_turtle_hybrid_backtest,
             ticker="ETH-USD",
-            interval="5m",
+            symbol="ETHUSDT",
+            yfinance_patch="edgar.services.orb_turtle_hybrid_strategy._fetch_intraday_bars",
             lookback_years=0.2,
-            market_data_source="binance",
-            auto_adjust_for_yf_limits=False,
         )
 
-        self.assertEqual(payload["market_data_source"], "binance")
-        self.assertEqual(payload["market_data_symbol"], "ETHUSDT")
-        self.assertEqual(payload["effective_interval"], "5m")
-        self.assertGreater(payload["bar_count"], 0)
-        mock_binance_fetch.assert_called_once()
-        mock_yf_fetch.assert_not_called()
+        self.assertEqual(payload["strategy_variant"], "orb_turtle_hybrid")
 
     def test_orb_turtle_long_gate_snapshot_requires_all_five_gates(self):
         from edgar.services.orb_turtle_hybrid_strategy import _turtle_long_gate_snapshot
@@ -1505,12 +1482,9 @@ class BinanceDataTests(TestCase):
         self.assertEqual(after_open, datetime(2025, 1, 2, 1, 30))
 
     def test_opening_shock_fade_uses_real_local_cache_data(self):
-        from django.conf import settings
         from edgar.services.opening_shock_fade_strategy import run_opening_shock_fade_backtest
 
-        cache_file = Path(settings.BASE_DIR) / "cache" / "binance_asia_orb" / "BTCUSDT_2022-01-01_2026-02-25_5m.csv.gz"
-        if not cache_file.exists():
-            self.skipTest("real BTCUSDT local cache file is not available")
+        cache_file = self._require_real_local_cache("BTCUSDT")
 
         payload = run_opening_shock_fade_backtest(
             ticker="BTC-USD",
@@ -1531,43 +1505,41 @@ class BinanceDataTests(TestCase):
         self.assertEqual(payload["short_trades"], payload["total_trades"])
         self.assertEqual(payload["trades"][0]["direction"], "short")
 
-    @patch("edgar.services.session_sfp_fvg_strategy._fetch_intraday_bars")
-    @patch("edgar.services.session_sfp_fvg_strategy.fetch_binance_klines")
-    def test_session_sfp_strategy_binance_source_path(self, mock_binance_fetch, mock_yf_fetch):
+    def test_session_sfp_strategy_binance_source_path(self):
         from edgar.services.session_sfp_fvg_strategy import run_session_sfp_fvg_backtest
 
-        start = datetime(2025, 1, 1)
-        bars = []
-        for i in range(5000):
-            ts = start + timedelta(minutes=5 * i)
-            px = 100.0 + (i * 0.01)
-            bars.append(
-                {
-                    "timestamp": ts,
-                    "open": px,
-                    "high": px + 0.25,
-                    "low": px - 0.25,
-                    "close": px + 0.05,
-                    "volume": 1000.0 + i,
-                }
-            )
-
-        mock_binance_fetch.return_value = (bars, "ETHUSDT")
-        payload = run_session_sfp_fvg_backtest(
+        payload = self._assert_real_binance_strategy_smoke(
+            runner=run_session_sfp_fvg_backtest,
             ticker="ETH-USD",
-            interval="5m",
-            lookback_years=0.1,
-            market_data_source="binance",
-            auto_adjust_for_yf_limits=False,
+            symbol="ETHUSDT",
+            yfinance_patch="edgar.services.session_sfp_fvg_strategy._fetch_intraday_bars",
         )
 
-        self.assertEqual(payload["market_data_source"], "binance")
-        self.assertEqual(payload["market_data_symbol"], "ETHUSDT")
-        self.assertEqual(payload["effective_interval"], "5m")
         self.assertEqual(payload["strategy_variant"], "hourly_sfp_fvg")
-        self.assertGreater(payload["bar_count"], 0)
-        mock_binance_fetch.assert_called_once()
-        mock_yf_fetch.assert_not_called()
+
+    def test_market_mechanics_strategy_binance_source_path(self):
+        from edgar.services.market_mechanics_strategy import run_market_mechanics_backtest
+
+        payload = self._assert_real_binance_strategy_smoke(
+            runner=run_market_mechanics_backtest,
+            ticker="BTC-USD",
+            symbol="BTCUSDT",
+            yfinance_patch="edgar.services.market_mechanics_strategy._fetch_intraday_bars",
+        )
+
+        self.assertEqual(payload["strategy_variant"], "price_action_3step")
+
+    def test_manipulation_strategy_binance_source_path(self):
+        from edgar.services.manipulation_strategy import run_manipulation_backtest
+
+        payload = self._assert_real_binance_strategy_smoke(
+            runner=run_manipulation_backtest,
+            ticker="BTC-USD",
+            symbol="BTCUSDT",
+            yfinance_patch="edgar.services.manipulation_strategy._fetch_intraday_bars",
+        )
+
+        self.assertEqual(payload["strategy_variant"], "manipulation_ifvg")
 
 
 class ManipulationStopLogicTests(TestCase):

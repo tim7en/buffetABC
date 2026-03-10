@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timedelta, timezone
+import gzip
 import math
+from pathlib import Path
 import time
 from typing import Any
 
@@ -47,6 +50,139 @@ def _cache_timeout_sec(interval_minutes: int) -> int:
     if interval_minutes <= 60:
         return 60 * 60
     return 2 * 60 * 60
+
+
+def _project_root() -> Path:
+    try:
+        from django.conf import settings
+
+        return Path(settings.BASE_DIR)
+    except Exception:  # pragma: no cover - fallback for non-Django execution
+        return Path(__file__).resolve().parents[2]
+
+
+def _local_cache_roots() -> list[Path]:
+    root = _project_root()
+    return [
+        root / "cache" / "binance_asia_orb",
+        root / "cache" / "cache" / "cache" / "binance_asia_orb",
+    ]
+
+
+def _locate_local_cache_file(symbol: str) -> Path | None:
+    best_match: Path | None = None
+    for base in _local_cache_roots():
+        matches = sorted(base.glob(f"{symbol}_*_5m.csv.gz"))
+        if not matches:
+            continue
+        candidate = max(matches, key=lambda path: path.stat().st_size)
+        if best_match is None or candidate.stat().st_size > best_match.stat().st_size:
+            best_match = candidate
+    return best_match
+
+
+def _load_local_cache_5m_bars(path: Path) -> list[dict[str, Any]]:
+    bars: list[dict[str, Any]] = []
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            try:
+                open_time = int(row["open_time"])
+                bars.append(
+                    {
+                        "timestamp": datetime.fromtimestamp(open_time / 1000, tz=timezone.utc)
+                        .astimezone(timezone.utc)
+                        .replace(tzinfo=None),
+                        "open": float(row["open"]),
+                        "high": float(row["high"]),
+                        "low": float(row["low"]),
+                        "close": float(row["close"]),
+                        "volume": float(row.get("volume", 0.0) or 0.0),
+                    }
+                )
+            except Exception:
+                continue
+    return bars
+
+
+def _bucket_start(ts: datetime, interval_minutes: int) -> datetime:
+    return ts.replace(
+        minute=(ts.minute // interval_minutes) * interval_minutes,
+        second=0,
+        microsecond=0,
+    )
+
+
+def _resample_local_cache_bars(
+    base_bars: list[dict[str, Any]],
+    interval_key: str,
+) -> list[dict[str, Any]]:
+    if interval_key == "5m":
+        return base_bars
+
+    interval_minutes = _interval_to_minutes(interval_key)
+    if interval_minutes % 5 != 0:
+        return []
+
+    aggregated: list[dict[str, Any]] = []
+    current_bucket: datetime | None = None
+    current_bar: dict[str, Any] | None = None
+
+    for bar in base_bars:
+        bucket = _bucket_start(bar["timestamp"], interval_minutes)
+        if current_bucket != bucket:
+            if current_bar is not None:
+                aggregated.append(current_bar)
+            current_bucket = bucket
+            current_bar = {
+                "timestamp": bucket,
+                "open": float(bar["open"]),
+                "high": float(bar["high"]),
+                "low": float(bar["low"]),
+                "close": float(bar["close"]),
+                "volume": float(bar.get("volume", 0.0) or 0.0),
+            }
+            continue
+
+        current_bar["high"] = max(float(current_bar["high"]), float(bar["high"]))
+        current_bar["low"] = min(float(current_bar["low"]), float(bar["low"]))
+        current_bar["close"] = float(bar["close"])
+        current_bar["volume"] = float(current_bar["volume"]) + float(bar.get("volume", 0.0) or 0.0)
+
+    if current_bar is not None:
+        aggregated.append(current_bar)
+
+    return aggregated
+
+
+def _load_local_cache_payload(
+    ticker: str,
+    interval: str,
+    lookback_years: float,
+    warmup_days: int,
+    market_data_symbol: str | None = None,
+) -> tuple[list[dict[str, Any]], str] | None:
+    interval_key = (interval or "").strip().lower()
+    if interval_key not in {"5m", "15m", "30m", "60m"}:
+        return None
+
+    symbol = resolve_binance_symbol(ticker=ticker, explicit_symbol=market_data_symbol)
+    cache_file = _locate_local_cache_file(symbol)
+    if cache_file is None:
+        return None
+
+    base_bars = _load_local_cache_5m_bars(cache_file)
+    if not base_bars:
+        return None
+
+    bars = _resample_local_cache_bars(base_bars=base_bars, interval_key=interval_key)
+    if not bars:
+        return None
+
+    lookback_days = max(int(365.25 * lookback_years), 1)
+    total_days = lookback_days + max(int(warmup_days), 1)
+    cutoff = bars[-1]["timestamp"] - timedelta(days=total_days)
+    return ([bar for bar in bars if bar["timestamp"] >= cutoff], symbol)
 
 
 def resolve_binance_symbol(ticker: str, explicit_symbol: str | None = None) -> str:
@@ -118,6 +254,24 @@ def fetch_binance_klines(
         f"binance:klines:v1:{symbol}:{interval_key}:"
         f"{lookback_days}:{int(warmup_days)}:{end_bucket}"
     )
+    local_cache_key = f"{cache_key}:local"
+    if use_cache and cache is not None:
+        cached_payload = cache.get(local_cache_key)
+        if cached_payload is not None:
+            return cached_payload
+
+    local_payload = _load_local_cache_payload(
+        ticker=ticker,
+        interval=interval_key,
+        lookback_years=lookback_years,
+        warmup_days=warmup_days,
+        market_data_symbol=market_data_symbol,
+    )
+    if local_payload is not None and local_payload[0]:
+        if use_cache and cache is not None:
+            cache.set(local_cache_key, local_payload, timeout=_cache_timeout_sec(interval_minutes))
+        return local_payload
+
     if use_cache and cache is not None:
         cached_payload = cache.get(cache_key)
         if cached_payload is not None:
