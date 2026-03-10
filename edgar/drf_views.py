@@ -690,7 +690,7 @@ class StrategyViewSet(viewsets.ViewSet):
                     lookback_years=lookback_years,
                     market_data_source=(request.data.get("market_data_source") or "binance").strip().lower(),
                     market_data_symbol=(request.data.get("market_data_symbol") or "").strip().upper() or None,
-                    session_open=(request.data.get("session_open") or "tokyo_open").strip().lower(),
+                    session_open=(request.data.get("session_open") or "hong_kong_open").strip().lower(),
                     opening_range_minutes=int(request.data.get("opening_range_minutes", 15)),
                     shock_window_minutes=int(request.data.get("shock_window_minutes", 30)),
                     entry_window_minutes=int(request.data.get("entry_window_minutes", 60)),

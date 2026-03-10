@@ -125,7 +125,7 @@ def run_opening_range_breakdown_backtest(
     lookback_years: float = 2.0,
     market_data_source: str = "binance",
     market_data_symbol: str | None = None,
-    session_open: str = "tokyo_open",
+    session_open: str = "hong_kong_open",
     opening_range_minutes: int = 30,
     entry_window_minutes: int = 90,
     breakdown_buffer_bps: float = 2.0,
