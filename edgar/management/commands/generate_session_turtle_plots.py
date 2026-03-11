@@ -21,6 +21,12 @@ class Command(BaseCommand):
             help="Directory for CSV and PNG outputs.",
         )
         parser.add_argument(
+            "--basket",
+            choices=["core", "index", "expanded"],
+            default="expanded",
+            help="Asset basket to replay (default: expanded).",
+        )
+        parser.add_argument(
             "--exposure-mult",
             type=float,
             default=2.0,
@@ -79,6 +85,24 @@ class Command(BaseCommand):
             default=None,
             help="Optional cap for the equity asset class, expressed as an exposure multiplier.",
         )
+        parser.add_argument(
+            "--base-risk-pct",
+            type=float,
+            default=5.0,
+            help="Base per-trade risk as a percent of account equity (default: 5.0).",
+        )
+        parser.add_argument(
+            "--fixed-stop-pct",
+            type=float,
+            default=10.0,
+            help="Fixed stop distance as a percent of entry price (default: 10.0).",
+        )
+        parser.add_argument(
+            "--directional-volume-risk-pct",
+            type=float,
+            default=7.0,
+            help="Risk percent to use for directional volume-boosted entries (default: 7.0).",
+        )
 
     def handle(self, *args, **options):
         output_dir = Path(options["output_dir"]).resolve()
@@ -86,6 +110,7 @@ class Command(BaseCommand):
 
         exposure_mult = float(options["exposure_mult"])
         report = generate_session_turtle_shared_account_report(
+            basket=str(options["basket"]),
             exposure_mult=exposure_mult,
             use_drawdown_governor=bool(options["use_drawdown_governor"]),
             drawdown_trigger_1_pct=float(options["drawdown_trigger_1_pct"]),
@@ -96,6 +121,9 @@ class Command(BaseCommand):
             gold_cap_mult=float(options["gold_cap_mult"]) if options["gold_cap_mult"] is not None else None,
             metals_cap_mult=float(options["metals_cap_mult"]) if options["metals_cap_mult"] is not None else None,
             equity_cap_mult=float(options["equity_cap_mult"]) if options["equity_cap_mult"] is not None else None,
+            base_risk_pct=float(options["base_risk_pct"]) / 100.0,
+            fixed_stop_pct=float(options["fixed_stop_pct"]) / 100.0,
+            directional_volume_risk_pct=float(options["directional_volume_risk_pct"]) / 100.0,
         )
         summary = report["summary"]
 

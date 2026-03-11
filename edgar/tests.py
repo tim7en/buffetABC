@@ -280,6 +280,62 @@ class CommandPersistenceTests(TestCase):
         self.assertEqual(mock_report.call_args.kwargs["metals_cap_mult"], 1.0)
         self.assertEqual(mock_report.call_args.kwargs["equity_cap_mult"], 1.0)
 
+    @patch("edgar.management.commands.generate_session_turtle_plots.generate_session_turtle_shared_account_report")
+    def test_generate_session_turtle_plots_forwards_risk_and_stop_settings(self, mock_report):
+        mock_report.return_value = {
+            "summary": {
+                "label": "Session Turtle Trend x10 Custom Risk",
+                "initial_capital": 1000.0,
+            },
+            "equity_curve": [
+                {"date": "2024-01-02T10:00:00", "equity": 1000.0},
+                {"date": "2024-01-10T10:00:00", "equity": 1125.0},
+            ],
+            "trades": [{"ticker": "BTC-USD"}],
+            "yearly_returns": [{"year": 2024, "pnl": 125.0}],
+            "asset_summary": [{"ticker": "BTC-USD", "pnl": 125.0}],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            call_command(
+                "generate_session_turtle_plots",
+                f"--output-dir={temp_dir}",
+                "--exposure-mult=10",
+                "--base-risk-pct=1",
+                "--fixed-stop-pct=5",
+                "--directional-volume-risk-pct=1.4",
+            )
+
+        self.assertEqual(mock_report.call_args.kwargs["exposure_mult"], 10.0)
+        self.assertEqual(mock_report.call_args.kwargs["base_risk_pct"], 0.01)
+        self.assertEqual(mock_report.call_args.kwargs["fixed_stop_pct"], 0.05)
+        self.assertAlmostEqual(mock_report.call_args.kwargs["directional_volume_risk_pct"], 0.014)
+
+    @patch("edgar.management.commands.generate_session_turtle_plots.generate_session_turtle_shared_account_report")
+    def test_generate_session_turtle_plots_forwards_basket(self, mock_report):
+        mock_report.return_value = {
+            "summary": {
+                "label": "Session Turtle Trend Core x2",
+                "initial_capital": 1000.0,
+            },
+            "equity_curve": [
+                {"date": "2024-01-02T10:00:00", "equity": 1000.0},
+                {"date": "2024-01-10T10:00:00", "equity": 1125.0},
+            ],
+            "trades": [{"ticker": "BTC-USD"}],
+            "yearly_returns": [{"year": 2024, "pnl": 125.0}],
+            "asset_summary": [{"ticker": "BTC-USD", "pnl": 125.0}],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            call_command(
+                "generate_session_turtle_plots",
+                f"--output-dir={temp_dir}",
+                "--basket=core",
+            )
+
+        self.assertEqual(mock_report.call_args.kwargs["basket"], "core")
+
 
 class ApiTests(TestCase):
     def setUp(self):

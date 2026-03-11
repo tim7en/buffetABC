@@ -7,7 +7,7 @@ from datetime import datetime
 from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
 
 
-DEFAULT_SESSION_TURTLE_UNIVERSE: tuple[tuple[str, str, str], ...] = (
+CORE_SESSION_TURTLE_UNIVERSE: tuple[tuple[str, str, str], ...] = (
     ("BTC-USD", "binance", "hong_kong_open"),
     ("BTC-USD", "binance", "new_york_equity_open"),
     ("ETH-USD", "binance", "hong_kong_open"),
@@ -18,6 +18,7 @@ DEFAULT_SESSION_TURTLE_UNIVERSE: tuple[tuple[str, str, str], ...] = (
     ("PAXG-USD", "binance", "new_york_equity_open"),
     ("AMZN", "tiingo", "new_york_equity_open"),
     ("COIN", "tiingo", "new_york_equity_open"),
+    ("COPPER", "tiingo", "new_york_equity_open"),
     ("CRCL", "tiingo", "new_york_equity_open"),
     ("GLD", "tiingo", "new_york_equity_open"),
     ("HOOD", "tiingo", "new_york_equity_open"),
@@ -29,10 +30,31 @@ DEFAULT_SESSION_TURTLE_UNIVERSE: tuple[tuple[str, str, str], ...] = (
     ("TSLA", "tiingo", "new_york_equity_open"),
 )
 
+INDEX_SESSION_TURTLE_UNIVERSE: tuple[tuple[str, str, str], ...] = (
+    ("QQQ", "tiingo", "new_york_equity_open"),
+    ("SPY", "tiingo", "new_york_equity_open"),
+)
+
+EXPANDED_SESSION_TURTLE_UNIVERSE: tuple[tuple[str, str, str], ...] = (
+    *CORE_SESSION_TURTLE_UNIVERSE,
+    *INDEX_SESSION_TURTLE_UNIVERSE,
+)
+
 CRYPTO_TICKERS = {"BTC-USD", "ETH-USD", "SOL-USD"}
 GOLD_TICKERS = {"PAXG-USD", "GLD"}
-EQUITY_TICKERS = {"AMZN", "COIN", "CRCL", "HOOD", "INTC", "MSTR", "PLTR", "TSLA"}
-METAL_TICKERS = {"PPLT", "SLV"}
+EQUITY_TICKERS = {"AMZN", "COIN", "CRCL", "HOOD", "INTC", "MSTR", "PLTR", "QQQ", "SPY", "TSLA"}
+METAL_TICKERS = {"COPPER", "PPLT", "SLV"}
+
+
+def _resolve_universe(basket: str) -> tuple[tuple[str, str, str], ...]:
+    key = (basket or "expanded").strip().lower()
+    if key == "core":
+        return CORE_SESSION_TURTLE_UNIVERSE
+    if key == "index":
+        return INDEX_SESSION_TURTLE_UNIVERSE
+    if key == "expanded":
+        return EXPANDED_SESSION_TURTLE_UNIVERSE
+    raise ValueError("basket must be one of {'core', 'index', 'expanded'}")
 
 
 @dataclass
@@ -192,6 +214,7 @@ def _build_asset_rows(executed_trades: list[dict], total_pnl: float) -> list[dic
 
 def generate_session_turtle_shared_account_report(
     *,
+    basket: str = "expanded",
     exposure_mult: float = 2.0,
     use_drawdown_governor: bool = False,
     drawdown_trigger_1_pct: float = 10.0,
@@ -232,9 +255,10 @@ def generate_session_turtle_shared_account_report(
     ):
         if cap_mult is not None and cap_mult <= 0:
             raise ValueError(f"{label} must be positive when provided")
+    universe = _resolve_universe(basket)
 
     candidates: list[dict] = []
-    for combo_idx, (ticker, source, session_open) in enumerate(DEFAULT_SESSION_TURTLE_UNIVERSE):
+    for combo_idx, (ticker, source, session_open) in enumerate(universe):
         payload = run_session_turtle_trend_backtest(
             ticker=ticker,
             initial_capital=initial_capital,
@@ -432,7 +456,7 @@ def generate_session_turtle_shared_account_report(
         bucket_pnl[trade["asset_bucket"]] += float(trade["net_pnl"])
         exposure_counter[float(trade["entry_exposure_mult"])] += 1
 
-    label = f"Session Turtle Trend x{exposure_mult:g}"
+    label = f"Session Turtle Trend {basket.capitalize()} x{exposure_mult:g}"
     if use_drawdown_governor:
         label += " With DD Governor"
     if any(cap is not None for cap in asset_class_caps.values()):
@@ -441,6 +465,7 @@ def generate_session_turtle_shared_account_report(
     summary = {
         "strategy_variant": "session_turtle_trend_shared_account",
         "label": label,
+        "basket": basket,
         "start_date": start_date,
         "end_date": end_date,
         "candidate_trades": len(candidates),

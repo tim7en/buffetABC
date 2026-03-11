@@ -1,0 +1,3 @@
+ticker,source,asset_bucket,trades,long_trades,short_trades,pnl,pnl_share_pct,long_pnl,short_pnl
+SPY,tiingo,equity,31,22,9,52.1502,91.22,93.6019,-41.4517
+QQQ,tiingo,equity,34,24,10,5.0168,8.78,43.0329,-38.0161
