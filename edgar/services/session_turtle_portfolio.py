@@ -80,6 +80,10 @@ class _OpenTrade:
     scaled_position_size: float
     scaled_shares: float
     scaled_pnl: float
+    performance_risk_mult: float
+    performance_score: float | None
+    performance_rank_pct: float | None
+    performance_peer_count: int
 
 
 def _asset_bucket(ticker: str) -> str:
@@ -98,6 +102,60 @@ def _realized_drawdown_pct(capital: float, peak_capital: float) -> float:
     if peak_capital <= 0:
         return 0.0
     return (peak_capital - capital) / peak_capital * 100.0
+
+
+def _candidate_return_pct(candidate: dict) -> float:
+    position_size = float(candidate.get("position_size", 0.0) or 0.0)
+    if position_size <= 0:
+        return 0.0
+    return float(candidate.get("pnl", 0.0) or 0.0) / position_size
+
+
+def _decayed_trade_return_score(returns: list[float], lookback_trades: int, decay: float) -> float:
+    if lookback_trades <= 0 or decay <= 0:
+        return 0.0
+    recent = returns[-lookback_trades:]
+    if not recent:
+        return 0.0
+    total = 0.0
+    weights = 0.0
+    for age, value in enumerate(reversed(recent)):
+        weight = decay**age
+        total += float(value) * weight
+        weights += weight
+    return total / weights if weights > 0 else 0.0
+
+
+def _performance_leadership_scale(
+    *,
+    ticker: str,
+    closed_trade_returns_by_ticker: dict[str, list[float]],
+    lookback_trades: int,
+    decay: float,
+    floor_mult: float,
+    cap_mult: float,
+    min_history: int,
+) -> tuple[float, float | None, float | None, int]:
+    if lookback_trades <= 0 or min_history <= 0:
+        return 1.0, None, None, 0
+
+    scores: dict[str, float] = {}
+    for asset_ticker, returns in closed_trade_returns_by_ticker.items():
+        if len(returns) < min_history:
+            continue
+        scores[str(asset_ticker)] = _decayed_trade_return_score(
+            returns=returns,
+            lookback_trades=lookback_trades,
+            decay=decay,
+        )
+    if ticker not in scores or len(scores) < 2:
+        return 1.0, scores.get(ticker), None, len(scores)
+
+    ordered = sorted(scores.items(), key=lambda item: (item[1], item[0]))
+    ticker_idx = next(idx for idx, item in enumerate(ordered) if item[0] == ticker)
+    rank_pct = ticker_idx / (len(ordered) - 1) if len(ordered) > 1 else 0.5
+    mult = floor_mult + (rank_pct * (cap_mult - floor_mult))
+    return mult, scores[ticker], rank_pct, len(scores)
 
 
 def _active_exposure_mult(
@@ -234,6 +292,12 @@ def generate_session_turtle_shared_account_report(
     trend_fast_period: int = 55,
     trend_slow_period: int = 200,
     base_portfolio_cap_pct: float = 0.90,
+    use_performance_leadership_overlay: bool = False,
+    performance_lookback_trades: int = 6,
+    performance_decay: float = 0.75,
+    performance_floor_mult: float = 0.75,
+    performance_cap_mult: float = 1.25,
+    performance_min_history: int = 3,
 ) -> dict:
     if exposure_mult <= 0:
         raise ValueError("exposure_mult must be positive")
@@ -255,6 +319,18 @@ def generate_session_turtle_shared_account_report(
     ):
         if cap_mult is not None and cap_mult <= 0:
             raise ValueError(f"{label} must be positive when provided")
+    if performance_lookback_trades <= 0:
+        raise ValueError("performance_lookback_trades must be positive")
+    if not 0 < performance_decay <= 1.0:
+        raise ValueError("performance_decay must be between 0 and 1")
+    if performance_floor_mult <= 0 or performance_cap_mult <= 0:
+        raise ValueError("performance floor/cap multipliers must be positive")
+    if performance_floor_mult > performance_cap_mult:
+        raise ValueError("performance_floor_mult must be <= performance_cap_mult")
+    if not performance_floor_mult <= 1.0 <= performance_cap_mult:
+        raise ValueError("performance overlay must bracket neutral sizing at 1.0")
+    if performance_min_history <= 0:
+        raise ValueError("performance_min_history must be positive")
     universe = _resolve_universe(basket)
 
     candidates: list[dict] = []
@@ -304,6 +380,7 @@ def generate_session_turtle_shared_account_report(
             )
 
     candidates.sort(key=lambda row: (row["entry_ts"], row["combo_idx"], row["trade_idx"]))
+    closed_candidate_results = sorted(candidates, key=lambda row: (row["exit_ts"], row["combo_idx"], row["trade_idx"]))
     capital = float(initial_capital)
     peak_capital = capital
     max_drawdown = 0.0
@@ -318,6 +395,20 @@ def generate_session_turtle_shared_account_report(
         "metals": metals_cap_mult,
         "equity": equity_cap_mult,
     }
+    closed_candidate_idx = 0
+    closed_trade_returns_by_ticker: dict[str, list[float]] = defaultdict(list)
+
+    def close_candidate_history_up_to(timestamp: datetime) -> None:
+        nonlocal closed_candidate_idx
+        while (
+            closed_candidate_idx < len(closed_candidate_results)
+            and closed_candidate_results[closed_candidate_idx]["exit_ts"] <= timestamp
+        ):
+            closed_candidate = closed_candidate_results[closed_candidate_idx]
+            closed_trade_returns_by_ticker[str(closed_candidate["ticker"])].append(
+                _candidate_return_pct(closed_candidate)
+            )
+            closed_candidate_idx += 1
 
     def close_positions_up_to(timestamp: datetime) -> None:
         nonlocal capital, peak_capital, max_drawdown, open_positions
@@ -353,6 +444,18 @@ def generate_session_turtle_shared_account_report(
                     "scale": round(position.scale, 6),
                     "entry_rel_volume": round(position.entry_rel_volume, 4),
                     "risk_model": position.risk_model,
+                    "performance_risk_mult": round(position.performance_risk_mult, 4),
+                    "performance_score": (
+                        round(position.performance_score, 6)
+                        if position.performance_score is not None
+                        else None
+                    ),
+                    "performance_rank_pct": (
+                        round(position.performance_rank_pct, 4)
+                        if position.performance_rank_pct is not None
+                        else None
+                    ),
+                    "performance_peer_count": position.performance_peer_count,
                     "net_pnl": round(position.scaled_pnl, 4),
                     "equity_after_exit": round(capital, 4),
                 }
@@ -360,6 +463,7 @@ def generate_session_turtle_shared_account_report(
 
     for candidate in candidates:
         close_positions_up_to(candidate["entry_ts"])
+        close_candidate_history_up_to(candidate["entry_ts"])
         if any(position.ticker == candidate["ticker"] for position in open_positions):
             skipped_same_ticker += 1
             continue
@@ -391,7 +495,28 @@ def generate_session_turtle_shared_account_report(
             skipped_no_capacity += 1
             continue
 
-        scaled_position_size = min(float(candidate["position_size"]), available_notional)
+        performance_risk_mult = 1.0
+        performance_score: float | None = None
+        performance_rank_pct: float | None = None
+        performance_peer_count = 0
+        if use_performance_leadership_overlay:
+            (
+                performance_risk_mult,
+                performance_score,
+                performance_rank_pct,
+                performance_peer_count,
+            ) = _performance_leadership_scale(
+                ticker=str(candidate["ticker"]),
+                closed_trade_returns_by_ticker=closed_trade_returns_by_ticker,
+                lookback_trades=performance_lookback_trades,
+                decay=performance_decay,
+                floor_mult=performance_floor_mult,
+                cap_mult=performance_cap_mult,
+                min_history=performance_min_history,
+            )
+
+        target_position_size = float(candidate["position_size"]) * performance_risk_mult
+        scaled_position_size = min(target_position_size, available_notional)
         if scaled_position_size <= 1e-9:
             skipped_no_capacity += 1
             continue
@@ -420,6 +545,10 @@ def generate_session_turtle_shared_account_report(
                 scaled_position_size=scaled_position_size,
                 scaled_shares=float(candidate["shares"]) * scale,
                 scaled_pnl=float(candidate["pnl"]) * scale,
+                performance_risk_mult=performance_risk_mult,
+                performance_score=performance_score,
+                performance_rank_pct=performance_rank_pct,
+                performance_peer_count=performance_peer_count,
             )
         )
 
@@ -455,10 +584,13 @@ def generate_session_turtle_shared_account_report(
     for trade in executed_trades:
         bucket_pnl[trade["asset_bucket"]] += float(trade["net_pnl"])
         exposure_counter[float(trade["entry_exposure_mult"])] += 1
+    performance_mults = [float(trade.get("performance_risk_mult", 1.0) or 1.0) for trade in executed_trades]
 
     label = f"Session Turtle Trend {basket.capitalize()} x{exposure_mult:g}"
     if use_drawdown_governor:
         label += " With DD Governor"
+    if use_performance_leadership_overlay:
+        label += " With Leadership Overlay"
     if any(cap is not None for cap in asset_class_caps.values()):
         label += " With Asset Class Caps"
 
@@ -500,6 +632,17 @@ def generate_session_turtle_shared_account_report(
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,
         "directional_volume_risk_pct": directional_volume_risk_pct,
+        "use_performance_leadership_overlay": use_performance_leadership_overlay,
+        "performance_lookback_trades": performance_lookback_trades,
+        "performance_decay": performance_decay,
+        "performance_floor_mult": performance_floor_mult,
+        "performance_cap_mult": performance_cap_mult,
+        "performance_min_history": performance_min_history,
+        "avg_performance_risk_mult": (
+            round(sum(performance_mults) / len(performance_mults), 4) if performance_mults else 1.0
+        ),
+        "entries_performance_upscaled": sum(1 for mult in performance_mults if mult > 1.000001),
+        "entries_performance_downscaled": sum(1 for mult in performance_mults if mult < 0.999999),
         "trend_fast_period": trend_fast_period,
         "trend_slow_period": trend_slow_period,
         "crypto_trades": bucket_counter["crypto"],

@@ -14,6 +14,7 @@ from django.test import TestCase
 from edgar import sp500
 from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental, EdgarMetricMapping
 from edgar.services.edgar_client import EdgarClient, RateLimiter
+from edgar.services.session_turtle_portfolio import generate_session_turtle_shared_account_report
 from edgar.services.strategy import (
     BacktestResult,
     Trade,
@@ -335,6 +336,121 @@ class CommandPersistenceTests(TestCase):
             )
 
         self.assertEqual(mock_report.call_args.kwargs["basket"], "core")
+
+    @patch("edgar.management.commands.generate_session_turtle_plots.generate_session_turtle_shared_account_report")
+    def test_generate_session_turtle_plots_forwards_performance_leadership_overlay(self, mock_report):
+        mock_report.return_value = {
+            "summary": {
+                "label": "Session Turtle Trend Core x2 With Leadership Overlay",
+                "initial_capital": 1000.0,
+            },
+            "equity_curve": [
+                {"date": "2024-01-02T10:00:00", "equity": 1000.0},
+                {"date": "2024-01-10T10:00:00", "equity": 1125.0},
+            ],
+            "trades": [{"ticker": "BTC-USD"}],
+            "yearly_returns": [{"year": 2024, "pnl": 125.0}],
+            "asset_summary": [{"ticker": "BTC-USD", "pnl": 125.0}],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            call_command(
+                "generate_session_turtle_plots",
+                f"--output-dir={temp_dir}",
+                "--use-performance-leadership-overlay",
+                "--performance-lookback-trades=8",
+                "--performance-decay=0.8",
+                "--performance-floor-mult=0.7",
+                "--performance-cap-mult=1.3",
+                "--performance-min-history=2",
+            )
+
+        self.assertTrue(mock_report.call_args.kwargs["use_performance_leadership_overlay"])
+        self.assertEqual(mock_report.call_args.kwargs["performance_lookback_trades"], 8)
+        self.assertEqual(mock_report.call_args.kwargs["performance_decay"], 0.8)
+        self.assertEqual(mock_report.call_args.kwargs["performance_floor_mult"], 0.7)
+        self.assertEqual(mock_report.call_args.kwargs["performance_cap_mult"], 1.3)
+        self.assertEqual(mock_report.call_args.kwargs["performance_min_history"], 2)
+
+
+class SessionTurtlePortfolioTests(TestCase):
+    @patch("edgar.services.session_turtle_portfolio._resolve_universe")
+    @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")
+    def test_session_turtle_portfolio_supports_performance_leadership_overlay(
+        self,
+        mock_backtest,
+        mock_resolve_universe,
+    ):
+        mock_resolve_universe.return_value = (
+            ("AAA", "tiingo", "new_york_equity_open"),
+            ("BBB", "tiingo", "new_york_equity_open"),
+        )
+
+        def _trade(entry_date: str, exit_date: str, pnl: float) -> dict:
+            return {
+                "direction": "long",
+                "entry_date": entry_date,
+                "exit_date": exit_date,
+                "entry_price": 100.0,
+                "exit_price": 100.0 + pnl,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": pnl,
+                "risk_model": "directional_volume_boost",
+                "entry_rel_volume": 1.5,
+            }
+
+        payloads = {
+            "AAA": {
+                "trades": [
+                    _trade("2024-01-01T10:00:00", "2024-01-02T10:00:00", 20.0),
+                    _trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 20.0),
+                    _trade("2024-01-05T10:00:00", "2024-01-06T10:00:00", 10.0),
+                ]
+            },
+            "BBB": {
+                "trades": [
+                    _trade("2024-01-01T10:00:00", "2024-01-02T10:00:00", -20.0),
+                    _trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", -20.0),
+                    _trade("2024-01-05T10:00:00", "2024-01-06T10:00:00", 10.0),
+                ]
+            },
+        }
+        mock_backtest.side_effect = lambda ticker, **kwargs: payloads[ticker]
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=2.0,
+            base_portfolio_cap_pct=0.9,
+            use_performance_leadership_overlay=True,
+            performance_lookback_trades=2,
+            performance_decay=1.0,
+            performance_floor_mult=0.5,
+            performance_cap_mult=1.5,
+            performance_min_history=2,
+        )
+
+        trades = report["trades"]
+        self.assertEqual(len(trades), 6)
+
+        aaa_last = next(
+            trade for trade in trades if trade["ticker"] == "AAA" and trade["entry_ts"] == "2024-01-05T10:00:00"
+        )
+        bbb_last = next(
+            trade for trade in trades if trade["ticker"] == "BBB" and trade["entry_ts"] == "2024-01-05T10:00:00"
+        )
+        self.assertEqual(aaa_last["performance_risk_mult"], 1.5)
+        self.assertEqual(bbb_last["performance_risk_mult"], 0.5)
+        self.assertEqual(aaa_last["notional"], 150.0)
+        self.assertEqual(bbb_last["notional"], 50.0)
+        self.assertEqual(aaa_last["performance_rank_pct"], 1.0)
+        self.assertEqual(bbb_last["performance_rank_pct"], 0.0)
+
+        summary = report["summary"]
+        self.assertTrue(summary["use_performance_leadership_overlay"])
+        self.assertEqual(summary["entries_performance_upscaled"], 1)
+        self.assertEqual(summary["entries_performance_downscaled"], 1)
 
 
 class ApiTests(TestCase):

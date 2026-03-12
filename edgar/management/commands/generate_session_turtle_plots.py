@@ -103,6 +103,41 @@ class Command(BaseCommand):
             default=7.0,
             help="Risk percent to use for directional volume-boosted entries (default: 7.0).",
         )
+        parser.add_argument(
+            "--use-performance-leadership-overlay",
+            action="store_true",
+            help="Scale each asset's position size using decayed recent paper-performance versus peers.",
+        )
+        parser.add_argument(
+            "--performance-lookback-trades",
+            type=int,
+            default=6,
+            help="Closed trades per asset to score for the leadership overlay (default: 6).",
+        )
+        parser.add_argument(
+            "--performance-decay",
+            type=float,
+            default=0.75,
+            help="Exponential decay for older asset scores in the leadership overlay (default: 0.75).",
+        )
+        parser.add_argument(
+            "--performance-floor-mult",
+            type=float,
+            default=0.75,
+            help="Minimum position-size multiplier for lagging assets (default: 0.75).",
+        )
+        parser.add_argument(
+            "--performance-cap-mult",
+            type=float,
+            default=1.25,
+            help="Maximum position-size multiplier for leading assets (default: 1.25).",
+        )
+        parser.add_argument(
+            "--performance-min-history",
+            type=int,
+            default=3,
+            help="Closed trades required before the leadership overlay sizes an asset away from neutral (default: 3).",
+        )
 
     def handle(self, *args, **options):
         output_dir = Path(options["output_dir"]).resolve()
@@ -124,6 +159,12 @@ class Command(BaseCommand):
             base_risk_pct=float(options["base_risk_pct"]) / 100.0,
             fixed_stop_pct=float(options["fixed_stop_pct"]) / 100.0,
             directional_volume_risk_pct=float(options["directional_volume_risk_pct"]) / 100.0,
+            use_performance_leadership_overlay=bool(options["use_performance_leadership_overlay"]),
+            performance_lookback_trades=int(options["performance_lookback_trades"]),
+            performance_decay=float(options["performance_decay"]),
+            performance_floor_mult=float(options["performance_floor_mult"]),
+            performance_cap_mult=float(options["performance_cap_mult"]),
+            performance_min_history=int(options["performance_min_history"]),
         )
         summary = report["summary"]
 
