@@ -48,3 +48,4 @@ The package uses the existing local caches:
 
 - This package keeps the current research toggles for the leadership overlay and extended-hours protective exits.
 - The default run is still the simpler production baseline without those research overlays enabled.
+- Python dependencies for the standalone runner are listed in `requirements.txt`.

@@ -8,12 +8,7 @@ from typing import Any
 
 
 def _project_root() -> Path:
-    try:
-        from django.conf import settings
-
-        return Path(settings.BASE_DIR)
-    except Exception:  # pragma: no cover
-        return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[2]
 
 
 def _tiingo_root() -> Path:

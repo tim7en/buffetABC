@@ -10,9 +10,6 @@ from pathlib import Path
 import time
 from typing import Any
 
-import requests
-
-
 _BINANCE_BASE_URL = "https://api.binance.com"
 _VALID_INTERVALS = {
     "1m": "1m",
@@ -53,12 +50,7 @@ def _cache_timeout_sec(interval_minutes: int) -> int:
 
 
 def _project_root() -> Path:
-    try:
-        from django.conf import settings
-
-        return Path(settings.BASE_DIR)
-    except Exception:  # pragma: no cover - fallback for non-Django execution
-        return Path(__file__).resolve().parents[2]
+    return Path(__file__).resolve().parents[2]
 
 
 def _local_cache_roots() -> list[Path]:
@@ -299,6 +291,8 @@ def fetch_binance_klines(
         cached_payload = cache.get(cache_key)
         if cached_payload is not None:
             return cached_payload
+
+    import requests
 
     rows: list[list[Any]] = []
     session = requests.Session()
