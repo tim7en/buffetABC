@@ -188,6 +188,7 @@ def run_session_turtle_trend_backtest(
     atr_stop_mult: float = 2.0,
     fixed_stop_pct: float | None = None,
     entry_window_minutes: int = 480,
+    core_session_minutes: int | None = None,
     entry_buffer_bps: float = 0.0,
     base_risk_pct: float = 0.01,
     max_position_pct: float = 0.30,
@@ -211,6 +212,7 @@ def run_session_turtle_trend_backtest(
     use_4h_trend_filter: bool = False,
     trend_fast_period: int = 55,
     trend_slow_period: int = 200,
+    use_extended_hours_protective_exits_only: bool = False,
     use_chandelier_exit: bool = False,
     chandelier_period: int = 22,
     chandelier_atr_period: int = 22,
@@ -232,6 +234,10 @@ def run_session_turtle_trend_backtest(
         raise ValueError("channel_period must be 20 or 55")
     if atr_period < 5:
         raise ValueError("atr_period must be >= 5")
+    if entry_window_minutes <= 0:
+        raise ValueError("entry_window_minutes must be positive")
+    if core_session_minutes is not None and core_session_minutes <= 0:
+        raise ValueError("core_session_minutes must be positive when provided")
     if volume_period < 2:
         raise ValueError("volume_period must be >= 2")
     if atr_stop_mult <= 0:
@@ -255,6 +261,12 @@ def run_session_turtle_trend_backtest(
     if trend_fast_period >= trend_slow_period:
         raise ValueError("trend_fast_period must be smaller than trend_slow_period")
 
+    core_session_window = int(core_session_minutes) if core_session_minutes is not None else int(entry_window_minutes)
+    active_entry_window = (
+        min(int(entry_window_minutes), core_session_window)
+        if use_extended_hours_protective_exits_only
+        else int(entry_window_minutes)
+    )
     exit_channel = exit_channel_period if exit_channel_period is not None else (10 if channel_period == 20 else 20)
     preload_warmup_days = max(channel_period + exit_channel + atr_period + 20, 75)
     if use_4h_trend_filter:
@@ -355,6 +367,7 @@ def run_session_turtle_trend_backtest(
         minutes_open = minutes_since_session_open(ts, session_open)
         current_session_idx = bar_to_session_idx[i]
         completed_session_idx = current_session_idx - 1
+        outside_core_session = use_extended_hours_protective_exits_only and minutes_open >= core_session_window
 
         if ts >= period_start:
             bars_in_period += 1
@@ -371,22 +384,25 @@ def run_session_turtle_trend_backtest(
                 )
                 protective_stop = current_stop
                 stop_reason = "stop_loss"
-                if current_exit_channel is not None and current_exit_channel > protective_stop:
+                if not outside_core_session and current_exit_channel is not None and current_exit_channel > protective_stop:
                     protective_stop = current_exit_channel
                     stop_reason = "exit_channel"
                 if low_i <= protective_stop:
-                    trailed_stop = _stop_is_trailed("long", open_trade.stop_loss, current_stop)
-                    break_even_stop = use_break_even_stop and trailed_stop and _stop_is_break_even_or_better(
-                        direction="long",
-                        entry_price=open_trade.entry_price,
-                        active_stop=current_stop,
-                    )
-                    if stop_reason == "stop_loss" and break_even_stop:
-                        reason = "break_even_stop"
-                    elif stop_reason == "stop_loss" and use_chandelier_exit and trailed_stop:
-                        reason = "chandelier_stop"
+                    if outside_core_session:
+                        reason = "extended_hours_protective_stop"
                     else:
-                        reason = stop_reason
+                        trailed_stop = _stop_is_trailed("long", open_trade.stop_loss, current_stop)
+                        break_even_stop = use_break_even_stop and trailed_stop and _stop_is_break_even_or_better(
+                            direction="long",
+                            entry_price=open_trade.entry_price,
+                            active_stop=current_stop,
+                        )
+                        if stop_reason == "stop_loss" and break_even_stop:
+                            reason = "break_even_stop"
+                        elif stop_reason == "stop_loss" and use_chandelier_exit and trailed_stop:
+                            reason = "chandelier_stop"
+                        else:
+                            reason = stop_reason
                     _close_trade(open_trade, i, protective_stop, reason)
                     open_trade = None
                 else:
@@ -396,56 +412,57 @@ def run_session_turtle_trend_backtest(
                         if completed_session_idx >= 0 and daily_atr[completed_session_idx] is not None
                         else open_trade.atr_at_entry
                     )
-                    next_stop = current_stop
-                    if use_break_even_stop:
-                        next_stop = _tighten_stop(
-                            direction="long",
-                            current_stop=next_stop,
-                            candidate_stop=_break_even_stop_candidate(
+                    if not outside_core_session:
+                        next_stop = current_stop
+                        if use_break_even_stop:
+                            next_stop = _tighten_stop(
                                 direction="long",
-                                entry_price=open_trade.entry_price,
-                                initial_stop=open_trade.stop_loss,
-                                bar_high=high_i,
-                                bar_low=low_i,
-                                trigger_r=break_even_trigger_r,
+                                current_stop=next_stop,
+                                candidate_stop=_break_even_stop_candidate(
+                                    direction="long",
+                                    entry_price=open_trade.entry_price,
+                                    initial_stop=open_trade.stop_loss,
+                                    bar_high=high_i,
+                                    bar_low=low_i,
+                                    trigger_r=break_even_trigger_r,
+                                ),
+                                take_profit=None,
+                            )
+                        if fixed_stop_pct is None:
+                            trend_stop = open_trade.highest_price_since_entry - (atr_now * atr_stop_mult)
+                            next_stop = _tighten_stop(
+                                direction="long",
+                                current_stop=next_stop,
+                                candidate_stop=trend_stop,
+                                take_profit=None,
+                            )
+                        tr_stop = None
+                        if use_chandelier_exit:
+                            tr_stop = _chandelier_stop_candidate(
+                                direction="long",
+                                idx=i,
+                                rolling_highs=chandelier_highs,
+                                rolling_lows=chandelier_lows,
+                                atr_values=chandelier_atr_vals,
+                                atr_mult=chandelier_atr_mult,
+                            )
+                        open_trade.active_stop_loss = round(
+                            _tighten_stop(
+                                direction="long",
+                                current_stop=next_stop,
+                                candidate_stop=tr_stop,
+                                take_profit=None,
                             ),
-                            take_profit=None,
+                            4,
                         )
-                    if fixed_stop_pct is None:
-                        trend_stop = open_trade.highest_price_since_entry - (atr_now * atr_stop_mult)
-                        next_stop = _tighten_stop(
-                            direction="long",
-                            current_stop=next_stop,
-                            candidate_stop=trend_stop,
-                            take_profit=None,
-                        )
-                    tr_stop = None
-                    if use_chandelier_exit:
-                        tr_stop = _chandelier_stop_candidate(
-                            direction="long",
-                            idx=i,
-                            rolling_highs=chandelier_highs,
-                            rolling_lows=chandelier_lows,
-                            atr_values=chandelier_atr_vals,
-                            atr_mult=chandelier_atr_mult,
-                        )
-                    open_trade.active_stop_loss = round(
-                        _tighten_stop(
-                            direction="long",
-                            current_stop=next_stop,
-                            candidate_stop=tr_stop,
-                            take_profit=None,
-                        ),
-                        4,
-                    )
-                    open_trade.exit_channel_level = current_exit_channel
+                        open_trade.exit_channel_level = current_exit_channel
 
                     if (
                         enable_pyramiding
                         and open_trade.unit_count < max_units
                         and open_trade.next_add_price is not None
                         and close_i >= open_trade.next_add_price
-                        and minutes_open < entry_window_minutes
+                        and minutes_open < active_entry_window
                         and i < len(bars) - 1
                         and completed_session_idx >= 0
                     ):
@@ -507,22 +524,25 @@ def run_session_turtle_trend_backtest(
                 )
                 protective_stop = current_stop
                 stop_reason = "stop_loss"
-                if current_exit_channel is not None and current_exit_channel < protective_stop:
+                if not outside_core_session and current_exit_channel is not None and current_exit_channel < protective_stop:
                     protective_stop = current_exit_channel
                     stop_reason = "exit_channel"
                 if high_i >= protective_stop:
-                    trailed_stop = _stop_is_trailed("short", open_trade.stop_loss, current_stop)
-                    break_even_stop = use_break_even_stop and trailed_stop and _stop_is_break_even_or_better(
-                        direction="short",
-                        entry_price=open_trade.entry_price,
-                        active_stop=current_stop,
-                    )
-                    if stop_reason == "stop_loss" and break_even_stop:
-                        reason = "break_even_stop"
-                    elif stop_reason == "stop_loss" and use_chandelier_exit and trailed_stop:
-                        reason = "chandelier_stop"
+                    if outside_core_session:
+                        reason = "extended_hours_protective_stop"
                     else:
-                        reason = stop_reason
+                        trailed_stop = _stop_is_trailed("short", open_trade.stop_loss, current_stop)
+                        break_even_stop = use_break_even_stop and trailed_stop and _stop_is_break_even_or_better(
+                            direction="short",
+                            entry_price=open_trade.entry_price,
+                            active_stop=current_stop,
+                        )
+                        if stop_reason == "stop_loss" and break_even_stop:
+                            reason = "break_even_stop"
+                        elif stop_reason == "stop_loss" and use_chandelier_exit and trailed_stop:
+                            reason = "chandelier_stop"
+                        else:
+                            reason = stop_reason
                     _close_trade(open_trade, i, protective_stop, reason)
                     open_trade = None
                 else:
@@ -532,56 +552,57 @@ def run_session_turtle_trend_backtest(
                         if completed_session_idx >= 0 and daily_atr[completed_session_idx] is not None
                         else open_trade.atr_at_entry
                     )
-                    next_stop = current_stop
-                    if use_break_even_stop:
-                        next_stop = _tighten_stop(
-                            direction="short",
-                            current_stop=next_stop,
-                            candidate_stop=_break_even_stop_candidate(
+                    if not outside_core_session:
+                        next_stop = current_stop
+                        if use_break_even_stop:
+                            next_stop = _tighten_stop(
                                 direction="short",
-                                entry_price=open_trade.entry_price,
-                                initial_stop=open_trade.stop_loss,
-                                bar_high=high_i,
-                                bar_low=low_i,
-                                trigger_r=break_even_trigger_r,
+                                current_stop=next_stop,
+                                candidate_stop=_break_even_stop_candidate(
+                                    direction="short",
+                                    entry_price=open_trade.entry_price,
+                                    initial_stop=open_trade.stop_loss,
+                                    bar_high=high_i,
+                                    bar_low=low_i,
+                                    trigger_r=break_even_trigger_r,
+                                ),
+                                take_profit=None,
+                            )
+                        if fixed_stop_pct is None:
+                            trend_stop = open_trade.lowest_price_since_entry + (atr_now * atr_stop_mult)
+                            next_stop = _tighten_stop(
+                                direction="short",
+                                current_stop=next_stop,
+                                candidate_stop=trend_stop,
+                                take_profit=None,
+                            )
+                        tr_stop = None
+                        if use_chandelier_exit:
+                            tr_stop = _chandelier_stop_candidate(
+                                direction="short",
+                                idx=i,
+                                rolling_highs=chandelier_highs,
+                                rolling_lows=chandelier_lows,
+                                atr_values=chandelier_atr_vals,
+                                atr_mult=chandelier_atr_mult,
+                            )
+                        open_trade.active_stop_loss = round(
+                            _tighten_stop(
+                                direction="short",
+                                current_stop=next_stop,
+                                candidate_stop=tr_stop,
+                                take_profit=None,
                             ),
-                            take_profit=None,
+                            4,
                         )
-                    if fixed_stop_pct is None:
-                        trend_stop = open_trade.lowest_price_since_entry + (atr_now * atr_stop_mult)
-                        next_stop = _tighten_stop(
-                            direction="short",
-                            current_stop=next_stop,
-                            candidate_stop=trend_stop,
-                            take_profit=None,
-                        )
-                    tr_stop = None
-                    if use_chandelier_exit:
-                        tr_stop = _chandelier_stop_candidate(
-                            direction="short",
-                            idx=i,
-                            rolling_highs=chandelier_highs,
-                            rolling_lows=chandelier_lows,
-                            atr_values=chandelier_atr_vals,
-                            atr_mult=chandelier_atr_mult,
-                        )
-                    open_trade.active_stop_loss = round(
-                        _tighten_stop(
-                            direction="short",
-                            current_stop=next_stop,
-                            candidate_stop=tr_stop,
-                            take_profit=None,
-                        ),
-                        4,
-                    )
-                    open_trade.exit_channel_level = current_exit_channel
+                        open_trade.exit_channel_level = current_exit_channel
 
                     if (
                         enable_pyramiding
                         and open_trade.unit_count < max_units
                         and open_trade.next_add_price is not None
                         and close_i <= open_trade.next_add_price
-                        and minutes_open < entry_window_minutes
+                        and minutes_open < active_entry_window
                         and i < len(bars) - 1
                         and completed_session_idx >= 0
                     ):
@@ -654,7 +675,7 @@ def run_session_turtle_trend_backtest(
 
         if open_trade is not None:
             continue
-        if ts < period_start or i >= len(bars) - 1 or minutes_open >= entry_window_minutes:
+        if ts < period_start or i >= len(bars) - 1 or minutes_open >= active_entry_window:
             continue
         if completed_session_idx < max(channel_period, atr_period, exit_channel):
             continue
@@ -844,12 +865,14 @@ def run_session_turtle_trend_backtest(
         "atr_stop_mult": atr_stop_mult,
         "fixed_stop_pct": fixed_stop_pct,
         "entry_window_minutes": entry_window_minutes,
+        "core_session_minutes": core_session_window,
         "allow_longs": allow_longs,
         "allow_shorts": allow_shorts,
         "use_4h_trend_filter": use_4h_trend_filter,
         "trend_filter_interval": "4h" if use_4h_trend_filter else None,
         "trend_fast_period": trend_fast_period,
         "trend_slow_period": trend_slow_period,
+        "use_extended_hours_protective_exits_only": use_extended_hours_protective_exits_only,
         "use_volume_risk_scaling": use_volume_risk_scaling,
         "volume_period": volume_period,
         "volume_risk_floor": volume_risk_floor,

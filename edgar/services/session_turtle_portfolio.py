@@ -298,6 +298,8 @@ def generate_session_turtle_shared_account_report(
     performance_floor_mult: float = 0.75,
     performance_cap_mult: float = 1.25,
     performance_min_history: int = 3,
+    use_extended_hours_protective_exits: bool = False,
+    extended_hours_core_session_minutes: int = 390,
 ) -> dict:
     if exposure_mult <= 0:
         raise ValueError("exposure_mult must be positive")
@@ -331,10 +333,17 @@ def generate_session_turtle_shared_account_report(
         raise ValueError("performance overlay must bracket neutral sizing at 1.0")
     if performance_min_history <= 0:
         raise ValueError("performance_min_history must be positive")
+    if extended_hours_core_session_minutes <= 0:
+        raise ValueError("extended_hours_core_session_minutes must be positive")
     universe = _resolve_universe(basket)
 
     candidates: list[dict] = []
     for combo_idx, (ticker, source, session_open) in enumerate(universe):
+        use_extended_hours_mode = (
+            use_extended_hours_protective_exits
+            and source == "tiingo"
+            and session_open == "new_york_equity_open"
+        )
         payload = run_session_turtle_trend_backtest(
             ticker=ticker,
             initial_capital=initial_capital,
@@ -346,9 +355,12 @@ def generate_session_turtle_shared_account_report(
             base_risk_pct=base_risk_pct,
             max_position_pct=0.90,
             fixed_stop_pct=fixed_stop_pct,
+            entry_window_minutes=extended_hours_core_session_minutes if use_extended_hours_mode else 480,
+            core_session_minutes=extended_hours_core_session_minutes if use_extended_hours_mode else None,
             use_4h_trend_filter=True,
             trend_fast_period=trend_fast_period,
             trend_slow_period=trend_slow_period,
+            use_extended_hours_protective_exits_only=use_extended_hours_mode,
             use_directional_volume_risk_boost=True,
             directional_volume_min_rel_volume=1.25,
             directional_volume_close_location_threshold=0.65,
@@ -589,6 +601,8 @@ def generate_session_turtle_shared_account_report(
     label = f"Session Turtle Trend {basket.capitalize()} x{exposure_mult:g}"
     if use_drawdown_governor:
         label += " With DD Governor"
+    if use_extended_hours_protective_exits:
+        label += " With Extended Hours Protective Exits"
     if use_performance_leadership_overlay:
         label += " With Leadership Overlay"
     if any(cap is not None for cap in asset_class_caps.values()):
@@ -632,6 +646,8 @@ def generate_session_turtle_shared_account_report(
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,
         "directional_volume_risk_pct": directional_volume_risk_pct,
+        "use_extended_hours_protective_exits": use_extended_hours_protective_exits,
+        "extended_hours_core_session_minutes": extended_hours_core_session_minutes,
         "use_performance_leadership_overlay": use_performance_leadership_overlay,
         "performance_lookback_trades": performance_lookback_trades,
         "performance_decay": performance_decay,

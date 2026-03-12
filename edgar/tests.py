@@ -372,6 +372,33 @@ class CommandPersistenceTests(TestCase):
         self.assertEqual(mock_report.call_args.kwargs["performance_cap_mult"], 1.3)
         self.assertEqual(mock_report.call_args.kwargs["performance_min_history"], 2)
 
+    @patch("edgar.management.commands.generate_session_turtle_plots.generate_session_turtle_shared_account_report")
+    def test_generate_session_turtle_plots_forwards_extended_hours_protective_exits(self, mock_report):
+        mock_report.return_value = {
+            "summary": {
+                "label": "Session Turtle Trend Core x2 With Extended Hours Protective Exits",
+                "initial_capital": 1000.0,
+            },
+            "equity_curve": [
+                {"date": "2024-01-02T10:00:00", "equity": 1000.0},
+                {"date": "2024-01-10T10:00:00", "equity": 1125.0},
+            ],
+            "trades": [{"ticker": "BTC-USD"}],
+            "yearly_returns": [{"year": 2024, "pnl": 125.0}],
+            "asset_summary": [{"ticker": "BTC-USD", "pnl": 125.0}],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            call_command(
+                "generate_session_turtle_plots",
+                f"--output-dir={temp_dir}",
+                "--use-extended-hours-protective-exits",
+                "--extended-hours-core-session-minutes=390",
+            )
+
+        self.assertTrue(mock_report.call_args.kwargs["use_extended_hours_protective_exits"])
+        self.assertEqual(mock_report.call_args.kwargs["extended_hours_core_session_minutes"], 390)
+
 
 class SessionTurtlePortfolioTests(TestCase):
     @patch("edgar.services.session_turtle_portfolio._resolve_universe")
@@ -451,6 +478,34 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertTrue(summary["use_performance_leadership_overlay"])
         self.assertEqual(summary["entries_performance_upscaled"], 1)
         self.assertEqual(summary["entries_performance_downscaled"], 1)
+
+    @patch("edgar.services.session_turtle_portfolio._resolve_universe")
+    @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")
+    def test_session_turtle_portfolio_forwards_extended_hours_protective_exits_to_tiingo_assets(
+        self,
+        mock_backtest,
+        mock_resolve_universe,
+    ):
+        mock_resolve_universe.return_value = (
+            ("AAA", "tiingo", "new_york_equity_open"),
+            ("BTC-USD", "binance", "new_york_equity_open"),
+        )
+        mock_backtest.return_value = {"trades": []}
+
+        generate_session_turtle_shared_account_report(
+            basket="core",
+            use_extended_hours_protective_exits=True,
+            extended_hours_core_session_minutes=390,
+        )
+
+        first_call = mock_backtest.call_args_list[0].kwargs
+        second_call = mock_backtest.call_args_list[1].kwargs
+        self.assertTrue(first_call["use_extended_hours_protective_exits_only"])
+        self.assertEqual(first_call["entry_window_minutes"], 390)
+        self.assertEqual(first_call["core_session_minutes"], 390)
+        self.assertFalse(second_call["use_extended_hours_protective_exits_only"])
+        self.assertEqual(second_call["entry_window_minutes"], 480)
+        self.assertIsNone(second_call["core_session_minutes"])
 
 
 class ApiTests(TestCase):
@@ -2246,6 +2301,97 @@ class BinanceDataTests(TestCase):
         self.assertEqual(payload["fixed_stop_pct"], 0.10)
         self.assertGreater(payload["total_trades"], 0)
         self.assertEqual(payload["trades"][0]["stop_source"], "fixed_pct_stop")
+
+    @patch("edgar.services.session_turtle_trend_strategy._load_local_bars")
+    def test_session_turtle_trend_supports_extended_hours_protective_exits_only(self, mock_load_bars):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        start = datetime(2024, 1, 1, 14, 30)
+        bars: list[dict] = []
+        total_sessions = 22
+        bars_per_session = 96
+        breakout_session = 21
+
+        for session_idx in range(total_sessions):
+            session_start = start + timedelta(days=session_idx)
+            for step in range(bars_per_session):
+                ts = session_start + timedelta(minutes=15 * step)
+                open_price = 100.0
+                high_price = 100.2
+                low_price = 99.8
+                close_price = 100.0
+                if session_idx == breakout_session:
+                    if step == 2:
+                        low_price = 99.9
+                        high_price = 101.0
+                        close_price = 101.0
+                    elif 3 <= step < 26:
+                        open_price = 101.0
+                        high_price = 101.2
+                        low_price = 100.8
+                        close_price = 101.0
+                    elif step == 34:
+                        open_price = 101.0
+                        high_price = 101.0
+                        low_price = 99.5
+                        close_price = 100.5
+                    elif step > 34:
+                        open_price = 101.0
+                        high_price = 101.2
+                        low_price = 100.4
+                        close_price = 101.0
+                bars.append(
+                    {
+                        "timestamp": ts,
+                        "open": open_price,
+                        "high": high_price,
+                        "low": low_price,
+                        "close": close_price,
+                        "volume": 1000.0,
+                    }
+                )
+
+        mock_load_bars.return_value = (bars, "TOKEQ", "local_tiingo_cache", "synthetic")
+
+        baseline = run_session_turtle_trend_backtest(
+            ticker="TOKEQ",
+            interval="15m",
+            lookback_years=1.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            channel_period=20,
+            fixed_stop_pct=0.05,
+            entry_window_minutes=390,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+        extended = run_session_turtle_trend_backtest(
+            ticker="TOKEQ",
+            interval="15m",
+            lookback_years=1.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            channel_period=20,
+            fixed_stop_pct=0.05,
+            entry_window_minutes=390,
+            core_session_minutes=390,
+            use_extended_hours_protective_exits_only=True,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertGreater(baseline["total_trades"], 0)
+        self.assertGreater(extended["total_trades"], 0)
+        baseline_trade = baseline["trades"][0]
+        extended_trade = extended["trades"][0]
+        self.assertEqual(baseline_trade["exit_reason"], "exit_channel")
+        self.assertEqual(extended_trade["exit_reason"], "end_of_data")
+        self.assertEqual(extended["core_session_minutes"], 390)
+        self.assertTrue(extended["use_extended_hours_protective_exits_only"])
+        self.assertGreater(
+            datetime.fromisoformat(extended_trade["exit_date"]),
+            datetime.fromisoformat(baseline_trade["exit_date"]),
+        )
 
     def test_session_turtle_trend_supports_volume_risk_scaling(self):
         from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest

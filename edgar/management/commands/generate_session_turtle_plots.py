@@ -138,6 +138,17 @@ class Command(BaseCommand):
             default=3,
             help="Closed trades required before the leadership overlay sizes an asset away from neutral (default: 3).",
         )
+        parser.add_argument(
+            "--use-extended-hours-protective-exits",
+            action="store_true",
+            help="For New York session Tiingo assets, keep entries in core hours but allow protective stops outside them.",
+        )
+        parser.add_argument(
+            "--extended-hours-core-session-minutes",
+            type=int,
+            default=390,
+            help="Core-session length used before outside-hours protective exits take over (default: 390).",
+        )
 
     def handle(self, *args, **options):
         output_dir = Path(options["output_dir"]).resolve()
@@ -165,6 +176,8 @@ class Command(BaseCommand):
             performance_floor_mult=float(options["performance_floor_mult"]),
             performance_cap_mult=float(options["performance_cap_mult"]),
             performance_min_history=int(options["performance_min_history"]),
+            use_extended_hours_protective_exits=bool(options["use_extended_hours_protective_exits"]),
+            extended_hours_core_session_minutes=int(options["extended_hours_core_session_minutes"]),
         )
         summary = report["summary"]
 
