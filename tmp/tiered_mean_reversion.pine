@@ -1,0 +1,355 @@
+//@version=6
+// =============================================================================
+// TIERED MEAN REVERSION STRATEGY v1
+// =============================================================================
+// Concept: Price deviates from its statistical mean in a measurable way (Z-score).
+// The further price deviates, the stronger the reversion impulse tends to be —
+// and the better the risk/reward of fading that deviation.
+//
+// This strategy enters in up to 3 progressive tiers as price moves deeper into
+// extreme Z-score territory. Each tier is sized to its own risk % so total risk
+// scales in a controlled, pre-defined manner. All tiers share a single exit:
+// Z-score reverts toward zero (the mean). A Z-score stop-out protects against
+// the rare case where the mean itself breaks down.
+//
+// Regime Guard: ADX filters out strongly trending conditions where mean reversion
+// is less reliable. Optional HTF EMA bias ensures we only fade dips in uptrends
+// and rips in downtrends — trading WITH the broader structure.
+//
+// Best suited for: crypto, FX, mean-reverting equity indices.
+// Avoid: momentum breakout regimes, thin liquidity markets.
+// =============================================================================
+
+strategy(
+     title              = "Tiered Mean Reversion v1",
+     shorttitle         = "TMR v1",
+     overlay            = true,
+     pyramiding         = 3,
+     default_qty_type   = strategy.fixed,
+     default_qty_value  = 1,
+     initial_capital    = 10000,
+     commission_type    = strategy.commission.percent,
+     commission_value   = 0.05,
+     slippage           = 2,
+     calc_on_every_tick = false)
+
+// =============================================================================
+// INPUTS
+// =============================================================================
+
+grp_mr = "── Mean Reversion Core"
+i_src        = input.source(close, "Source",          group=grp_mr)
+i_bb_len     = input.int(20, "Lookback Length",        group=grp_mr, minval=5, maxval=500)
+
+grp_tiers = "── Entry Tiers  (Z-Score thresholds)"
+i_t1_z       = input.float(1.5, "Tier 1 Entry Z",     group=grp_tiers, minval=0.5, maxval=4.9, step=0.1)
+i_t2_z       = input.float(2.0, "Tier 2 Entry Z",     group=grp_tiers, minval=0.5, maxval=4.9, step=0.1)
+i_t3_z       = input.float(2.5, "Tier 3 Entry Z",     group=grp_tiers, minval=0.5, maxval=4.9, step=0.1)
+i_stop_z     = input.float(4.0, "Stop-Out Z",          group=grp_tiers, minval=2.5, maxval=8.0, step=0.25)
+i_exit_z     = input.float(0.1, "Exit Z (near mean)",  group=grp_tiers, minval=-0.5, maxval=1.5, step=0.05,
+     tooltip="Long exits when Z crosses ABOVE -ExitZ. Short exits when Z crosses BELOW +ExitZ.")
+
+grp_dir = "── Direction"
+i_allow_long  = input.bool(true,  "Allow Longs",  group=grp_dir)
+i_allow_short = input.bool(true,  "Allow Shorts", group=grp_dir)
+
+grp_risk = "── Risk Management"
+i_t1_risk    = input.float(1.0, "Tier 1 Risk %",      group=grp_risk, minval=0.1, maxval=10.0, step=0.1)
+i_t2_risk    = input.float(1.5, "Tier 2 Risk %",      group=grp_risk, minval=0.1, maxval=10.0, step=0.1)
+i_t3_risk    = input.float(2.0, "Tier 3 Risk %",      group=grp_risk, minval=0.1, maxval=10.0, step=0.1)
+i_max_bars   = input.int(50,    "Max Bars in Trade",   group=grp_risk, minval=0,
+     tooltip="Close trade after N bars regardless of outcome. Set 0 to disable.")
+
+grp_regime = "── Market Regime Filter"
+i_use_adx    = input.bool(true,  "Use ADX Range Filter",     group=grp_regime)
+i_adx_len    = input.int(14,     "ADX Length",               group=grp_regime, minval=2)
+i_adx_max    = input.float(25.0, "Max ADX (ranging market)", group=grp_regime, minval=5.0, maxval=60.0, step=1.0,
+     tooltip="Only trade when ADX is below this level. Higher ADX = trending market = avoid.")
+i_use_htf    = input.bool(true,  "Use HTF Trend Bias Filter", group=grp_regime,
+     tooltip="Only take longs when HTF is bullish (buy dips). Only take shorts when HTF is bearish (sell rips).")
+i_htf_tf     = input.timeframe("D", "HTF Timeframe",         group=grp_regime)
+i_htf_len    = input.int(50,     "HTF EMA Length",           group=grp_regime, minval=5)
+
+grp_vol = "── Volume Quality Filter"
+i_use_vol    = input.bool(false, "Use Volume Filter",  group=grp_vol)
+i_vol_len    = input.int(20,     "Vol SMA Length",     group=grp_vol)
+i_min_vol    = input.float(0.5,  "Min Relative Volume", group=grp_vol, minval=0.1, step=0.05,
+     tooltip="Require at least this multiple of average volume to accept entry.")
+
+grp_dd = "── Drawdown Governor"
+i_use_dd     = input.bool(false, "Pause Trading on Drawdown", group=grp_dd)
+i_dd_halt    = input.float(15.0, "Halt Threshold (%)",         group=grp_dd, minval=1.0, step=0.5)
+
+grp_vis = "── Visuals"
+i_show_bands  = input.bool(true,  "Show Tier Bands",     group=grp_vis)
+i_show_basis  = input.bool(true,  "Show Mean Line",      group=grp_vis)
+i_show_sigs   = input.bool(true,  "Show Entry Signals",  group=grp_vis)
+i_show_levels = input.bool(true,  "Show Active Levels",  group=grp_vis)
+
+// =============================================================================
+// CORE CALCULATIONS
+// =============================================================================
+
+// ── Equity & drawdown ────────────────────────────────────────────────────────
+realized_eq  = strategy.initial_capital + strategy.netprofit
+var float eq_peak = strategy.initial_capital
+eq_peak     := math.max(eq_peak, realized_eq)
+dd_pct       = eq_peak > 0 ? (eq_peak - realized_eq) / eq_peak * 100.0 : 0.0
+halted       = i_use_dd and dd_pct >= i_dd_halt
+
+// ── Z-score ──────────────────────────────────────────────────────────────────
+bb_mean = ta.sma(i_src, i_bb_len)
+bb_std  = ta.stdev(i_src, i_bb_len)
+z       = bb_std > 0 ? (i_src - bb_mean) / bb_std : 0.0
+
+// Price-level equivalents for every tier (visualisation + stop sizing)
+lvl_t1u  = bb_mean + i_t1_z  * bb_std
+lvl_t2u  = bb_mean + i_t2_z  * bb_std
+lvl_t3u  = bb_mean + i_t3_z  * bb_std
+lvl_stu  = bb_mean + i_stop_z * bb_std
+lvl_t1l  = bb_mean - i_t1_z  * bb_std
+lvl_t2l  = bb_mean - i_t2_z  * bb_std
+lvl_t3l  = bb_mean - i_t3_z  * bb_std
+lvl_stl  = bb_mean - i_stop_z * bb_std
+
+// ── Regime: ADX range filter ─────────────────────────────────────────────────
+[_dip, _dim, adx] = ta.dmi(i_adx_len, i_adx_len)
+is_ranging = not i_use_adx or adx <= i_adx_max
+
+// ── HTF trend bias ────────────────────────────────────────────────────────────
+// In an uptrend: only take longs (fade dips back toward rising mean).
+// In a downtrend: only take shorts (fade rips back toward falling mean).
+htf_c   = request.security(syminfo.tickerid, i_htf_tf, close,
+     barmerge.gaps_off, barmerge.lookahead_off)
+htf_ema = request.security(syminfo.tickerid, i_htf_tf, ta.ema(close, i_htf_len),
+     barmerge.gaps_off, barmerge.lookahead_off)
+htf_up  = htf_c > htf_ema
+htf_dn  = htf_c < htf_ema
+ok_long  = i_allow_long  and (not i_use_htf or htf_up)
+ok_short = i_allow_short and (not i_use_htf or htf_dn)
+
+// ── Volume ────────────────────────────────────────────────────────────────────
+vol_sma  = ta.sma(volume, i_vol_len)
+rel_vol  = vol_sma > 0 ? volume / vol_sma : 1.0
+ok_vol   = not i_use_vol or rel_vol >= i_min_vol
+
+// =============================================================================
+// POSITION STATE
+// =============================================================================
+
+in_long  = strategy.position_size > 0
+in_short = strategy.position_size < 0
+is_flat  = strategy.position_size == 0
+
+// Tier counter — tracks how many tiers have been filled for the current trade.
+// Resets automatically when position goes flat.
+var int long_tiers  = 0
+var int short_tiers = 0
+if is_flat
+    long_tiers  := 0
+    short_tiers := 0
+
+// Bars-in-trade counter for time-based stop
+var int bars_held = 0
+if is_flat
+    bars_held := 0
+else
+    bars_held += 1
+
+// =============================================================================
+// RISK SIZING
+// =============================================================================
+// Each tier risks its own designated % of current equity.
+// Stop distance is measured from current close to the Z-score stop-out level,
+// so position size automatically scales with current volatility (bb_std).
+
+f_qty(risk_pct, stop_price) =>
+    eq       = math.max(realized_eq, 1.0)
+    risk_amt = eq * risk_pct / 100.0
+    stop_d   = math.abs(close - stop_price)
+    qty      = stop_d > 0 ? risk_amt / stop_d : 0.0
+    math.max(qty, 0.0)
+
+// Stop prices anchored to current Z-stop band
+long_stop_px  = lvl_stl
+short_stop_px = lvl_stu
+
+l1_qty = f_qty(i_t1_risk, long_stop_px)
+l2_qty = f_qty(i_t2_risk, long_stop_px)
+l3_qty = f_qty(i_t3_risk, long_stop_px)
+s1_qty = f_qty(i_t1_risk, short_stop_px)
+s2_qty = f_qty(i_t2_risk, short_stop_px)
+s3_qty = f_qty(i_t3_risk, short_stop_px)
+
+// =============================================================================
+// ENTRY SIGNALS
+// =============================================================================
+// Each tier activates on a NEW Z-score crossover at its threshold.
+// Using crossover/crossunder (not just >=) prevents re-triggering on the same
+// extreme; price must first retreat past the threshold to trigger again.
+
+ok_entry = is_ranging and ok_vol and not halted
+
+// ── Long tiers: buy the statistical dip ──────────────────────────────────────
+sig_l1 = ok_entry and ok_long and ta.crossunder(z, -i_t1_z) and is_flat
+sig_l2 = ok_entry and ok_long and ta.crossunder(z, -i_t2_z) and in_long and long_tiers == 1
+sig_l3 = ok_entry and ok_long and ta.crossunder(z, -i_t3_z) and in_long and long_tiers == 2
+
+// ── Short tiers: sell the statistical rip ────────────────────────────────────
+sig_s1 = ok_entry and ok_short and ta.crossover(z,  i_t1_z) and is_flat
+sig_s2 = ok_entry and ok_short and ta.crossover(z,  i_t2_z) and in_short and short_tiers == 1
+sig_s3 = ok_entry and ok_short and ta.crossover(z,  i_t3_z) and in_short and short_tiers == 2
+
+// =============================================================================
+// ENTRIES
+// =============================================================================
+
+if sig_l1 and l1_qty > 0
+    strategy.entry("L1", strategy.long,  qty=l1_qty, comment="Long T1")
+    long_tiers := 1
+
+if sig_l2 and l2_qty > 0
+    strategy.entry("L2", strategy.long,  qty=l2_qty, comment="Long T2")
+    long_tiers := 2
+
+if sig_l3 and l3_qty > 0
+    strategy.entry("L3", strategy.long,  qty=l3_qty, comment="Long T3")
+    long_tiers := 3
+
+if sig_s1 and s1_qty > 0
+    strategy.entry("S1", strategy.short, qty=s1_qty, comment="Short T1")
+    short_tiers := 1
+
+if sig_s2 and s2_qty > 0
+    strategy.entry("S2", strategy.short, qty=s2_qty, comment="Short T2")
+    short_tiers := 2
+
+if sig_s3 and s3_qty > 0
+    strategy.entry("S3", strategy.short, qty=s3_qty, comment="Short T3")
+    short_tiers := 3
+
+// =============================================================================
+// EXITS
+// =============================================================================
+// Three exit paths:
+//   1. Mean Revert Exit — Z reverts back toward zero (the primary profit target)
+//   2. Z-Score Stop-Out — price continued moving against us past stop_z
+//   3. Time Stop        — trade has been open longer than max_bars
+
+long_mean_exit  = in_long  and ta.crossover( z, -i_exit_z)
+short_mean_exit = in_short and ta.crossunder(z,  i_exit_z)
+long_z_stop     = in_long  and z <= -i_stop_z
+short_z_stop    = in_short and z >=  i_stop_z
+time_stop       = (i_max_bars > 0) and bars_held >= i_max_bars
+
+if in_long
+    l_reason = long_z_stop ? "Z-Stop Long" : time_stop ? "Time Stop Long" : "Mean Revert Long"
+    if long_mean_exit or long_z_stop or time_stop
+        strategy.close_all(comment=l_reason)
+        long_tiers := 0
+
+if in_short
+    s_reason = short_z_stop ? "Z-Stop Short" : time_stop ? "Time Stop Short" : "Mean Revert Short"
+    if short_mean_exit or short_z_stop or time_stop
+        strategy.close_all(comment=s_reason)
+        short_tiers := 0
+
+// =============================================================================
+// VISUALS
+// =============================================================================
+
+// ── Mean line ────────────────────────────────────────────────────────────────
+plot(i_show_basis ? bb_mean : na, "Mean", color.new(color.silver, 20), 1)
+
+// ── Tier bands ────────────────────────────────────────────────────────────────
+// Each pair of bands fills a colour gradient — deepest zone is most extreme.
+p_t1u = plot(i_show_bands ? lvl_t1u : na, "T1 Upper", color.new(color.blue,   50), 1)
+p_t2u = plot(i_show_bands ? lvl_t2u : na, "T2 Upper", color.new(color.orange, 30), 1)
+p_t3u = plot(i_show_bands ? lvl_t3u : na, "T3 Upper", color.new(color.red,    10), 1)
+p_t1l = plot(i_show_bands ? lvl_t1l : na, "T1 Lower", color.new(color.blue,   50), 1)
+p_t2l = plot(i_show_bands ? lvl_t2l : na, "T2 Lower", color.new(color.orange, 30), 1)
+p_t3l = plot(i_show_bands ? lvl_t3l : na, "T3 Lower", color.new(color.red,    10), 1)
+
+fill(p_t1u, p_t2u, color.new(color.blue,   92), title="T1→T2 Upper Zone")
+fill(p_t2u, p_t3u, color.new(color.orange, 87), title="T2→T3 Upper Zone")
+fill(p_t1l, p_t2l, color.new(color.blue,   92), title="T1→T2 Lower Zone")
+fill(p_t2l, p_t3l, color.new(color.orange, 87), title="T2→T3 Lower Zone")
+
+// ── Active trade levels (stop & mean target while in a position) ─────────────
+plot(i_show_levels and in_long  ? long_stop_px  : na, "Long Z-Stop",    color.new(color.red,  0), 1, plot.style_linebr)
+plot(i_show_levels and in_long  ? bb_mean       : na, "Long Mean Target", color.new(color.lime, 0), 1, plot.style_linebr)
+plot(i_show_levels and in_short ? short_stop_px : na, "Short Z-Stop",   color.new(color.red,  0), 1, plot.style_linebr)
+plot(i_show_levels and in_short ? bb_mean       : na, "Short Mean Target", color.new(color.lime, 0), 1, plot.style_linebr)
+
+// ── Entry shapes — size increases with tier severity ─────────────────────────
+plotshape(i_show_sigs and sig_l1, "L1", shape.triangleup,   location.belowbar, color.new(color.lime,   0), size=size.tiny,   text="L1")
+plotshape(i_show_sigs and sig_l2, "L2", shape.triangleup,   location.belowbar, color.new(color.teal,   0), size=size.small,  text="L2")
+plotshape(i_show_sigs and sig_l3, "L3", shape.triangleup,   location.belowbar, color.new(color.aqua,   0), size=size.normal, text="L3")
+plotshape(i_show_sigs and sig_s1, "S1", shape.triangledown, location.abovebar, color.new(color.red,    0), size=size.tiny,   text="S1")
+plotshape(i_show_sigs and sig_s2, "S2", shape.triangledown, location.abovebar, color.new(color.orange, 0), size=size.small,  text="S2")
+plotshape(i_show_sigs and sig_s3, "S3", shape.triangledown, location.abovebar, color.new(color.maroon, 0), size=size.normal, text="S3")
+
+// ── Background: regime highlight ─────────────────────────────────────────────
+bgcolor(i_use_adx and not is_ranging ? color.new(color.purple, 93) : na, title="Trending (ADX high — filtered)")
+bgcolor(halted                        ? color.new(color.red,    90) : na, title="DD Halt Active")
+
+// =============================================================================
+// INFO TABLE
+// =============================================================================
+
+var table t = table.new(position.top_right, 2, 11,
+     bgcolor=color.new(color.black, 70),
+     border_color=color.new(color.gray, 60),
+     border_width=1)
+
+if barstate.islast
+    // Header
+    table.cell(t, 0, 0, "Tiered Mean Reversion", text_color=color.white,  text_size=size.small, bgcolor=color.new(color.navy, 30))
+    table.cell(t, 1, 0, syminfo.ticker,           text_color=color.yellow, text_size=size.small, bgcolor=color.new(color.navy, 30))
+
+    // Equity
+    table.cell(t, 0, 1, "Equity",    text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 1, "$" + str.tostring(realized_eq, "#,###.##"), text_color=color.white, text_size=size.tiny)
+
+    // Drawdown
+    dd_col = dd_pct > i_dd_halt * 0.75 ? color.red : dd_pct > i_dd_halt * 0.5 ? color.orange : color.white
+    table.cell(t, 0, 2, "DD %",      text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 2, str.tostring(dd_pct, "#.##") + "%", text_color=dd_col, text_size=size.tiny)
+
+    // Z-score (colour-coded by zone)
+    az    = math.abs(z)
+    z_col = az >= i_stop_z ? color.red : az >= i_t3_z ? color.orange : az >= i_t2_z ? color.yellow : az >= i_t1_z ? color.lime : color.white
+    table.cell(t, 0, 3, "Z-Score",   text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 3, str.tostring(z, "#.##"), text_color=z_col, text_size=size.tiny)
+
+    // ADX / Regime
+    table.cell(t, 0, 4, "ADX",       text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 4, str.tostring(adx, "#.#"), text_color=is_ranging ? color.lime : color.red, text_size=size.tiny)
+
+    table.cell(t, 0, 5, "Regime",    text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 5, is_ranging ? "RANGE" : "TREND", text_color=is_ranging ? color.lime : color.red, text_size=size.tiny)
+
+    // HTF bias
+    htf_txt = htf_up ? "BULL" : htf_dn ? "BEAR" : "NEUTRAL"
+    htf_col = htf_up ? color.lime : htf_dn ? color.red : color.gray
+    table.cell(t, 0, 6, "HTF Bias",  text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 6, htf_txt,     text_color=htf_col,     text_size=size.tiny)
+
+    // Relative volume
+    table.cell(t, 0, 7, "Rel Vol",   text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 7, str.tostring(rel_vol, "#.##") + "x", text_color=ok_vol ? color.white : color.gray, text_size=size.tiny)
+
+    // Active position & tier
+    pos_txt = in_long  ? "LONG  ×" + str.tostring(long_tiers)  :
+              in_short ? "SHORT ×" + str.tostring(short_tiers) : "FLAT"
+    pos_col = in_long ? color.lime : in_short ? color.red : color.gray
+    table.cell(t, 0, 8, "Position",  text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 8, pos_txt,     text_color=pos_col,     text_size=size.tiny)
+
+    // Bars held
+    table.cell(t, 0, 9,  "Bars Held", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 9,  str.tostring(bars_held), text_color=color.white, text_size=size.tiny)
+
+    // Status
+    table.cell(t, 0, 10, "Status",   text_color=color.gray,  text_size=size.tiny)
+    table.cell(t, 1, 10, halted ? "HALTED" : "ACTIVE", text_color=halted ? color.red : color.lime, text_size=size.tiny)

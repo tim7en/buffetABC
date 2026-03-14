@@ -1,0 +1,633 @@
+//@version=6
+// =============================================================================
+// TIERED MEAN REVERSION — SESSION, MACRO & ANOMALY AWARE  v3
+// =============================================================================
+// New in v3 vs v2:
+//
+// 1. LEVERAGE SUPPORT (1x – 20x)
+//    Position size = min(risk-based qty, equity × leverage / price)
+//    Risk inputs are expressed as % of notional equity — with leverage the
+//    effective exposure scales accordingly.  At x20 always pair with tight
+//    Z-stop and small base-risk values.
+//
+// 2. PREVIOUS SESSION HIGH / LOW  (PDH / PDL)
+//    Previous day's high and low are "gravity" levels that price tends to
+//    revisit.  When price is BEYOND PDL (for longs) or PDH (for shorts)
+//    during off-hours or thin-session bars, this is a high-probability
+//    reversion setup — risk is boosted by a configurable multiplier.
+//
+// 3. WEEKEND OVEREXTENSION BOOST
+//    Crypto 24/7: Saturday / Sunday moves happen in thin liquidity and
+//    frequently reverse at Monday's London open.  When a Z-score extreme
+//    forms over the weekend, the post-weekend snap-back signal receives an
+//    extra risk boost.
+//
+// RISK FORMULA (unchanged core):
+//   final_risk = base_tier_risk × session_mult × macro_mult × vol_mult
+//                × pdhl_boost × weekend_boost
+//   qty = min( final_risk_based_qty,  equity × leverage / price )
+//
+// =============================================================================
+
+strategy(
+     title              = "Tiered Mean Reversion — Session, Macro & Anomaly v3",
+     shorttitle         = "TMR v3",
+     overlay            = true,
+     pyramiding         = 3,
+     default_qty_type   = strategy.fixed,
+     default_qty_value  = 1,
+     initial_capital    = 10000,
+     commission_type    = strategy.commission.percent,
+     commission_value   = 0.05,
+     slippage           = 2,
+     calc_on_every_tick = false)
+
+// =============================================================================
+// INPUTS
+// =============================================================================
+
+grp_mr    = "── Mean Reversion Core"
+i_src         = input.source(close,  "Source",                         group=grp_mr)
+i_bb_len      = input.int(20,        "Lookback Length",                 group=grp_mr, minval=5, maxval=500)
+
+grp_tiers = "── Entry Tiers  (Z-Score)"
+i_t1_z        = input.float(1.5, "Tier 1 Entry Z",                     group=grp_tiers, minval=0.5, maxval=4.9, step=0.1)
+i_t2_z        = input.float(2.0, "Tier 2 Entry Z",                     group=grp_tiers, minval=0.5, maxval=4.9, step=0.1)
+i_t3_z        = input.float(2.5, "Tier 3 Entry Z",                     group=grp_tiers, minval=0.5, maxval=4.9, step=0.1)
+i_stop_z      = input.float(4.0, "Stop-Out Z",                         group=grp_tiers, minval=2.5, maxval=8.0, step=0.25)
+i_exit_z      = input.float(0.1, "Exit Z (near mean)",                 group=grp_tiers, minval=-0.5, maxval=1.5, step=0.05)
+
+grp_dir   = "── Direction"
+i_allow_long  = input.bool(true,  "Allow Longs",  group=grp_dir)
+i_allow_short = input.bool(true,  "Allow Shorts", group=grp_dir)
+
+grp_risk  = "── Risk & Leverage"
+i_t1_risk     = input.float(1.0,  "Tier 1 Base Risk %",                group=grp_risk, minval=0.1, maxval=10.0, step=0.1)
+i_t2_risk     = input.float(1.5,  "Tier 2 Base Risk %",                group=grp_risk, minval=0.1, maxval=10.0, step=0.1)
+i_t3_risk     = input.float(2.0,  "Tier 3 Base Risk %",                group=grp_risk, minval=0.1, maxval=10.0, step=0.1)
+i_leverage    = input.float(3.0,  "Leverage Cap (×)",                  group=grp_risk, minval=1.0, maxval=20.0, step=0.5,
+     tooltip="Maximum position value = equity × leverage.\n"
+           + "Risk-based sizing still applies first; this cap prevents over-leverage.\n"
+           + "≥ x10: use very small risk % and tight Z-stop (≤ 3.0) to avoid liquidation.")
+i_max_bars    = input.int(50,     "Max Bars in Trade  (0 = off)",       group=grp_risk, minval=0)
+
+// ── Session weighting ─────────────────────────────────────────────────────────
+grp_sess  = "── Session Risk Weighting"
+i_use_sess    = input.bool(true,   "Enable Session Weighting",          group=grp_sess)
+i_skip_offh   = input.bool(true,   "Block Entries in Off-Hours",        group=grp_sess)
+i_m_ln        = input.float(1.25,  "London / NY Overlap ×",            group=grp_sess, minval=0.0, maxval=3.0, step=0.05)
+i_m_al        = input.float(0.90,  "Asia / London Overlap ×",          group=grp_sess, minval=0.0, maxval=3.0, step=0.05)
+i_m_lo        = input.float(1.00,  "London Only ×",                    group=grp_sess, minval=0.0, maxval=3.0, step=0.05)
+i_m_ny        = input.float(1.00,  "New York Only ×",                  group=grp_sess, minval=0.0, maxval=3.0, step=0.05)
+i_m_as        = input.float(0.75,  "Tokyo / Asia Only ×",              group=grp_sess, minval=0.0, maxval=3.0, step=0.05)
+i_m_oh        = input.float(0.50,  "Off-Hours ×",                      group=grp_sess, minval=0.0, maxval=3.0, step=0.05)
+
+// ── Previous Session H/L — off-hours anomaly boost ────────────────────────────
+grp_pdhl  = "── Previous Session H/L  (Off-Hours Anomaly)"
+i_use_pdhl    = input.bool(true,   "Enable PDH/PDL Anomaly Boost",     group=grp_pdhl,
+     tooltip="Price beyond previous day's high/low in off-hours signals a strong "
+           + "reversion impulse — market is overextended relative to prior session range.")
+i_pdhl_boost  = input.float(1.15,  "Beyond PDH/PDL Risk ×",            group=grp_pdhl, minval=1.0, maxval=2.0, step=0.05)
+i_pdhl_target = input.bool(true,   "Plot PDH/PDL as Targets",          group=grp_pdhl,
+     tooltip="Show previous day high/low as potential reversion target levels.")
+i_use_pwhl    = input.bool(true,   "Also Use Previous Week H/L",       group=grp_pdhl,
+     tooltip="Extends the same logic to weekly levels for larger overextensions.")
+i_pwhl_boost  = input.float(1.20,  "Beyond PWH/PWL Risk ×",            group=grp_pdhl, minval=1.0, maxval=2.0, step=0.05)
+
+// ── Weekend overextension ─────────────────────────────────────────────────────
+grp_wknd  = "── Weekend Overextension"
+i_use_wknd    = input.bool(true,   "Weekend Overextension Boost",       group=grp_wknd,
+     tooltip="Crypto weekend moves in thin liquidity often fully retrace by Monday open.\n"
+           + "Boost risk when a Z-score extreme forms Saturday or Sunday.")
+i_wknd_min_z  = input.float(2.0,   "Min |Z| for Weekend Boost",        group=grp_wknd, minval=1.0, maxval=4.0, step=0.1)
+i_wknd_boost  = input.float(1.12,  "Weekend Risk ×",                   group=grp_wknd, minval=1.0, maxval=2.0, step=0.05)
+
+// ── US Macro Calendar ─────────────────────────────────────────────────────────
+grp_mac   = "── US Macro Calendar Guard"
+i_use_mac     = input.bool(true,   "Enable Macro Calendar Guard",       group=grp_mac)
+i_mac_nfp     = input.bool(true,   "Guard  NFP   (1st Friday)",        group=grp_mac)
+i_mac_cpi     = input.bool(true,   "Guard  CPI/PPI  (2nd–3rd Tue/Wed)", group=grp_mac)
+i_mac_gdp     = input.bool(true,   "Guard  GDP/PCE  (last Thursday)",  group=grp_mac)
+i_pre_halt    = input.bool(true,   "Halt  Pre-Release  (30 min)",       group=grp_mac)
+i_dur_halt    = input.bool(true,   "Halt  During Release  (60 min)",    group=grp_mac)
+i_close_pre   = input.bool(false,  "Close Positions Pre-Release",       group=grp_mac)
+i_post_boost  = input.bool(true,   "Post-Release Reversion Boost",     group=grp_mac)
+i_post_mult   = input.float(1.25,  "Post-Release Risk ×",              group=grp_mac, minval=0.5, maxval=3.0, step=0.05)
+
+// ── Volume Risk Adjustment ────────────────────────────────────────────────────
+grp_vol   = "── Volume Risk Adjustment"
+i_use_vol     = input.bool(true,   "Enable Volume Risk Adjustment",     group=grp_vol)
+i_vol_len     = input.int(20,      "Volume SMA Length",                 group=grp_vol, minval=2)
+i_vol_th      = input.float(1.20,  "High-Volume Threshold  (× avg)",   group=grp_vol, minval=0.5, step=0.05)
+i_cl_loc_th   = input.float(0.65,  "Directional Close Location",        group=grp_vol, minval=0.5, maxval=1.0, step=0.05)
+i_vol_boost   = input.float(1.20,  "Confirmed Volume ×",               group=grp_vol, minval=1.0, maxval=3.0, step=0.05)
+i_vol_penalty = input.float(0.70,  "Low Volume ×",                     group=grp_vol, minval=0.1, maxval=1.0, step=0.05)
+
+// ── ADX Regime Filter ────────────────────────────────────────────────────────
+grp_adx   = "── ADX Regime Filter"
+i_use_adx     = input.bool(true,   "Use ADX Range Filter",              group=grp_adx)
+i_adx_len     = input.int(14,      "ADX Length",                        group=grp_adx, minval=2)
+i_adx_max     = input.float(25.0,  "Max ADX  (market is ranging)",     group=grp_adx, minval=5.0, maxval=60.0, step=1.0)
+
+// ── HTF Trend Bias ───────────────────────────────────────────────────────────
+grp_htf   = "── HTF Trend Bias"
+i_use_htf     = input.bool(true,   "HTF Trend Bias Filter",             group=grp_htf)
+i_htf_tf      = input.timeframe("D", "HTF Timeframe",                  group=grp_htf)
+i_htf_len     = input.int(50,      "HTF EMA Length",                   group=grp_htf, minval=5)
+
+// ── Drawdown Governor ─────────────────────────────────────────────────────────
+grp_dd    = "── Drawdown Governor"
+i_use_dd      = input.bool(false,  "Pause on Drawdown",                 group=grp_dd)
+i_dd_halt     = input.float(15.0,  "Halt Threshold (%)",                group=grp_dd, minval=1.0, step=0.5)
+
+// ── Visuals ───────────────────────────────────────────────────────────────────
+grp_vis   = "── Visuals"
+i_show_bands  = input.bool(true,   "Show Tier Bands",                   group=grp_vis)
+i_show_basis  = input.bool(true,   "Show Mean Line",                    group=grp_vis)
+i_show_pdhl   = input.bool(true,   "Show PDH/PDL Lines",                group=grp_vis)
+i_show_sigs   = input.bool(true,   "Show Entry Signals",                group=grp_vis)
+i_show_levels = input.bool(true,   "Show Active Stop / Target Lines",   group=grp_vis)
+i_show_sess   = input.bool(true,   "Show Session Background",           group=grp_vis)
+i_show_macro  = input.bool(true,   "Show Macro Event Background",       group=grp_vis)
+
+// =============================================================================
+// CORE CALCULATIONS
+// =============================================================================
+
+// ── Equity & drawdown ────────────────────────────────────────────────────────
+realized_eq  = strategy.initial_capital + strategy.netprofit
+var float eq_peak = strategy.initial_capital
+eq_peak     := math.max(eq_peak, realized_eq)
+dd_pct       = eq_peak > 0 ? (eq_peak - realized_eq) / eq_peak * 100.0 : 0.0
+dd_halted    = i_use_dd and dd_pct >= i_dd_halt
+
+// ── Z-score ───────────────────────────────────────────────────────────────────
+bb_mean  = ta.sma(i_src, i_bb_len)
+bb_std   = ta.stdev(i_src, i_bb_len)
+z        = bb_std > 0 ? (i_src - bb_mean) / bb_std : 0.0
+
+lvl_t1u  = bb_mean + i_t1_z  * bb_std
+lvl_t2u  = bb_mean + i_t2_z  * bb_std
+lvl_t3u  = bb_mean + i_t3_z  * bb_std
+lvl_stu  = bb_mean + i_stop_z * bb_std
+lvl_t1l  = bb_mean - i_t1_z  * bb_std
+lvl_t2l  = bb_mean - i_t2_z  * bb_std
+lvl_t3l  = bb_mean - i_t3_z  * bb_std
+lvl_stl  = bb_mean - i_stop_z * bb_std
+
+// ── ADX ───────────────────────────────────────────────────────────────────────
+[_dip, _dim, adx] = ta.dmi(i_adx_len, i_adx_len)
+is_ranging = not i_use_adx or adx <= i_adx_max
+
+// ── HTF trend bias ────────────────────────────────────────────────────────────
+htf_c   = request.security(syminfo.tickerid, i_htf_tf, close,
+     barmerge.gaps_off, barmerge.lookahead_off)
+htf_ema = request.security(syminfo.tickerid, i_htf_tf, ta.ema(close, i_htf_len),
+     barmerge.gaps_off, barmerge.lookahead_off)
+htf_up  = htf_c > htf_ema
+htf_dn  = htf_c < htf_ema
+ok_long  = i_allow_long  and (not i_use_htf or htf_up)
+ok_short = i_allow_short and (not i_use_htf or htf_dn)
+
+// =============================================================================
+// PREVIOUS SESSION HIGH / LOW  — off-hours anomaly levels
+// =============================================================================
+// Previous day H/L are key gravity levels price tends to revisit.
+// Previous week H/L catch larger overextensions (weekend gaps, thin Sunday moves).
+
+pdh = request.security(syminfo.tickerid, "D", high[1],
+     barmerge.gaps_off, barmerge.lookahead_off)
+pdl = request.security(syminfo.tickerid, "D", low[1],
+     barmerge.gaps_off, barmerge.lookahead_off)
+pwh = request.security(syminfo.tickerid, "W", high[1],
+     barmerge.gaps_off, barmerge.lookahead_off)
+pwl = request.security(syminfo.tickerid, "W", low[1],
+     barmerge.gaps_off, barmerge.lookahead_off)
+
+// Price is "anomalous" if it has traded beyond the previous session's range —
+// this is the off-hours overextension signature we want to fade.
+beyond_pdl  = close < pdl    // below prev day low  → long candidate
+beyond_pdh  = close > pdh    // above prev day high → short candidate
+beyond_pwl  = close < pwl    // below prev week low → stronger long
+beyond_pwh  = close > pwh    // above prev week high → stronger short
+
+// =============================================================================
+// SESSION DETECTION  (intraday only)
+// =============================================================================
+
+is_intraday = timeframe.isintraday
+
+in_tokyo  = is_intraday ? not na(time(timeframe.period, "0900-1530", "Asia/Tokyo"))        : true
+in_london = is_intraday ? not na(time(timeframe.period, "0800-1700", "Europe/London"))     : true
+in_ny     = is_intraday ? not na(time(timeframe.period, "0930-1600", "America/New_York"))  : true
+
+overlap_ln = in_london and in_ny
+overlap_al = in_tokyo  and in_london
+
+in_any_session = in_tokyo or in_london or in_ny
+ok_sess_entry  = not is_intraday or not i_skip_offh or in_any_session
+
+sess_mult =
+     not i_use_sess or not is_intraday ? 1.0  :
+     overlap_ln                        ? i_m_ln :
+     overlap_al                        ? i_m_al :
+     in_london                         ? i_m_lo :
+     in_ny                             ? i_m_ny :
+     in_tokyo                          ? i_m_as :
+     i_m_oh
+
+sess_label =
+     not is_intraday ? "DAILY+" :
+     overlap_ln      ? "OVL L/NY" :
+     overlap_al      ? "OVL A/L"  :
+     in_london       ? "LONDON"   :
+     in_ny           ? "NEW YORK" :
+     in_tokyo        ? "TOKYO"    :
+     "OFF-HRS"
+
+// =============================================================================
+// PREVIOUS SESSION H/L BOOST
+// =============================================================================
+// Only apply during off-hours or thin sessions — that's when anomalies form.
+// Price must be BEYOND the prev session extreme to qualify.
+
+in_thin_session = is_intraday and (not in_any_session or in_tokyo)
+
+// Daily level boost
+pdhl_boost_l =
+     i_use_pdhl and in_thin_session and beyond_pdl ? i_pdhl_boost : 1.0
+pdhl_boost_s =
+     i_use_pdhl and in_thin_session and beyond_pdh ? i_pdhl_boost : 1.0
+
+// Weekly level boost (overrides daily if stronger)
+pwhl_boost_l =
+     i_use_pdhl and i_use_pwhl and beyond_pwl ? i_pwhl_boost : 1.0
+pwhl_boost_s =
+     i_use_pdhl and i_use_pwhl and beyond_pwh ? i_pwhl_boost : 1.0
+
+// Take the larger of daily/weekly boost
+pdhl_final_l = math.max(pdhl_boost_l, pwhl_boost_l)
+pdhl_final_s = math.max(pdhl_boost_s, pwhl_boost_s)
+
+// =============================================================================
+// WEEKEND OVEREXTENSION
+// =============================================================================
+// dayofweek:  1=Sun  2=Mon  3=Tue  4=Wed  5=Thu  6=Fri  7=Sat
+
+is_weekend   = dayofweek == 1 or dayofweek == 7  // Sunday or Saturday
+wknd_boost   = (i_use_wknd and is_weekend and math.abs(z) >= i_wknd_min_z)
+               ? i_wknd_boost : 1.0
+
+// =============================================================================
+// US MACRO CALENDAR
+// =============================================================================
+
+_dow = dayofweek
+_dom = dayofmonth
+
+_raw_nfp = _dow == dayofweek.friday   and _dom <= 7
+_raw_cpi = (_dow == dayofweek.tuesday or _dow == dayofweek.wednesday) and _dom >= 8  and _dom <= 21
+_raw_gdp = _dow == dayofweek.thursday and _dom >= 22
+
+is_nfp_day = i_use_mac and i_mac_nfp and _raw_nfp
+is_cpi_day = i_use_mac and i_mac_cpi and _raw_cpi
+is_gdp_day = i_use_mac and i_mac_gdp and _raw_gdp
+is_macro_day = is_nfp_day or is_cpi_day or is_gdp_day
+
+pre_release  = is_macro_day and i_pre_halt   and is_intraday and not na(time(timeframe.period, "0800-0830", "America/New_York"))
+at_release   = is_macro_day and i_dur_halt   and is_intraday and not na(time(timeframe.period, "0830-0930", "America/New_York"))
+post_release = is_macro_day and i_post_boost and is_intraday and not na(time(timeframe.period, "0930-1200", "America/New_York"))
+
+daily_macro  = not is_intraday and is_macro_day
+
+macro_halt         = pre_release or at_release
+macro_boost_active = post_release
+
+macro_mult =
+     not i_use_mac      ? 1.0 :
+     macro_halt         ? 0.0 :
+     macro_boost_active ? i_post_mult :
+     daily_macro        ? 0.80 :
+     1.0
+
+macro_label =
+     macro_halt         ? "HALTED"   :
+     macro_boost_active ? "POST-REL" :
+     is_nfp_day         ? "NFP DAY"  :
+     is_cpi_day         ? "CPI DAY"  :
+     is_gdp_day         ? "GDP DAY"  :
+     "NORMAL"
+
+macro_label_col =
+     macro_halt         ? color.red    :
+     macro_boost_active ? color.lime   :
+     is_macro_day       ? color.orange :
+     color.gray
+
+// =============================================================================
+// VOLUME RISK ADJUSTMENT
+// =============================================================================
+
+vol_sma   = ta.sma(volume, i_vol_len)
+rel_vol   = vol_sma > 0 ? volume / vol_sma : 1.0
+bar_rng   = math.max(high - low, syminfo.mintick)
+close_loc = (close - low) / bar_rng
+
+vol_high        = rel_vol >= i_vol_th
+vol_conf_long   = vol_high and close_loc >= i_cl_loc_th
+vol_conf_short  = vol_high and close_loc <= (1.0 - i_cl_loc_th)
+
+vol_mult_long  =
+     not i_use_vol  ? 1.0         :
+     vol_conf_long  ? i_vol_boost :
+     vol_high       ? 1.0         :
+     i_vol_penalty
+
+vol_mult_short =
+     not i_use_vol  ? 1.0         :
+     vol_conf_short ? i_vol_boost :
+     vol_high       ? 1.0         :
+     i_vol_penalty
+
+// =============================================================================
+// COMPOSITE FINAL RISK MULTIPLIER
+// =============================================================================
+// final_risk = base × session × macro × volume × pdhl × weekend
+// qty        = min( risk_based_qty, equity × leverage / price )
+
+macro_gated  = macro_mult == 0.0
+ok_entry     = is_ranging and ok_sess_entry and not macro_gated and not dd_halted
+
+final_mult_l = sess_mult * macro_mult * vol_mult_long  * pdhl_final_l * wknd_boost
+final_mult_s = sess_mult * macro_mult * vol_mult_short * pdhl_final_s * wknd_boost
+
+// =============================================================================
+// POSITION STATE
+// =============================================================================
+
+in_long  = strategy.position_size > 0
+in_short = strategy.position_size < 0
+is_flat  = strategy.position_size == 0
+
+var int long_tiers  = 0
+var int short_tiers = 0
+if is_flat
+    long_tiers  := 0
+    short_tiers := 0
+
+var int bars_held = 0
+if is_flat
+    bars_held := 0
+else
+    bars_held += 1
+
+// =============================================================================
+// RISK SIZING  (with leverage cap)
+// =============================================================================
+
+f_qty(base_risk, stop_px, risk_mult) =>
+    eq        = math.max(realized_eq, 1.0)
+    adj_risk  = base_risk * risk_mult
+    risk_amt  = eq * adj_risk / 100.0
+    stop_d    = math.abs(close - stop_px)
+    qty_risk  = stop_d > 0 ? risk_amt / stop_d : 0.0
+    // Leverage cap: max position notional = equity × leverage
+    qty_lev   = close > 0 ? (eq * i_leverage) / close : 0.0
+    math.max(math.min(qty_risk, qty_lev), 0.0)
+
+long_stop_px  = lvl_stl
+short_stop_px = lvl_stu
+
+l1_qty = f_qty(i_t1_risk, long_stop_px,  final_mult_l)
+l2_qty = f_qty(i_t2_risk, long_stop_px,  final_mult_l)
+l3_qty = f_qty(i_t3_risk, long_stop_px,  final_mult_l)
+s1_qty = f_qty(i_t1_risk, short_stop_px, final_mult_s)
+s2_qty = f_qty(i_t2_risk, short_stop_px, final_mult_s)
+s3_qty = f_qty(i_t3_risk, short_stop_px, final_mult_s)
+
+// =============================================================================
+// ENTRY SIGNALS
+// =============================================================================
+
+sig_l1 = ok_entry and ok_long  and ta.crossunder(z, -i_t1_z) and is_flat
+sig_l2 = ok_entry and ok_long  and ta.crossunder(z, -i_t2_z) and in_long  and long_tiers  == 1
+sig_l3 = ok_entry and ok_long  and ta.crossunder(z, -i_t3_z) and in_long  and long_tiers  == 2
+sig_s1 = ok_entry and ok_short and ta.crossover( z,  i_t1_z) and is_flat
+sig_s2 = ok_entry and ok_short and ta.crossover( z,  i_t2_z) and in_short and short_tiers == 1
+sig_s3 = ok_entry and ok_short and ta.crossover( z,  i_t3_z) and in_short and short_tiers == 2
+
+// Entry label encodes session + anomaly context
+_anom_l = pdhl_final_l > 1.0 ? " PDH/PDL" : wknd_boost > 1.0 ? " WKND" : ""
+_anom_s = pdhl_final_s > 1.0 ? " PDH/PDL" : wknd_boost > 1.0 ? " WKND" : ""
+_vol_l  = vol_conf_long  ? " V+" : ""
+_vol_s  = vol_conf_short ? " V+" : ""
+
+// =============================================================================
+// ENTRIES
+// =============================================================================
+
+if sig_l1 and l1_qty > 0
+    strategy.entry("L1", strategy.long,  qty=l1_qty, comment="L1 " + sess_label + _anom_l + _vol_l)
+    long_tiers := 1
+
+if sig_l2 and l2_qty > 0
+    strategy.entry("L2", strategy.long,  qty=l2_qty, comment="L2 " + sess_label + _anom_l + _vol_l)
+    long_tiers := 2
+
+if sig_l3 and l3_qty > 0
+    strategy.entry("L3", strategy.long,  qty=l3_qty, comment="L3 " + sess_label + _anom_l + _vol_l)
+    long_tiers := 3
+
+if sig_s1 and s1_qty > 0
+    strategy.entry("S1", strategy.short, qty=s1_qty, comment="S1 " + sess_label + _anom_s + _vol_s)
+    short_tiers := 1
+
+if sig_s2 and s2_qty > 0
+    strategy.entry("S2", strategy.short, qty=s2_qty, comment="S2 " + sess_label + _anom_s + _vol_s)
+    short_tiers := 2
+
+if sig_s3 and s3_qty > 0
+    strategy.entry("S3", strategy.short, qty=s3_qty, comment="S3 " + sess_label + _anom_s + _vol_s)
+    short_tiers := 3
+
+// =============================================================================
+// EXITS
+// =============================================================================
+
+long_mean_exit  = in_long  and ta.crossover( z, -i_exit_z)
+short_mean_exit = in_short and ta.crossunder(z,  i_exit_z)
+long_z_stop     = in_long  and z <= -i_stop_z
+short_z_stop    = in_short and z >=  i_stop_z
+time_stop       = (i_max_bars > 0) and bars_held >= i_max_bars
+macro_close     = i_use_mac and i_close_pre and pre_release and (in_long or in_short)
+
+if macro_close
+    strategy.close_all(comment="Pre-Macro Close")
+    long_tiers  := 0
+    short_tiers := 0
+
+if in_long
+    l_rsn = long_z_stop ? "Z-Stop Long"  : time_stop ? "Time Stop" : "Mean Revert Long"
+    if long_mean_exit or long_z_stop or time_stop
+        strategy.close_all(comment=l_rsn)
+        long_tiers := 0
+
+if in_short
+    s_rsn = short_z_stop ? "Z-Stop Short" : time_stop ? "Time Stop" : "Mean Revert Short"
+    if short_mean_exit or short_z_stop or time_stop
+        strategy.close_all(comment=s_rsn)
+        short_tiers := 0
+
+// =============================================================================
+// VISUALS
+// =============================================================================
+
+// ── Session backgrounds ───────────────────────────────────────────────────────
+bgcolor(i_show_sess and is_intraday and overlap_ln ? color.new(color.green,  94) : na, title="Session: L/NY Overlap")
+bgcolor(i_show_sess and is_intraday and overlap_al ? color.new(color.teal,   94) : na, title="Session: A/L Overlap")
+bgcolor(i_show_sess and is_intraday and in_london and not overlap_ln ? color.new(color.blue,   97) : na, title="Session: London")
+bgcolor(i_show_sess and is_intraday and in_ny     and not overlap_ln ? color.new(color.blue,   97) : na, title="Session: New York")
+bgcolor(i_show_sess and is_intraday and in_tokyo  and not overlap_al ? color.new(color.purple, 97) : na, title="Session: Tokyo")
+
+// ── Macro backgrounds ─────────────────────────────────────────────────────────
+bgcolor(i_show_macro and macro_halt         ? color.new(color.red,    88) : na, title="Macro: Halt")
+bgcolor(i_show_macro and macro_boost_active ? color.new(color.yellow, 93) : na, title="Macro: Post-Release")
+bgcolor(i_show_macro and is_macro_day and not macro_halt and not macro_boost_active
+     ? color.new(color.orange, 96) : na, title="Macro: Event Day")
+
+// ── Weekend background ────────────────────────────────────────────────────────
+bgcolor(i_use_wknd and is_weekend ? color.new(color.gray, 96) : na, title="Weekend")
+
+// ── Regime ────────────────────────────────────────────────────────────────────
+bgcolor(i_use_adx and not is_ranging ? color.new(color.purple, 93) : na, title="Trending (ADX filtered)")
+bgcolor(dd_halted                    ? color.new(color.red,    90) : na, title="DD Halt")
+
+// ── Mean line ─────────────────────────────────────────────────────────────────
+plot(i_show_basis ? bb_mean : na, "Mean", color.new(color.silver, 20), 1)
+
+// ── Tier bands ────────────────────────────────────────────────────────────────
+p_t1u = plot(i_show_bands ? lvl_t1u : na, "T1 Upper", color.new(color.blue,   50), 1)
+p_t2u = plot(i_show_bands ? lvl_t2u : na, "T2 Upper", color.new(color.orange, 30), 1)
+p_t3u = plot(i_show_bands ? lvl_t3u : na, "T3 Upper", color.new(color.red,    10), 1)
+p_t1l = plot(i_show_bands ? lvl_t1l : na, "T1 Lower", color.new(color.blue,   50), 1)
+p_t2l = plot(i_show_bands ? lvl_t2l : na, "T2 Lower", color.new(color.orange, 30), 1)
+p_t3l = plot(i_show_bands ? lvl_t3l : na, "T3 Lower", color.new(color.red,    10), 1)
+
+fill(p_t1u, p_t2u, color.new(color.blue,   92), title="T1→T2 Upper")
+fill(p_t2u, p_t3u, color.new(color.orange, 87), title="T2→T3 Upper")
+fill(p_t1l, p_t2l, color.new(color.blue,   92), title="T1→T2 Lower")
+fill(p_t2l, p_t3l, color.new(color.orange, 87), title="T2→T3 Lower")
+
+// ── PDH / PDL levels ──────────────────────────────────────────────────────────
+plot(i_show_pdhl and i_pdhl_target ? pdh : na, "Prev Day High", color.new(color.yellow, 40), 1, plot.style_linebr)
+plot(i_show_pdhl and i_pdhl_target ? pdl : na, "Prev Day Low",  color.new(color.yellow, 40), 1, plot.style_linebr)
+plot(i_show_pdhl and i_pdhl_target and i_use_pwhl ? pwh : na, "Prev Week High", color.new(color.orange, 30), 1, plot.style_linebr)
+plot(i_show_pdhl and i_pdhl_target and i_use_pwhl ? pwl : na, "Prev Week Low",  color.new(color.orange, 30), 1, plot.style_linebr)
+
+// ── Active trade stop & target ────────────────────────────────────────────────
+plot(i_show_levels and in_long  ? long_stop_px  : na, "Long Z-Stop",      color.new(color.red,  0), 1, plot.style_linebr)
+plot(i_show_levels and in_long  ? bb_mean       : na, "Long Mean Target",  color.new(color.lime, 0), 1, plot.style_linebr)
+plot(i_show_levels and in_short ? short_stop_px : na, "Short Z-Stop",     color.new(color.red,  0), 1, plot.style_linebr)
+plot(i_show_levels and in_short ? bb_mean       : na, "Short Mean Target", color.new(color.lime, 0), 1, plot.style_linebr)
+
+// ── Entry signals ─────────────────────────────────────────────────────────────
+plotshape(i_show_sigs and sig_l1, "L1", shape.triangleup,   location.belowbar, color.new(color.lime,   0), size=size.tiny,   text="L1")
+plotshape(i_show_sigs and sig_l2, "L2", shape.triangleup,   location.belowbar, color.new(color.teal,   0), size=size.small,  text="L2")
+plotshape(i_show_sigs and sig_l3, "L3", shape.triangleup,   location.belowbar, color.new(color.aqua,   0), size=size.normal, text="L3")
+plotshape(i_show_sigs and sig_s1, "S1", shape.triangledown, location.abovebar, color.new(color.red,    0), size=size.tiny,   text="S1")
+plotshape(i_show_sigs and sig_s2, "S2", shape.triangledown, location.abovebar, color.new(color.orange, 0), size=size.small,  text="S2")
+plotshape(i_show_sigs and sig_s3, "S3", shape.triangledown, location.abovebar, color.new(color.maroon, 0), size=size.normal, text="S3")
+
+// =============================================================================
+// INFO TABLE  (18 rows)
+// =============================================================================
+
+var table t = table.new(position.top_right, 2, 18,
+     bgcolor=color.new(color.black, 70),
+     border_color=color.new(color.gray, 60),
+     border_width=1)
+
+if barstate.islast
+    table.cell(t, 0, 0, "TMR  Anomaly & Macro  v3",  text_color=color.white,  text_size=size.small, bgcolor=color.new(color.navy, 30))
+    table.cell(t, 1, 0, syminfo.ticker,               text_color=color.yellow, text_size=size.small, bgcolor=color.new(color.navy, 30))
+
+    table.cell(t, 0, 1, "Equity",        text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 1, "$" + str.tostring(realized_eq, "#,###.##"), text_color=color.white, text_size=size.tiny)
+
+    dd_col = dd_pct > i_dd_halt * 0.75 ? color.red : dd_pct > i_dd_halt * 0.5 ? color.orange : color.white
+    table.cell(t, 0, 2, "DD %",          text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 2, str.tostring(dd_pct, "#.##") + "%", text_color=dd_col, text_size=size.tiny)
+
+    az    = math.abs(z)
+    z_col = az >= i_stop_z ? color.red : az >= i_t3_z ? color.orange : az >= i_t2_z ? color.yellow : az >= i_t1_z ? color.lime : color.white
+    table.cell(t, 0, 3, "Z-Score",       text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 3, str.tostring(z, "#.##"), text_color=z_col, text_size=size.tiny)
+
+    table.cell(t, 0, 4, "ADX / Regime",  text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 4, str.tostring(adx, "#.#") + "  " + (is_ranging ? "RANGE" : "TREND"),
+         text_color=is_ranging ? color.lime : color.red, text_size=size.tiny)
+
+    htf_txt = htf_up ? "BULL" : htf_dn ? "BEAR" : "NEUTRAL"
+    htf_col = htf_up ? color.lime : htf_dn ? color.red : color.gray
+    table.cell(t, 0, 5, "HTF Bias",      text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 5, htf_txt,         text_color=htf_col,    text_size=size.tiny)
+
+    sess_col = overlap_ln ? color.lime : overlap_al or in_london or in_ny ? color.aqua : in_tokyo ? color.blue : color.gray
+    table.cell(t, 0, 6, "Session",       text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 6, sess_label,      text_color=sess_col,   text_size=size.tiny)
+
+    table.cell(t, 0, 7, "Session ×",     text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 7, str.tostring(sess_mult, "#.##") + "×",
+         text_color=sess_mult >= 1.0 ? color.lime : color.orange, text_size=size.tiny)
+
+    table.cell(t, 0, 8, "Macro",         text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 8, macro_label,     text_color=macro_label_col, text_size=size.tiny)
+
+    mac_col = macro_mult == 0.0 ? color.red : macro_mult > 1.0 ? color.lime : macro_mult < 1.0 ? color.orange : color.white
+    table.cell(t, 0, 9, "Macro ×",       text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 9, str.tostring(macro_mult, "#.##") + "×", text_color=mac_col, text_size=size.tiny)
+
+    table.cell(t, 0, 10, "Rel Vol",      text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 10, str.tostring(rel_vol, "#.##") + "×",
+         text_color=vol_high ? color.lime : color.gray, text_size=size.tiny)
+
+    _svm = in_short ? vol_mult_short : vol_mult_long
+    table.cell(t, 0, 11, "Vol ×",        text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 11, str.tostring(_svm, "#.##") + "×",
+         text_color=_svm > 1.0 ? color.lime : _svm < 1.0 ? color.orange : color.white, text_size=size.tiny)
+
+    // PDH/PDL anomaly row
+    _pdhl_l = in_short ? pdhl_final_s : pdhl_final_l
+    pdhl_col = _pdhl_l > 1.0 ? color.lime : color.gray
+    table.cell(t, 0, 12, "PDH/PDL ×",   text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 12, str.tostring(_pdhl_l, "#.##") + "×  " + (beyond_pdl ? "↓PDL" : beyond_pdh ? "↑PDH" : "—"),
+         text_color=pdhl_col, text_size=size.tiny)
+
+    // Weekend row
+    wknd_col = is_weekend ? color.orange : color.gray
+    table.cell(t, 0, 13, "Weekend ×",   text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 13, str.tostring(wknd_boost, "#.##") + "×  " + (is_weekend ? "WKND" : "—"),
+         text_color=wknd_col, text_size=size.tiny)
+
+    // Leverage
+    table.cell(t, 0, 14, "Leverage",    text_color=color.gray, text_size=size.tiny)
+    lev_col = i_leverage >= 10 ? color.red : i_leverage >= 5 ? color.orange : color.lime
+    table.cell(t, 1, 14, str.tostring(i_leverage, "#.#") + "×",
+         text_color=lev_col, text_size=size.tiny)
+
+    // Final composite multiplier
+    _eff = in_short ? final_mult_s : final_mult_l
+    table.cell(t, 0, 15, "Final ×",     text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 15, str.tostring(_eff, "#.##") + "×",
+         text_color=_eff > 1.0 ? color.lime : _eff == 0.0 ? color.red : color.orange, text_size=size.tiny)
+
+    pos_txt = in_long  ? "LONG  ×" + str.tostring(long_tiers)  :
+              in_short ? "SHORT ×" + str.tostring(short_tiers) : "FLAT"
+    pos_col = in_long ? color.lime : in_short ? color.red : color.gray
+    table.cell(t, 0, 16, "Position",    text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 16, pos_txt,       text_color=pos_col,    text_size=size.tiny)
+
+    stat_txt = dd_halted ? "DD HALT" : macro_gated ? "MAC GATE" : not ok_sess_entry ? "OFF-HRS" : not is_ranging ? "TRENDING" : "ACTIVE"
+    stat_col = (dd_halted or macro_gated) ? color.red : not ok_sess_entry or not is_ranging ? color.orange : color.lime
+    table.cell(t, 0, 17, "Status",      text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 17, stat_txt,      text_color=stat_col,   text_size=size.tiny)
