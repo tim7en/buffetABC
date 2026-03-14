@@ -5,202 +5,60 @@
     "interval": "5m",
     "lookback_years": 3.0,
     "warmup_days": 60,
-    "bb_len": 1440,
-    "t3_z": 2.25,
-    "t2_z": 2.5,
-    "t1_z": 3.0,
-    "stop_z": 4.0,
-    "exit_z": 1.25,
-    "tier1_score": 4,
-    "tier2_score": 2,
-    "min_score": 4,
-    "t1_risk": 3.0,
-    "t2_risk": 1.5,
-    "t3_risk": 0.75,
-    "leverage": 5.0,
-    "skip_offhours": true,
-    "use_macro": true,
-    "use_vol": true,
-    "vol_len": 288,
-    "vol_th": 1.2,
-    "close_loc_th": 0.65,
-    "use_adx": true,
-    "adx_len": 14,
-    "adx_max": 25.0,
-    "use_htf": true,
-    "htf_ema_len": 600,
+    "pair_y": "BTC-USD",
+    "pair_x": "ETH-USD",
+    "hedge_len": 2016,
+    "spread_len": 288,
+    "entry_z": 2.25,
+    "exit_z": 0.5,
+    "stop_z": 3.75,
+    "max_bars": 96,
+    "risk_pct": 1.0,
+    "leverage": 4.0,
+    "use_r2": true,
+    "min_r2": 0.85,
+    "min_beta": 5.0,
+    "max_beta": 40.0,
     "use_ou": true,
     "ou_len": 288,
-    "ou_recalc": 12,
     "ou_half_life_min": 3.0,
     "ou_half_life_max": 72.0,
     "hl_exit_mult": 3.0,
     "hl_min_bars": 12,
     "use_reversal": true,
-    "min_reversal_z": 0.1,
-    "require_close_reversal": true,
-    "use_fixed_target": true,
-    "max_bars": 96,
-    "use_dd": false,
-    "dd_halt_pct": 15.0,
-    "use_pdhl": true,
-    "use_weekend": true,
-    "allow_long": true,
-    "allow_short": false
+    "min_reversal_z": 0.05,
+    "allow_long_spread": true,
+    "allow_short_spread": true
   },
   "results": [
     {
-      "ticker": "BTC-USD",
-      "symbol": "BTCUSDT",
-      "bars_total": 315345,
+      "pair": "BTCUSDT/ETHUSDT",
+      "bars_total": 330608,
       "initial": 10000.0,
-      "final_equity": 8594.14,
-      "total_ret_pct": -14.06,
-      "cagr_pct": -4.93,
-      "max_dd_pct": 17.84,
-      "sharpe": -0.723,
-      "n_trades": 12,
-      "win_rate_pct": 25.0,
-      "profit_factor": 0.362,
-      "avg_win": 266.2,
-      "avg_loss": -244.94,
-      "long_n": 12,
-      "short_n": 0,
-      "long_pnl": -1405.86,
-      "short_pnl": 0,
-      "long_wr_pct": 25.0,
-      "short_wr_pct": 0.0,
-      "tier_n": {
-        "1": 12,
-        "2": 0,
-        "3": 0
-      },
-      "tier_pnl": {
-        "1": -1405.86,
-        "2": 0.0,
-        "3": 0.0
-      },
-      "tier_wr_pct": {
-        "1": 25.0,
-        "2": 0.0,
-        "3": 0.0
-      },
+      "final_equity": 449.75,
+      "total_ret_pct": -95.5,
+      "cagr_pct": -62.72,
+      "max_dd_pct": 95.5,
+      "sharpe": -6.22,
+      "n_trades": 748,
+      "win_rate_pct": 28.1,
+      "profit_factor": 0.26,
+      "avg_win": 15.95,
+      "avg_loss": -23.98,
+      "long_spread_n": 342,
+      "short_spread_n": 406,
+      "long_spread_wr_pct": 31.0,
+      "short_spread_wr_pct": 25.6,
+      "long_spread_pnl": -3561.84,
+      "short_spread_pnl": -5988.41,
+      "avg_beta": 17.908,
+      "avg_r2": 0.926,
+      "avg_half_life": 31.7,
       "exit_reasons": {
-        "Fixed-Target": 1,
-        "Z-Stop": 7,
-        "Time-Stop": 4
-      },
-      "session_wr": {
-        "NY": 22.2,
-        "OFF": 0.0,
-        "LONDON": 100.0,
-        "OVL_AL": 0.0
-      },
-      "score_dist": {
-        "4": 11,
-        "5": 1
-      }
-    },
-    {
-      "ticker": "ETH-USD",
-      "symbol": "ETHUSDT",
-      "bars_total": 315345,
-      "initial": 10000.0,
-      "final_equity": 10179.96,
-      "total_ret_pct": 1.8,
-      "cagr_pct": 0.6,
-      "max_dd_pct": 6.23,
-      "sharpe": 0.141,
-      "n_trades": 9,
-      "win_rate_pct": 55.6,
-      "profit_factor": 1.226,
-      "avg_win": 194.9,
-      "avg_loss": -198.63,
-      "long_n": 9,
-      "short_n": 0,
-      "long_pnl": 179.96,
-      "short_pnl": 0,
-      "long_wr_pct": 55.6,
-      "short_wr_pct": 0.0,
-      "tier_n": {
-        "1": 9,
-        "2": 0,
-        "3": 0
-      },
-      "tier_pnl": {
-        "1": 179.96,
-        "2": 0.0,
-        "3": 0.0
-      },
-      "tier_wr_pct": {
-        "1": 55.6,
-        "2": 0.0,
-        "3": 0.0
-      },
-      "exit_reasons": {
-        "Z-Stop": 2,
-        "Time-Stop": 6,
-        "Mean-Revert": 1
-      },
-      "session_wr": {
-        "NY": 66.7,
-        "OFF": 75.0,
-        "LONDON": 0.0,
-        "OVL_AL": 0.0
-      },
-      "score_dist": {
-        "4": 9
-      }
-    },
-    {
-      "ticker": "SOL-USD",
-      "symbol": "SOLUSDT",
-      "bars_total": 315345,
-      "initial": 10000.0,
-      "final_equity": 9181.22,
-      "total_ret_pct": -8.19,
-      "cagr_pct": -2.81,
-      "max_dd_pct": 17.22,
-      "sharpe": -0.24,
-      "n_trades": 11,
-      "win_rate_pct": 54.5,
-      "profit_factor": 0.628,
-      "avg_win": 230.24,
-      "avg_loss": -440.04,
-      "long_n": 11,
-      "short_n": 0,
-      "long_pnl": -818.78,
-      "short_pnl": 0,
-      "long_wr_pct": 54.5,
-      "short_wr_pct": 0.0,
-      "tier_n": {
-        "1": 11,
-        "2": 0,
-        "3": 0
-      },
-      "tier_pnl": {
-        "1": -818.78,
-        "2": 0.0,
-        "3": 0.0
-      },
-      "tier_wr_pct": {
-        "1": 54.5,
-        "2": 0.0,
-        "3": 0.0
-      },
-      "exit_reasons": {
-        "Time-Stop": 6,
-        "Mean-Revert": 1,
-        "Z-Stop": 4
-      },
-      "session_wr": {
-        "NY": 75.0,
-        "TOKYO": 25.0,
-        "OFF": 50.0,
-        "OVL_LN": 100.0
-      },
-      "score_dist": {
-        "4": 11
+        "Z-Stop": 465,
+        "Time-Stop": 89,
+        "Mean-Revert": 123,
+        "Target": 71
       }
     }
   ]
