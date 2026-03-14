@@ -6,14 +6,14 @@
     "lookback_years": 3.0,
     "warmup_days": 60,
     "bb_len": 1440,
-    "t3_z": 2.0,
+    "t3_z": 2.25,
     "t2_z": 2.5,
     "t1_z": 3.0,
     "stop_z": 4.0,
-    "exit_z": 0.5,
+    "exit_z": 1.25,
     "tier1_score": 4,
     "tier2_score": 2,
-    "min_score": 2,
+    "min_score": 4,
     "t1_risk": 3.0,
     "t2_risk": 1.5,
     "t3_risk": 0.75,
@@ -40,13 +40,13 @@
     "min_reversal_z": 0.1,
     "require_close_reversal": true,
     "use_fixed_target": true,
-    "max_bars": 288,
+    "max_bars": 96,
     "use_dd": false,
     "dd_halt_pct": 15.0,
     "use_pdhl": true,
     "use_weekend": true,
     "allow_long": true,
-    "allow_short": true
+    "allow_short": false
   },
   "results": [
     {
@@ -54,55 +54,51 @@
       "symbol": "BTCUSDT",
       "bars_total": 315345,
       "initial": 10000.0,
-      "final_equity": 4923.65,
-      "total_ret_pct": -50.76,
-      "cagr_pct": -21.05,
-      "max_dd_pct": 52.98,
-      "sharpe": -1.729,
-      "n_trades": 231,
-      "win_rate_pct": 40.3,
-      "profit_factor": 0.594,
-      "avg_win": 79.81,
-      "avg_loss": -90.57,
-      "long_n": 105,
-      "short_n": 126,
-      "long_pnl": -1916.47,
-      "short_pnl": -3159.88,
-      "long_wr_pct": 47.6,
-      "short_wr_pct": 34.1,
+      "final_equity": 8594.14,
+      "total_ret_pct": -14.06,
+      "cagr_pct": -4.93,
+      "max_dd_pct": 17.84,
+      "sharpe": -0.723,
+      "n_trades": 12,
+      "win_rate_pct": 25.0,
+      "profit_factor": 0.362,
+      "avg_win": 266.2,
+      "avg_loss": -244.94,
+      "long_n": 12,
+      "short_n": 0,
+      "long_pnl": -1405.86,
+      "short_pnl": 0,
+      "long_wr_pct": 25.0,
+      "short_wr_pct": 0.0,
       "tier_n": {
-        "1": 16,
-        "2": 215,
+        "1": 12,
+        "2": 0,
         "3": 0
       },
       "tier_pnl": {
-        "1": -2013.33,
-        "2": -3063.02,
+        "1": -1405.86,
+        "2": 0.0,
         "3": 0.0
       },
       "tier_wr_pct": {
-        "1": 6.2,
-        "2": 42.8,
+        "1": 25.0,
+        "2": 0.0,
         "3": 0.0
       },
       "exit_reasons": {
-        "Z-Stop": 76,
-        "Time-Stop": 118,
-        "Fixed-Target": 15,
-        "Mean-Revert": 22
+        "Fixed-Target": 1,
+        "Z-Stop": 7,
+        "Time-Stop": 4
       },
       "session_wr": {
-        "OFF": 45.5,
-        "NY": 36.2,
-        "TOKYO": 42.1,
-        "OVL_LN": 37.5,
-        "OVL_AL": 28.6,
-        "LONDON": 50.0
+        "NY": 22.2,
+        "OFF": 0.0,
+        "LONDON": 100.0,
+        "OVL_AL": 0.0
       },
       "score_dist": {
-        "2": 157,
-        "3": 58,
-        "4": 16
+        "4": 11,
+        "5": 1
       }
     },
     {
@@ -110,55 +106,50 @@
       "symbol": "ETHUSDT",
       "bars_total": 315345,
       "initial": 10000.0,
-      "final_equity": 5777.6,
-      "total_ret_pct": -42.22,
-      "cagr_pct": -16.72,
-      "max_dd_pct": 43.93,
-      "sharpe": -1.331,
-      "n_trades": 202,
-      "win_rate_pct": 44.6,
-      "profit_factor": 0.612,
-      "avg_win": 73.86,
-      "avg_loss": -97.05,
-      "long_n": 83,
-      "short_n": 119,
-      "long_pnl": -607.4,
-      "short_pnl": -3615.0,
-      "long_wr_pct": 47.0,
-      "short_wr_pct": 42.9,
+      "final_equity": 10179.96,
+      "total_ret_pct": 1.8,
+      "cagr_pct": 0.6,
+      "max_dd_pct": 6.23,
+      "sharpe": 0.141,
+      "n_trades": 9,
+      "win_rate_pct": 55.6,
+      "profit_factor": 1.226,
+      "avg_win": 194.9,
+      "avg_loss": -198.63,
+      "long_n": 9,
+      "short_n": 0,
+      "long_pnl": 179.96,
+      "short_pnl": 0,
+      "long_wr_pct": 55.6,
+      "short_wr_pct": 0.0,
       "tier_n": {
-        "1": 12,
-        "2": 190,
+        "1": 9,
+        "2": 0,
         "3": 0
       },
       "tier_pnl": {
-        "1": -317.64,
-        "2": -3904.76,
+        "1": 179.96,
+        "2": 0.0,
         "3": 0.0
       },
       "tier_wr_pct": {
-        "1": 41.7,
-        "2": 44.7,
+        "1": 55.6,
+        "2": 0.0,
         "3": 0.0
       },
       "exit_reasons": {
-        "Time-Stop": 131,
-        "Fixed-Target": 9,
-        "Z-Stop": 51,
-        "Mean-Revert": 11
+        "Z-Stop": 2,
+        "Time-Stop": 6,
+        "Mean-Revert": 1
       },
       "session_wr": {
-        "OVL_LN": 52.0,
-        "LONDON": 45.2,
-        "NY": 41.3,
-        "TOKYO": 47.2,
-        "OFF": 41.7,
-        "OVL_AL": 33.3
+        "NY": 66.7,
+        "OFF": 75.0,
+        "LONDON": 0.0,
+        "OVL_AL": 0.0
       },
       "score_dist": {
-        "2": 148,
-        "3": 42,
-        "4": 12
+        "4": 9
       }
     },
     {
@@ -166,55 +157,50 @@
       "symbol": "SOLUSDT",
       "bars_total": 315345,
       "initial": 10000.0,
-      "final_equity": 6030.12,
-      "total_ret_pct": -39.7,
-      "cagr_pct": -15.53,
-      "max_dd_pct": 44.48,
-      "sharpe": -1.115,
-      "n_trades": 225,
-      "win_rate_pct": 44.9,
+      "final_equity": 9181.22,
+      "total_ret_pct": -8.19,
+      "cagr_pct": -2.81,
+      "max_dd_pct": 17.22,
+      "sharpe": -0.24,
+      "n_trades": 11,
+      "win_rate_pct": 54.5,
       "profit_factor": 0.628,
-      "avg_win": 66.47,
-      "avg_loss": -86.15,
-      "long_n": 99,
-      "short_n": 126,
-      "long_pnl": -1715.25,
-      "short_pnl": -2254.63,
-      "long_wr_pct": 47.5,
-      "short_wr_pct": 42.9,
+      "avg_win": 230.24,
+      "avg_loss": -440.04,
+      "long_n": 11,
+      "short_n": 0,
+      "long_pnl": -818.78,
+      "short_pnl": 0,
+      "long_wr_pct": 54.5,
+      "short_wr_pct": 0.0,
       "tier_n": {
-        "1": 14,
-        "2": 211,
+        "1": 11,
+        "2": 0,
         "3": 0
       },
       "tier_pnl": {
-        "1": -377.26,
-        "2": -3592.62,
+        "1": -818.78,
+        "2": 0.0,
         "3": 0.0
       },
       "tier_wr_pct": {
-        "1": 42.9,
-        "2": 45.0,
+        "1": 54.5,
+        "2": 0.0,
         "3": 0.0
       },
       "exit_reasons": {
-        "Time-Stop": 157,
-        "Z-Stop": 48,
-        "Fixed-Target": 7,
-        "Mean-Revert": 13
+        "Time-Stop": 6,
+        "Mean-Revert": 1,
+        "Z-Stop": 4
       },
       "session_wr": {
-        "OFF": 44.2,
-        "LONDON": 36.7,
-        "TOKYO": 39.7,
-        "NY": 54.4,
-        "OVL_AL": 42.9,
-        "OVL_LN": 42.1
+        "NY": 75.0,
+        "TOKYO": 25.0,
+        "OFF": 50.0,
+        "OVL_LN": 100.0
       },
       "score_dist": {
-        "2": 172,
-        "3": 39,
-        "4": 14
+        "4": 11
       }
     }
   ]

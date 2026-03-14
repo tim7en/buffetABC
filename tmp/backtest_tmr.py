@@ -61,19 +61,19 @@ PARAMS: dict[str, Any] = {
     #   t3_z = minimum Z to trigger any entry
     #   t2_z = deeper deviation (+1 point)
     #   t1_z = very deep deviation (+1 point, stacks with t2)
-    "t3_z":   2.0,   # entry gate
+    "t3_z":   2.25,  # entry gate
     "t2_z":   2.5,   # score bonus
     "t1_z":   3.0,   # score bonus
 
     # Exit: rolling Z threshold (Z returns within exit_z of mean → close)
     # Stop: fixed price level set at entry time (entry_mean ± stop_z × entry_std)
     "stop_z": 4.0,   # hard stop
-    "exit_z": 0.5,   # exit when rolling Z returns within 0.5σ (wider to avoid noise)
+    "exit_z": 1.25,  # take partial snapbacks; full mean returns were too rare
 
     # Confluence score boundaries
     "tier1_score": 4,   # score ≥ 4 → Tier 1
     "tier2_score": 2,   # score 2–3 → Tier 2; score < 2 → Tier 3
-    "min_score":   2,   # skip weak single-confluence fades
+    "min_score":   4,   # only keep higher-conviction reversions
 
     # Risk per tier (% of equity per trade)
     "t1_risk": 3.0,
@@ -123,7 +123,7 @@ PARAMS: dict[str, Any] = {
     "use_fixed_target": True,
 
     # Max bars in trade (288 × 5m = 24 h time stop)
-    "max_bars": 288,
+    "max_bars": 96,
 
     # Drawdown governor
     "use_dd":      False,
@@ -137,7 +137,7 @@ PARAMS: dict[str, Any] = {
 
     # Directions
     "allow_long":  True,
-    "allow_short": True,
+    "allow_short": False,  # short-side expectancy was materially worse in sample
 }
 
 # =============================================================================
