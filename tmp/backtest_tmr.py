@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 """
-BTC/ETH Spread Mean Reversion — Python Backtest
-===============================================
+BTC/ETH Ratio Mean Reversion — Python Backtest
+==============================================
 
-This version replaces the single-asset price fade with a two-leg spread trade:
-  BTC price = alpha + beta * ETH price + residual
+This version is a market-neutral BTC/ETH ratio strategy for 5m bars.
+The traded signal is the log-ratio:
 
-The residual is treated as the tradable mean-reverting spread.
-Entries are taken in both directions:
-  - Long spread : long BTC, short beta * ETH
-  - Short spread: short BTC, long beta * ETH
+    ratio = log(BTC / ETH)
 
-The strategy uses:
-  - rolling OLS hedge ratio
-  - rolling residual Z-score
-  - R^2 and OU half-life regime filters
-  - reversal confirmation at the extreme
-  - spread-based stop/target and pair-aware sizing
+The ratio is faded in both directions:
+  - Long ratio : long BTC, short ETH
+  - Short ratio: short BTC, long ETH
+
+Compared with the rolling-regression spread version, this simpler ratio model
+behaved materially better on the local Binance sample. It is still strict:
+  - very deep Z-score entry
+  - reversal confirmation
+  - OU half-life regime filter
+  - short holding period
 """
 
 from __future__ import annotations
@@ -36,54 +37,49 @@ _PROD_DIR = _ROOT / "production" / "session_turtle_core_x2"
 sys.path.insert(0, str(_PROD_DIR))
 from binance_data import load_local_binance_klines  # noqa: E402
 
+
 # =============================================================================
 # STRATEGY PARAMETERS
 # =============================================================================
 
 PARAMS: dict[str, Any] = {
-    "initial_capital":  10_000.0,
-    "commission_pct":   0.05 / 100,
-    "interval":         "5m",
-    "lookback_years":   3.0,
-    "warmup_days":      60,
+    "initial_capital": 10_000.0,
+    "commission_pct":  0.05 / 100,
+    "interval":        "5m",
+    "lookback_years":  3.0,
+    "warmup_days":     60,
 
-    "pair_y": "BTC-USD",   # dependent leg in hedge regression
-    "pair_x": "ETH-USD",   # hedge leg in regression
+    "btc_ticker": "BTC-USD",
+    "eth_ticker": "ETH-USD",
 
-    # Rolling hedge ratio / residual model
-    "hedge_len":   2016,   # 7 days of 5m bars
-    "spread_len":  288,    # 1 day residual Z-score window
+    # Ratio window
+    "ratio_len": 4032,   # 14 days of 5m bars
 
-    # Entry / exit on residual Z-score
-    "entry_z":  2.25,
-    "exit_z":   0.50,
-    "stop_z":   3.75,
-    "max_bars": 96,
+    # Entry / exit
+    "entry_z":  3.5,
+    "exit_z":   1.0,
+    "stop_z":   5.5,
+    "max_bars": 24,
 
     # Sizing
-    "risk_pct": 1.00,
+    "risk_pct": 0.75,
     "leverage": 4.0,
 
-    # Regime filters
-    "use_r2":  True,
-    "min_r2":  0.85,
-    "min_beta": 5.0,
-    "max_beta": 40.0,
-
+    # OU-style regime filter on the ratio itself
     "use_ou":            True,
     "ou_len":            288,
     "ou_half_life_min":  3.0,
-    "ou_half_life_max":  72.0,
-    "hl_exit_mult":      3.0,
-    "hl_min_bars":       12,
+    "ou_half_life_max": 72.0,
+    "hl_exit_mult":     3.0,
+    "hl_min_bars":      12,
 
-    # Reversal confirmation
-    "use_reversal":    True,
-    "min_reversal_z":  0.05,
+    # Entry confirmation
+    "use_reversal":   True,
+    "min_reversal_z": 0.05,
 
     # Directions
-    "allow_long_spread":  True,
-    "allow_short_spread": True,
+    "allow_long_ratio":  True,
+    "allow_short_ratio": True,
 }
 
 
@@ -129,10 +125,9 @@ class RollingWindow:
 
 
 class HalfLifeEstimator:
-    """Rolling OU-style half-life estimate on a spread series."""
+    """Rolling OU-style half-life estimate on the ratio series."""
     def __init__(self, window: int) -> None:
         self.window = RollingWindow(window)
-        self.lambda_: float | None = None
         self.half_life: float | None = None
 
     def update(self, value: float) -> float | None:
@@ -149,71 +144,14 @@ class HalfLifeEstimator:
         mx = sum(x) / len(x)
         my = sum(y) / len(y)
         var_x = sum((xi - mx) ** 2 for xi in x)
-
         if var_x <= 1e-12:
-            self.lambda_ = 0.0
             self.half_life = math.inf
             return self.half_life
 
         cov_xy = sum((xi - mx) * (yi - my) for xi, yi in zip(x, y))
-        self.lambda_ = cov_xy / var_x
-        if self.lambda_ >= 0:
-            self.half_life = math.inf
-        else:
-            self.half_life = -math.log(2.0) / self.lambda_
+        lam = cov_xy / var_x
+        self.half_life = math.inf if lam >= 0 else -math.log(2.0) / lam
         return self.half_life
-
-
-class RollingOLS:
-    """Rolling OLS with intercept using O(1) sufficient statistics."""
-    def __init__(self, size: int) -> None:
-        self.size = size
-        self.x: deque[float] = deque(maxlen=size)
-        self.y: deque[float] = deque(maxlen=size)
-        self.sx = 0.0
-        self.sy = 0.0
-        self.sxx = 0.0
-        self.syy = 0.0
-        self.sxy = 0.0
-
-    def push(self, x: float, y: float) -> None:
-        if len(self.x) == self.size:
-            old_x = self.x.popleft()
-            old_y = self.y.popleft()
-            self.sx -= old_x
-            self.sy -= old_y
-            self.sxx -= old_x * old_x
-            self.syy -= old_y * old_y
-            self.sxy -= old_x * old_y
-
-        self.x.append(x)
-        self.y.append(y)
-        self.sx += x
-        self.sy += y
-        self.sxx += x * x
-        self.syy += y * y
-        self.sxy += x * y
-
-    def full(self) -> bool:
-        return len(self.x) == self.size
-
-    def coeffs(self) -> tuple[float | None, float | None, float | None]:
-        if not self.full():
-            return None, None, None
-
-        n = len(self.x)
-        var_x = self.sxx - (self.sx * self.sx) / n
-        var_y = self.syy - (self.sy * self.sy) / n
-        if var_x <= 1e-12 or var_y <= 1e-12:
-            return None, None, None
-
-        cov_xy = self.sxy - (self.sx * self.sy) / n
-        beta = cov_xy / var_x
-        mean_x = self.sx / n
-        mean_y = self.sy / n
-        alpha = mean_y - beta * mean_x
-        r2 = max(min((cov_xy * cov_xy) / (var_x * var_y), 1.0), 0.0)
-        return alpha, beta, r2
 
 
 # =============================================================================
@@ -223,18 +161,15 @@ class RollingOLS:
 @dataclass
 class Position:
     direction: str
-    pair_qty: float
+    gross_notional: float
     btc_qty: float
     eth_qty: float
-    beta: float
-    alpha: float
     btc_entry: float
     eth_entry: float
-    entry_spread: float
-    stop_spread: float
-    target_spread: float
+    entry_ratio: float
+    stop_ratio: float
+    target_ratio: float
     entry_fee: float
-    r2: float
     half_life: float | None
     max_hold_bars: int
     bars_held: int = 0
@@ -246,17 +181,15 @@ class Trade:
     direction: str
     entry_ts: datetime
     exit_ts: datetime
-    pair_qty: float
-    beta: float
-    entry_spread: float
-    exit_spread: float
+    gross_notional: float
+    entry_ratio: float
+    exit_ratio: float
     entry_btc: float
     exit_btc: float
     entry_eth: float
     exit_eth: float
     pnl: float
     exit_reason: str
-    r2: float
     half_life: float | None
 
 
@@ -264,38 +197,38 @@ class Trade:
 # CORE LOGIC
 # =============================================================================
 
-def load_pair_bars(y_ticker: str, x_ticker: str, p: dict) -> tuple[list[dict[str, Any]], str, str]:
-    y_bars, y_symbol = load_local_binance_klines(
-        ticker=y_ticker,
+def load_pair_bars(btc_ticker: str, eth_ticker: str, p: dict) -> tuple[list[dict[str, Any]], str, str]:
+    btc_bars, btc_symbol = load_local_binance_klines(
+        ticker=btc_ticker,
         interval=p["interval"],
         lookback_years=p["lookback_years"],
         warmup_days=p["warmup_days"],
     )
-    x_bars, x_symbol = load_local_binance_klines(
-        ticker=x_ticker,
+    eth_bars, eth_symbol = load_local_binance_klines(
+        ticker=eth_ticker,
         interval=p["interval"],
         lookback_years=p["lookback_years"],
         warmup_days=p["warmup_days"],
     )
 
-    x_by_ts = {bar["timestamp"]: bar for bar in x_bars}
+    eth_by_ts = {bar["timestamp"]: bar for bar in eth_bars}
     aligned: list[dict[str, Any]] = []
-    for y_bar in y_bars:
-        x_bar = x_by_ts.get(y_bar["timestamp"])
-        if x_bar is None:
+    for btc_bar in btc_bars:
+        eth_bar = eth_by_ts.get(btc_bar["timestamp"])
+        if eth_bar is None:
             continue
         aligned.append(
             {
-                "timestamp": y_bar["timestamp"],
-                "btc_close": float(y_bar["close"]),
-                "eth_close": float(x_bar["close"]),
+                "timestamp": btc_bar["timestamp"],
+                "btc_close": float(btc_bar["close"]),
+                "eth_close": float(eth_bar["close"]),
             }
         )
 
     if not aligned:
-        raise ValueError(f"No overlapping bars for {y_symbol}/{x_symbol}")
+        raise ValueError(f"No overlapping bars for {btc_symbol}/{eth_symbol}")
 
-    return aligned, y_symbol, x_symbol
+    return aligned, btc_symbol, eth_symbol
 
 
 def derive_hold_limit(entry_half_life: float | None, p: dict) -> int:
@@ -309,25 +242,26 @@ def derive_hold_limit(entry_half_life: float | None, p: dict) -> int:
     return hl_limit
 
 
-def calc_pair_qty(
+def calc_gross_notional(
     equity: float,
     risk_pct: float,
-    btc_price: float,
-    eth_price: float,
-    beta: float,
-    entry_spread: float,
-    stop_spread: float,
+    entry_ratio: float,
+    stop_ratio: float,
     leverage: float,
 ) -> float:
-    stop_d = abs(entry_spread - stop_spread)
-    gross_unit = abs(btc_price) + abs(beta) * abs(eth_price)
-    if stop_d <= 0 or gross_unit <= 0 or equity <= 0:
+    """
+    Equal-dollar BTC/ETH pair.
+    For a small log-ratio move dR, portfolio PnL is approximately:
+      gross_notional / 2 * dR
+    """
+    stop_d = abs(entry_ratio - stop_ratio)
+    if stop_d <= 0 or equity <= 0:
         return 0.0
 
     risk_amt = equity * risk_pct / 100.0
-    qty_risk = risk_amt / stop_d
-    qty_lev = (equity * leverage) / gross_unit
-    return max(min(qty_risk, qty_lev), 0.0)
+    gross_risk = (2.0 * risk_amt) / stop_d
+    gross_lev = equity * leverage
+    return max(min(gross_risk, gross_lev), 0.0)
 
 
 def unrealized_pnl(pos: Position, btc_price: float, eth_price: float) -> float:
@@ -335,16 +269,14 @@ def unrealized_pnl(pos: Position, btc_price: float, eth_price: float) -> float:
 
 
 def run_backtest(p: dict) -> dict[str, Any]:
-    bars, btc_symbol, eth_symbol = load_pair_bars(p["pair_y"], p["pair_x"], p)
+    bars, btc_symbol, eth_symbol = load_pair_bars(p["btc_ticker"], p["eth_ticker"], p)
 
     equity = p["initial_capital"]
-    equity_peak = equity
     pos: Position | None = None
     trades: list[Trade] = []
     equity_curve: list[tuple[datetime, float]] = []
 
-    ols = RollingOLS(p["hedge_len"])
-    spread_win = RollingWindow(p["spread_len"])
+    ratio_win = RollingWindow(p["ratio_len"])
     hl_est = HalfLifeEstimator(p["ou_len"])
     prev_z: float | None = None
 
@@ -352,42 +284,32 @@ def run_backtest(p: dict) -> dict[str, Any]:
         ts = bar["timestamp"]
         btc = bar["btc_close"]
         eth = bar["eth_close"]
+        ratio = math.log(btc / eth)
+        half_life = hl_est.update(ratio)
 
-        ols.push(eth, btc)
-        alpha, beta, r2 = ols.coeffs()
-        if alpha is None or beta is None or r2 is None:
-            continue
-
-        if not math.isfinite(alpha) or not math.isfinite(beta) or not math.isfinite(r2):
-            continue
-
-        spread = btc - (alpha + beta * eth)
-        half_life = hl_est.update(spread)
-
+        ratio_mean = ratio_win.sma()
+        ratio_std = ratio_win.stdev()
         z: float | None = None
-        spread_mean = spread_win.sma()
-        spread_std = spread_win.stdev()
-        if spread_mean is not None and spread_std is not None and spread_std > 1e-12:
-            z = (spread - spread_mean) / spread_std
+        if ratio_mean is not None and ratio_std is not None and ratio_std > 1e-12:
+            z = (ratio - ratio_mean) / ratio_std
 
-        # Exit on the current spread first.
         exit_reason: str | None = None
         if pos is not None:
             pos.bars_held += 1
             hold_limit = pos.max_hold_bars if pos.max_hold_bars > 0 else p["max_bars"]
-            if pos.direction == "long_spread":
-                if spread <= pos.stop_spread:
+            if pos.direction == "long_ratio":
+                if ratio <= pos.stop_ratio:
                     exit_reason = "Z-Stop"
-                elif spread >= pos.target_spread:
+                elif ratio >= pos.target_ratio:
                     exit_reason = "Target"
                 elif z is not None and z >= -p["exit_z"]:
                     exit_reason = "Mean-Revert"
                 elif hold_limit > 0 and pos.bars_held >= hold_limit:
                     exit_reason = "Time-Stop"
             else:
-                if spread >= pos.stop_spread:
+                if ratio >= pos.stop_ratio:
                     exit_reason = "Z-Stop"
-                elif spread <= pos.target_spread:
+                elif ratio <= pos.target_ratio:
                     exit_reason = "Target"
                 elif z is not None and z <= p["exit_z"]:
                     exit_reason = "Mean-Revert"
@@ -406,25 +328,20 @@ def run_backtest(p: dict) -> dict[str, Any]:
                     direction=pos.direction,
                     entry_ts=pos.entry_ts,
                     exit_ts=ts,
-                    pair_qty=pos.pair_qty,
-                    beta=pos.beta,
-                    entry_spread=pos.entry_spread,
-                    exit_spread=spread,
+                    gross_notional=pos.gross_notional,
+                    entry_ratio=pos.entry_ratio,
+                    exit_ratio=ratio,
                     entry_btc=pos.btc_entry,
                     exit_btc=btc,
                     entry_eth=pos.eth_entry,
                     exit_eth=eth,
                     pnl=total_pnl,
                     exit_reason=exit_reason,
-                    r2=pos.r2,
                     half_life=pos.half_life,
                 )
             )
             pos = None
 
-        # Entry after exits.
-        beta_ok = p["min_beta"] <= beta <= p["max_beta"]
-        r2_ok = (not p["use_r2"]) or r2 >= p["min_r2"]
         hl_ok = (
             not p["use_ou"] or
             half_life is None or
@@ -434,9 +351,9 @@ def run_backtest(p: dict) -> dict[str, Any]:
             )
         )
 
-        if pos is None and z is not None and prev_z is not None and beta_ok and r2_ok and hl_ok:
+        if pos is None and z is not None and prev_z is not None and hl_ok:
             long_reversal = (
-                p["allow_long_spread"] and
+                p["allow_long_ratio"] and
                 z <= -p["entry_z"] and
                 (
                     not p["use_reversal"] or
@@ -444,7 +361,7 @@ def run_backtest(p: dict) -> dict[str, Any]:
                 )
             )
             short_reversal = (
-                p["allow_short_spread"] and
+                p["allow_short_ratio"] and
                 z >= p["entry_z"] and
                 (
                     not p["use_reversal"] or
@@ -453,43 +370,39 @@ def run_backtest(p: dict) -> dict[str, Any]:
             )
 
             if long_reversal or short_reversal:
-                direction = "long_spread" if long_reversal else "short_spread"
-                if direction == "long_spread":
-                    stop_spread = spread_mean - p["stop_z"] * spread_std
-                    target_spread = spread_mean - p["exit_z"] * spread_std
-                    pair_qty = calc_pair_qty(
-                        equity, p["risk_pct"], btc, eth, beta, spread, stop_spread, p["leverage"]
-                    )
-                    btc_qty = pair_qty
-                    eth_qty = -pair_qty * beta
-                else:
-                    stop_spread = spread_mean + p["stop_z"] * spread_std
-                    target_spread = spread_mean + p["exit_z"] * spread_std
-                    pair_qty = calc_pair_qty(
-                        equity, p["risk_pct"], btc, eth, beta, spread, stop_spread, p["leverage"]
-                    )
-                    btc_qty = -pair_qty
-                    eth_qty = pair_qty * beta
+                direction = "long_ratio" if long_reversal else "short_ratio"
+                stop_ratio = (
+                    ratio_mean - p["stop_z"] * ratio_std
+                    if direction == "long_ratio"
+                    else ratio_mean + p["stop_z"] * ratio_std
+                )
+                target_ratio = (
+                    ratio_mean - p["exit_z"] * ratio_std
+                    if direction == "long_ratio"
+                    else ratio_mean + p["exit_z"] * ratio_std
+                )
 
-                if pair_qty > 0:
-                    entry_notional = abs(btc_qty * btc) + abs(eth_qty * eth)
-                    entry_fee = entry_notional * p["commission_pct"]
+                gross_notional = calc_gross_notional(
+                    equity, p["risk_pct"], ratio, stop_ratio, p["leverage"]
+                )
+                if gross_notional > 0:
+                    side = 1.0 if direction == "long_ratio" else -1.0
+                    btc_qty = side * (gross_notional / 2.0) / btc
+                    eth_qty = -side * (gross_notional / 2.0) / eth
+                    entry_fee = gross_notional * p["commission_pct"]
                     equity -= entry_fee
                     hold_limit = derive_hold_limit(half_life, p)
                     pos = Position(
                         direction=direction,
-                        pair_qty=pair_qty,
+                        gross_notional=gross_notional,
                         btc_qty=btc_qty,
                         eth_qty=eth_qty,
-                        beta=beta,
-                        alpha=alpha,
                         btc_entry=btc,
                         eth_entry=eth,
-                        entry_spread=spread,
-                        stop_spread=stop_spread,
-                        target_spread=target_spread,
+                        entry_ratio=ratio,
+                        stop_ratio=stop_ratio,
+                        target_ratio=target_ratio,
                         entry_fee=entry_fee,
-                        r2=r2,
                         half_life=half_life,
                         max_hold_bars=hold_limit,
                         bars_held=0,
@@ -499,10 +412,9 @@ def run_backtest(p: dict) -> dict[str, Any]:
         mtm = equity
         if pos is not None:
             mtm += unrealized_pnl(pos, btc, eth)
-        equity_peak = max(equity_peak, mtm)
         equity_curve.append((ts, round(mtm, 4)))
 
-        spread_win.push(spread)
+        ratio_win.push(ratio)
         if z is not None:
             prev_z = z
 
@@ -510,7 +422,7 @@ def run_backtest(p: dict) -> dict[str, Any]:
         last_ts = bars[-1]["timestamp"]
         last_btc = bars[-1]["btc_close"]
         last_eth = bars[-1]["eth_close"]
-        spread = last_btc - (pos.alpha + pos.beta * last_eth)
+        ratio = math.log(last_btc / last_eth)
         gross_pnl = unrealized_pnl(pos, last_btc, last_eth)
         exit_notional = abs(pos.btc_qty * last_btc) + abs(pos.eth_qty * last_eth)
         exit_fee = exit_notional * p["commission_pct"]
@@ -522,17 +434,15 @@ def run_backtest(p: dict) -> dict[str, Any]:
                 direction=pos.direction,
                 entry_ts=pos.entry_ts,
                 exit_ts=last_ts,
-                pair_qty=pos.pair_qty,
-                beta=pos.beta,
-                entry_spread=pos.entry_spread,
-                exit_spread=spread,
+                gross_notional=pos.gross_notional,
+                entry_ratio=pos.entry_ratio,
+                exit_ratio=ratio,
                 entry_btc=pos.btc_entry,
                 exit_btc=last_btc,
                 entry_eth=pos.eth_entry,
                 exit_eth=last_eth,
                 pnl=total_pnl,
                 exit_reason="End-Of-Data",
-                r2=pos.r2,
                 half_life=pos.half_life,
             )
         )
@@ -596,16 +506,15 @@ def _compute_metrics(
     for t in trades:
         exits[t.exit_reason] = exits.get(t.exit_reason, 0) + 1
 
-    long_trades = [t for t in trades if t.direction == "long_spread"]
-    short_trades = [t for t in trades if t.direction == "short_spread"]
+    long_trades = [t for t in trades if t.direction == "long_ratio"]
+    short_trades = [t for t in trades if t.direction == "short_ratio"]
 
     def dir_wr(items: list[Trade]) -> float:
         return sum(1 for t in items if t.pnl > 0) / len(items) * 100.0 if items else 0.0
 
-    avg_r2 = sum(t.r2 for t in trades) / n if n else 0.0
     finite_hl = [t.half_life for t in trades if t.half_life is not None and math.isfinite(t.half_life)]
     avg_hl = sum(finite_hl) / len(finite_hl) if finite_hl else 0.0
-    avg_beta = sum(t.beta for t in trades) / n if n else 0.0
+    avg_notional = sum(t.gross_notional for t in trades) / n if n else 0.0
 
     return {
         "pair": f"{btc_symbol}/{eth_symbol}",
@@ -621,15 +530,14 @@ def _compute_metrics(
         "profit_factor": round(pf, 3),
         "avg_win": round(avg_w, 2),
         "avg_loss": round(avg_l, 2),
-        "long_spread_n": len(long_trades),
-        "short_spread_n": len(short_trades),
-        "long_spread_wr_pct": round(dir_wr(long_trades), 1),
-        "short_spread_wr_pct": round(dir_wr(short_trades), 1),
-        "long_spread_pnl": round(sum(t.pnl for t in long_trades), 2),
-        "short_spread_pnl": round(sum(t.pnl for t in short_trades), 2),
-        "avg_beta": round(avg_beta, 3),
-        "avg_r2": round(avg_r2, 3),
+        "long_ratio_n": len(long_trades),
+        "short_ratio_n": len(short_trades),
+        "long_ratio_wr_pct": round(dir_wr(long_trades), 1),
+        "short_ratio_wr_pct": round(dir_wr(short_trades), 1),
+        "long_ratio_pnl": round(sum(t.pnl for t in long_trades), 2),
+        "short_ratio_pnl": round(sum(t.pnl for t in short_trades), 2),
         "avg_half_life": round(avg_hl, 2),
+        "avg_gross_notional": round(avg_notional, 2),
         "exit_reasons": exits,
         "equity_curve": [(str(ts), eq) for ts, eq in equity_curve[::288]],
     }
@@ -642,7 +550,7 @@ def _compute_metrics(
 def print_summary(result: dict[str, Any], p: dict) -> None:
     print()
     print("═" * 72)
-    print("  BTC/ETH SPREAD MEAN REVERSION — BACKTEST RESULTS")
+    print("  BTC/ETH RATIO MEAN REVERSION — BACKTEST RESULTS")
     print("═" * 72)
     print(f"  Pair                {result['pair']}")
     print(f"  Final equity        ${result['final_equity']:,.2f}")
@@ -656,10 +564,10 @@ def print_summary(result: dict[str, Any], p: dict) -> None:
     print(f"  Profit factor       {result['profit_factor']:.2f}x")
     print(f"  Avg win / loss      ${result['avg_win']:+.2f} / ${result['avg_loss']:+.2f}")
     print("  " + "─" * 66)
-    print(f"  Long spread         {result['long_spread_n']} trades, WR {result['long_spread_wr_pct']:.1f}%, PnL ${result['long_spread_pnl']:+.2f}")
-    print(f"  Short spread        {result['short_spread_n']} trades, WR {result['short_spread_wr_pct']:.1f}%, PnL ${result['short_spread_pnl']:+.2f}")
-    print(f"  Avg beta / R²       {result['avg_beta']:.3f} / {result['avg_r2']:.3f}")
+    print(f"  Long ratio          {result['long_ratio_n']} trades, WR {result['long_ratio_wr_pct']:.1f}%, PnL ${result['long_ratio_pnl']:+.2f}")
+    print(f"  Short ratio         {result['short_ratio_n']} trades, WR {result['short_ratio_wr_pct']:.1f}%, PnL ${result['short_ratio_pnl']:+.2f}")
     print(f"  Avg half-life       {result['avg_half_life']:.2f} bars")
+    print(f"  Avg gross notional  ${result['avg_gross_notional']:,.2f}")
     print("  " + "─" * 66)
     print("  Exit breakdown:")
     for reason, count in sorted(result["exit_reasons"].items(), key=lambda item: (-item[1], item[0])):
@@ -667,16 +575,16 @@ def print_summary(result: dict[str, Any], p: dict) -> None:
         print(f"    {reason:<16} {count:4d} ({pct:.1f}%)")
     print("  " + "─" * 66)
     print(
-        f"  Params: hedge_len={p['hedge_len']} spread_len={p['spread_len']}"
-        f"  entry={p['entry_z']} exit={p['exit_z']} stop={p['stop_z']}"
+        f"  Params: ratio_len={p['ratio_len']} entry={p['entry_z']}"
+        f" exit={p['exit_z']} stop={p['stop_z']} max_bars={p['max_bars']}"
     )
     print(
-        f"  Risk: risk_pct={p['risk_pct']} leverage={p['leverage']} max_bars={p['max_bars']}"
-        f"  both_dirs={p['allow_long_spread'] and p['allow_short_spread']}"
+        f"  Risk: risk_pct={p['risk_pct']} leverage={p['leverage']}"
+        f" both_dirs={p['allow_long_ratio'] and p['allow_short_ratio']}"
     )
     print(
-        f"  Filters: R²>={p['min_r2']:.2f} beta={p['min_beta']}..{p['max_beta']}"
-        f"  half_life={p['ou_half_life_min']:.0f}..{p['ou_half_life_max']:.0f}"
+        f"  Half-life filter: {p['ou_half_life_min']:.0f}..{p['ou_half_life_max']:.0f}"
+        f"  reversal={p['use_reversal']}"
     )
     print("═" * 72)
     print()
