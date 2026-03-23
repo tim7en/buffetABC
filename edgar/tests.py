@@ -604,6 +604,75 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertEqual(trade["entry_exposure_mult"], 0.5)
         self.assertEqual(report["summary"]["sentiment_lag_days"], 1)
 
+    @patch("edgar.services.session_turtle_portfolio._resolve_universe")
+    @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")
+    def test_session_turtle_portfolio_supports_direct_bucket_sentiment_sizing_for_crypto(
+        self,
+        mock_backtest,
+        mock_resolve_universe,
+    ):
+        mock_resolve_universe.return_value = (
+            ("BTC-USD", "binance", "new_york_equity_open"),
+            ("AMZN", "tiingo", "new_york_equity_open"),
+        )
+
+        def _trade(entry_date: str, exit_date: str, pnl: float) -> dict:
+            return {
+                "direction": "long",
+                "entry_date": entry_date,
+                "exit_date": exit_date,
+                "entry_price": 100.0,
+                "exit_price": 100.0 + pnl,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": pnl,
+                "risk_model": "directional_volume_boost",
+                "entry_rel_volume": 1.5,
+            }
+
+        payloads = {
+            "BTC-USD": {"trades": [_trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 20.0)]},
+            "AMZN": {"trades": [_trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 20.0)]},
+        }
+        mock_backtest.side_effect = lambda ticker, **kwargs: payloads[ticker]
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=2.0,
+            use_sentiment_governor=True,
+            sentiment_scores={"2024-01-02": 80.0},
+            sentiment_lag_days=1,
+            use_direct_bucket_sentiment_sizing=True,
+            bucket_sentiment_scores={
+                "crypto": {
+                    "2024-01-02": 20.0,
+                    "2024-01-03": 80.0,
+                }
+            },
+            bucket_sentiment_lag_days=1,
+            bucket_sentiment_threshold_1=45.0,
+            bucket_sentiment_threshold_2=25.0,
+            bucket_sentiment_size_mult_1=0.75,
+            bucket_sentiment_size_mult_2=0.5,
+            bucket_sentiment_reversal_window=0,
+        )
+
+        btc_trade = next(trade for trade in report["trades"] if trade["ticker"] == "BTC-USD")
+        amzn_trade = next(trade for trade in report["trades"] if trade["ticker"] == "AMZN")
+
+        self.assertEqual(btc_trade["direct_sentiment_score"], 20.0)
+        self.assertEqual(btc_trade["direct_sentiment_size_mult"], 0.5)
+        self.assertEqual(btc_trade["notional"], 50.0)
+
+        self.assertIsNone(amzn_trade["direct_sentiment_score"])
+        self.assertEqual(amzn_trade["direct_sentiment_size_mult"], 1.0)
+        self.assertEqual(amzn_trade["notional"], 100.0)
+
+        summary = report["summary"]
+        self.assertTrue(summary["use_direct_bucket_sentiment_sizing"])
+        self.assertEqual(summary["entries_direct_sentiment_downscaled"], 1)
+
 
 class ApiTests(TestCase):
     def setUp(self):

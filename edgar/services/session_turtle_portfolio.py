@@ -78,6 +78,8 @@ class _OpenTrade:
     asset_bucket: str
     entry_exposure_mult: float
     entry_sentiment_score: float | None
+    direct_sentiment_score: float | None
+    direct_sentiment_size_mult: float
     scale: float
     scaled_position_size: float
     scaled_shares: float
@@ -202,20 +204,73 @@ def _active_exposure_mult(
     if not use_sentiment_governor or sentiment_score is None:
         return dd_mult, sentiment_score
 
+    s_mult = _sentiment_regime_mult(
+        base_mult=base_exposure_mult,
+        sentiment_score=sentiment_score,
+        sentiment_threshold_1=sentiment_threshold_1,
+        sentiment_threshold_2=sentiment_threshold_2,
+        sentiment_mult_1=sentiment_exposure_mult_1,
+        sentiment_mult_2=sentiment_exposure_mult_2,
+        sentiment_reversal_recent_low=sentiment_reversal_recent_low,
+        sentiment_reversal_min_rise=sentiment_reversal_min_rise,
+        sentiment_reversal_mult=sentiment_reversal_mult,
+    )
+
+    return min(dd_mult, s_mult), sentiment_score
+
+
+def _sentiment_regime_mult(
+    *,
+    base_mult: float,
+    sentiment_score: float,
+    sentiment_threshold_1: float,
+    sentiment_threshold_2: float,
+    sentiment_mult_1: float,
+    sentiment_mult_2: float,
+    sentiment_reversal_recent_low: float | None,
+    sentiment_reversal_min_rise: float,
+    sentiment_reversal_mult: float,
+) -> float:
     if sentiment_score < sentiment_threshold_2:
         if (
             sentiment_reversal_recent_low is not None
             and (sentiment_score - sentiment_reversal_recent_low) >= sentiment_reversal_min_rise
         ):
-            s_mult = sentiment_reversal_mult
-        else:
-            s_mult = sentiment_exposure_mult_2
-    elif sentiment_score < sentiment_threshold_1:
-        s_mult = sentiment_exposure_mult_1
-    else:
-        s_mult = base_exposure_mult
+            return sentiment_reversal_mult
+        return sentiment_mult_2
+    if sentiment_score < sentiment_threshold_1:
+        return sentiment_mult_1
+    return base_mult
 
-    return min(dd_mult, s_mult), sentiment_score
+
+def _lookup_sentiment_signal(
+    *,
+    entry_ts: datetime,
+    sentiment_scores: dict[str, float] | None,
+    sentiment_lag_days: int,
+    sentiment_reversal_window: int,
+) -> tuple[float | None, float | None]:
+    if not sentiment_scores:
+        return None, None
+
+    lookup_ts = entry_ts - timedelta(days=sentiment_lag_days)
+    sentiment_score = get_score_for_date(
+        lookup_ts.strftime("%Y-%m-%d"),
+        sentiment_scores,
+    )
+    if sentiment_score is None or sentiment_reversal_window <= 0:
+        return sentiment_score, None
+
+    window_scores = [
+        get_score_for_date(
+            (lookup_ts - timedelta(days=offset)).strftime("%Y-%m-%d"),
+            sentiment_scores,
+        )
+        for offset in range(1, sentiment_reversal_window + 1)
+    ]
+    valid_window_scores = [score for score in window_scores if score is not None]
+    recent_low = min(valid_window_scores) if valid_window_scores else None
+    return sentiment_score, recent_low
 
 
 def _build_yearly_rows(executed_trades: list[dict], initial_capital: float) -> list[dict]:
@@ -420,6 +475,16 @@ def generate_session_turtle_shared_account_report(
     sentiment_reversal_window: int = 10,
     sentiment_reversal_min_rise: float = 10.0,
     sentiment_reversal_mult: float = 1.0,
+    use_direct_bucket_sentiment_sizing: bool = False,
+    bucket_sentiment_scores: dict[str, dict[str, float]] | None = None,
+    bucket_sentiment_lag_days: int = 1,
+    bucket_sentiment_threshold_1: float = 45.0,
+    bucket_sentiment_threshold_2: float = 25.0,
+    bucket_sentiment_size_mult_1: float = 0.75,
+    bucket_sentiment_size_mult_2: float = 0.5,
+    bucket_sentiment_reversal_window: int = 10,
+    bucket_sentiment_reversal_min_rise: float = 10.0,
+    bucket_sentiment_reversal_mult: float = 0.75,
     precomputed_candidates: list[dict] | None = None,
 ) -> dict:
     if exposure_mult <= 0:
@@ -470,6 +535,24 @@ def generate_session_turtle_shared_account_report(
         raise ValueError("sentiment_reversal_mult must be <= exposure_mult")
     if sentiment_reversal_window < 0:
         raise ValueError("sentiment_reversal_window must be non-negative")
+    if bucket_sentiment_lag_days < 0:
+        raise ValueError("bucket_sentiment_lag_days must be non-negative")
+    if bucket_sentiment_threshold_2 >= bucket_sentiment_threshold_1:
+        raise ValueError("bucket_sentiment_threshold_2 must be less than bucket_sentiment_threshold_1")
+    if (
+        bucket_sentiment_size_mult_1 <= 0
+        or bucket_sentiment_size_mult_2 <= 0
+        or bucket_sentiment_reversal_mult <= 0
+    ):
+        raise ValueError("bucket sentiment multipliers must be positive")
+    if bucket_sentiment_size_mult_1 > 1.0:
+        raise ValueError("bucket_sentiment_size_mult_1 must be <= 1.0")
+    if bucket_sentiment_size_mult_2 > bucket_sentiment_size_mult_1:
+        raise ValueError("bucket_sentiment_size_mult_2 must be <= bucket_sentiment_size_mult_1")
+    if bucket_sentiment_reversal_mult > 1.0:
+        raise ValueError("bucket_sentiment_reversal_mult must be <= 1.0")
+    if bucket_sentiment_reversal_window < 0:
+        raise ValueError("bucket_sentiment_reversal_window must be non-negative")
     if precomputed_candidates is None:
         candidates = build_session_turtle_shared_account_candidates(
             basket=basket,
@@ -554,6 +637,12 @@ def generate_session_turtle_shared_account_report(
                         if position.entry_sentiment_score is not None
                         else None
                     ),
+                    "direct_sentiment_score": (
+                        round(position.direct_sentiment_score, 2)
+                        if position.direct_sentiment_score is not None
+                        else None
+                    ),
+                    "direct_sentiment_size_mult": round(position.direct_sentiment_size_mult, 4),
                     "scale": round(position.scale, 6),
                     "entry_rel_volume": round(position.entry_rel_volume, 4),
                     "risk_model": position.risk_model,
@@ -581,26 +670,12 @@ def generate_session_turtle_shared_account_report(
             skipped_same_ticker += 1
             continue
 
-        # Lag daily sentiment by default so intraday entries do not consume
-        # same-day values that may only be known after the close.
-        sentiment_lookup_ts = candidate["entry_ts"] - timedelta(days=sentiment_lag_days)
-        sentiment_score: float | None = None
-        sentiment_reversal_recent_low: float | None = None
-        if use_sentiment_governor and sentiment_scores:
-            sentiment_score = get_score_for_date(
-                sentiment_lookup_ts.strftime("%Y-%m-%d"),
-                sentiment_scores,
-            )
-            if sentiment_score is not None and sentiment_reversal_window > 0:
-                window_scores = [
-                    get_score_for_date(
-                        (sentiment_lookup_ts - timedelta(days=offset)).strftime("%Y-%m-%d"),
-                        sentiment_scores,
-                    )
-                    for offset in range(1, sentiment_reversal_window + 1)
-                ]
-                valid_window_scores = [score for score in window_scores if score is not None]
-                sentiment_reversal_recent_low = min(valid_window_scores) if valid_window_scores else None
+        sentiment_score, sentiment_reversal_recent_low = _lookup_sentiment_signal(
+            entry_ts=candidate["entry_ts"],
+            sentiment_scores=sentiment_scores if use_sentiment_governor else None,
+            sentiment_lag_days=sentiment_lag_days,
+            sentiment_reversal_window=sentiment_reversal_window,
+        )
 
         active_exposure_mult, _ = _active_exposure_mult(
             base_exposure_mult=exposure_mult,
@@ -642,6 +717,8 @@ def generate_session_turtle_shared_account_report(
         performance_score: float | None = None
         performance_rank_pct: float | None = None
         performance_peer_count = 0
+        direct_sentiment_score: float | None = None
+        direct_sentiment_size_mult = 1.0
         if use_performance_leadership_overlay:
             (
                 performance_risk_mult,
@@ -658,7 +735,30 @@ def generate_session_turtle_shared_account_report(
                 min_history=performance_min_history,
             )
 
-        target_position_size = float(candidate["position_size"]) * performance_risk_mult
+        bucket_scores = None
+        if use_direct_bucket_sentiment_sizing and bucket_sentiment_scores:
+            bucket_scores = bucket_sentiment_scores.get(asset_bucket)
+        if bucket_scores:
+            direct_sentiment_score, direct_sentiment_recent_low = _lookup_sentiment_signal(
+                entry_ts=candidate["entry_ts"],
+                sentiment_scores=bucket_scores,
+                sentiment_lag_days=bucket_sentiment_lag_days,
+                sentiment_reversal_window=bucket_sentiment_reversal_window,
+            )
+            if direct_sentiment_score is not None:
+                direct_sentiment_size_mult = _sentiment_regime_mult(
+                    base_mult=1.0,
+                    sentiment_score=direct_sentiment_score,
+                    sentiment_threshold_1=bucket_sentiment_threshold_1,
+                    sentiment_threshold_2=bucket_sentiment_threshold_2,
+                    sentiment_mult_1=bucket_sentiment_size_mult_1,
+                    sentiment_mult_2=bucket_sentiment_size_mult_2,
+                    sentiment_reversal_recent_low=direct_sentiment_recent_low,
+                    sentiment_reversal_min_rise=bucket_sentiment_reversal_min_rise,
+                    sentiment_reversal_mult=bucket_sentiment_reversal_mult,
+                )
+
+        target_position_size = float(candidate["position_size"]) * performance_risk_mult * direct_sentiment_size_mult
         scaled_position_size = min(target_position_size, available_notional)
         if scaled_position_size <= 1e-9:
             skipped_no_capacity += 1
@@ -685,6 +785,8 @@ def generate_session_turtle_shared_account_report(
                 asset_bucket=asset_bucket,
                 entry_exposure_mult=active_exposure_mult,
                 entry_sentiment_score=sentiment_score,
+                direct_sentiment_score=direct_sentiment_score,
+                direct_sentiment_size_mult=direct_sentiment_size_mult,
                 scale=scale,
                 scaled_position_size=scaled_position_size,
                 scaled_shares=float(candidate["shares"]) * scale,
@@ -729,6 +831,7 @@ def generate_session_turtle_shared_account_report(
         bucket_pnl[trade["asset_bucket"]] += float(trade["net_pnl"])
         exposure_counter[float(trade["entry_exposure_mult"])] += 1
     performance_mults = [float(trade.get("performance_risk_mult", 1.0) or 1.0) for trade in executed_trades]
+    direct_sentiment_mults = [float(trade.get("direct_sentiment_size_mult", 1.0) or 1.0) for trade in executed_trades]
 
     label = f"Session Turtle Trend {basket.capitalize()} x{exposure_mult:g}"
     if use_drawdown_governor:
@@ -739,6 +842,8 @@ def generate_session_turtle_shared_account_report(
         label += " With Leadership Overlay"
     if use_sentiment_governor:
         label += " With Sentiment Governor"
+    if use_direct_bucket_sentiment_sizing:
+        label += " With Direct Bucket Sentiment Sizing"
     if any(cap is not None for cap in asset_class_caps.values()):
         label += " With Asset Class Caps"
 
@@ -785,6 +890,22 @@ def generate_session_turtle_shared_account_report(
         "sentiment_reversal_window": sentiment_reversal_window,
         "sentiment_reversal_min_rise": sentiment_reversal_min_rise,
         "sentiment_reversal_mult": sentiment_reversal_mult,
+        "use_direct_bucket_sentiment_sizing": use_direct_bucket_sentiment_sizing,
+        "bucket_sentiment_lag_days": bucket_sentiment_lag_days,
+        "bucket_sentiment_threshold_1": bucket_sentiment_threshold_1,
+        "bucket_sentiment_threshold_2": bucket_sentiment_threshold_2,
+        "bucket_sentiment_size_mult_1": bucket_sentiment_size_mult_1,
+        "bucket_sentiment_size_mult_2": bucket_sentiment_size_mult_2,
+        "bucket_sentiment_reversal_window": bucket_sentiment_reversal_window,
+        "bucket_sentiment_reversal_min_rise": bucket_sentiment_reversal_min_rise,
+        "bucket_sentiment_reversal_mult": bucket_sentiment_reversal_mult,
+        "bucket_sentiment_bucket_count": len(bucket_sentiment_scores or {}),
+        "avg_direct_sentiment_size_mult": (
+            round(sum(direct_sentiment_mults) / len(direct_sentiment_mults), 4)
+            if direct_sentiment_mults
+            else 1.0
+        ),
+        "entries_direct_sentiment_downscaled": sum(1 for mult in direct_sentiment_mults if mult < 0.999999),
         "channel_period": channel_period,
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,

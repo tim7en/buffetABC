@@ -182,6 +182,12 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
+        "--variant-set",
+        choices=["cumulative", "source_specific"],
+        default="cumulative",
+        help="Which research variant family to run (default: cumulative).",
+    )
+    parser.add_argument(
         "--sources",
         nargs="+",
         choices=["vix", "crypto_fg", "cnn_fg", "aaii"],
@@ -212,6 +218,54 @@ def main() -> None:
         default=1,
         help="Calendar-day lag applied to sentiment data to avoid same-day look-ahead bias (default: 1).",
     )
+    parser.add_argument(
+        "--direct-lag-days",
+        type=int,
+        default=1,
+        help="Calendar-day lag for direct bucket sentiment sizing (default: 1).",
+    )
+    parser.add_argument(
+        "--direct-threshold1",
+        type=float,
+        default=45.0,
+        help="Upper threshold for direct bucket sentiment sizing (default: 45).",
+    )
+    parser.add_argument(
+        "--direct-threshold2",
+        type=float,
+        default=25.0,
+        help="Lower threshold for direct bucket sentiment sizing (default: 25).",
+    )
+    parser.add_argument(
+        "--direct-mult1",
+        type=float,
+        default=0.75,
+        help="Direct sizing multiplier between direct-threshold1 and direct-threshold2 (default: 0.75).",
+    )
+    parser.add_argument(
+        "--direct-mult2",
+        type=float,
+        default=0.5,
+        help="Direct sizing multiplier below direct-threshold2 (default: 0.5).",
+    )
+    parser.add_argument(
+        "--direct-reversal-window",
+        type=int,
+        default=10,
+        help="Direct sizing reversal look-back window (default: 10).",
+    )
+    parser.add_argument(
+        "--direct-reversal-min-rise",
+        type=float,
+        default=10.0,
+        help="Direct sizing minimum rise from the recent low (default: 10).",
+    )
+    parser.add_argument(
+        "--direct-reversal-mult",
+        type=float,
+        default=0.75,
+        help="Direct sizing multiplier on reversal while still below the lower threshold (default: 0.75).",
+    )
     parser.add_argument("--output-dir", default=None, help="If set, write summary and trade CSVs here.")
     parser.add_argument("--skip-coverage", action="store_true", help="Skip printing raw source coverage reports.")
     args = parser.parse_args()
@@ -234,6 +288,7 @@ def main() -> None:
         scores = _load_source(source_name, aaii_csv=args.aaii_csv)
         loaded_sources.append((source_name, label, scores))
         print(f"  loaded {label}: {len(scores)} dates")
+    loaded_source_map = {name: (label, scores) for name, label, scores in loaded_sources}
 
     if not args.skip_coverage:
         for _, label, scores in loaded_sources:
@@ -264,20 +319,78 @@ def main() -> None:
         )
     ]
 
-    cumulative_labels: list[str] = []
-    cumulative_scores: list[dict[str, float]] = []
-    total_runs = len(loaded_sources) + 1
-    for run_index, (_, label, scores) in enumerate(loaded_sources, start=2):
-        cumulative_labels.append(label)
-        cumulative_scores.append(scores)
-        composite_scores = _combine_scores(cumulative_scores, args.combine_mode)
-        variant_label = f"Cumulative {args.combine_mode}: {' + '.join(cumulative_labels)}"
-        print(f"  [{run_index}/{total_runs}] {variant_label}")
+    if args.variant_set == "cumulative":
+        cumulative_labels: list[str] = []
+        cumulative_scores: list[dict[str, float]] = []
+        total_runs = len(loaded_sources) + 1
+        for run_index, (_, label, scores) in enumerate(loaded_sources, start=2):
+            cumulative_labels.append(label)
+            cumulative_scores.append(scores)
+            composite_scores = _combine_scores(cumulative_scores, args.combine_mode)
+            variant_label = f"Cumulative {args.combine_mode}: {' + '.join(cumulative_labels)}"
+            print(f"  [{run_index}/{total_runs}] {variant_label}")
+            results.append(
+                _run(
+                    label=variant_label,
+                    source_labels=list(cumulative_labels),
+                    scores=composite_scores,
+                    governor_kwargs=governor_kwargs,
+                    precomputed_candidates=precomputed_candidates,
+                )
+            )
+    else:
+        if "vix" not in loaded_source_map or "crypto_fg" not in loaded_source_map:
+            raise ValueError("source_specific variant_set requires both 'vix' and 'crypto_fg' in --sources")
+
+        vix_label, vix_scores = loaded_source_map["vix"]
+        crypto_label, crypto_scores = loaded_source_map["crypto_fg"]
+        full_composite_scores = _combine_scores(
+            [scores for _, _, scores in loaded_sources],
+            args.combine_mode,
+        )
+
+        total_runs = 4
+        print(f"  [2/{total_runs}] Macro brake only: {vix_label}")
         results.append(
             _run(
-                label=variant_label,
-                source_labels=list(cumulative_labels),
-                scores=composite_scores,
+                label=f"Macro brake only: {vix_label}",
+                source_labels=[f"{vix_label} macro"],
+                scores=vix_scores,
+                governor_kwargs=governor_kwargs,
+                precomputed_candidates=precomputed_candidates,
+            )
+        )
+
+        direct_bucket_kwargs = dict(governor_kwargs)
+        direct_bucket_kwargs.update(
+            use_direct_bucket_sentiment_sizing=True,
+            bucket_sentiment_scores={"crypto": crypto_scores},
+            bucket_sentiment_lag_days=args.direct_lag_days,
+            bucket_sentiment_threshold_1=args.direct_threshold1,
+            bucket_sentiment_threshold_2=args.direct_threshold2,
+            bucket_sentiment_size_mult_1=args.direct_mult1,
+            bucket_sentiment_size_mult_2=args.direct_mult2,
+            bucket_sentiment_reversal_window=args.direct_reversal_window,
+            bucket_sentiment_reversal_min_rise=args.direct_reversal_min_rise,
+            bucket_sentiment_reversal_mult=args.direct_reversal_mult,
+        )
+        print(f"  [3/{total_runs}] Macro {vix_label} + direct crypto sizing via {crypto_label}")
+        results.append(
+            _run(
+                label=f"Macro {vix_label} + direct crypto sizing ({crypto_label})",
+                source_labels=[f"{vix_label} macro", f"{crypto_label} direct crypto"],
+                scores=vix_scores,
+                governor_kwargs=direct_bucket_kwargs,
+                precomputed_candidates=precomputed_candidates,
+            )
+        )
+
+        print(f"  [4/{total_runs}] Full {args.combine_mode} composite")
+        results.append(
+            _run(
+                label=f"Full {args.combine_mode} composite",
+                source_labels=[label for _, label, _ in loaded_sources],
+                scores=full_composite_scores,
                 governor_kwargs=governor_kwargs,
                 precomputed_candidates=precomputed_candidates,
             )
