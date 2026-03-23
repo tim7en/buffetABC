@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -80,6 +81,10 @@ class _OpenTrade:
     entry_sentiment_score: float | None
     direct_sentiment_score: float | None
     direct_sentiment_size_mult: float
+    intraday_vol_proxy_regime: str | None
+    intraday_vol_proxy_mult: float
+    intraday_vol_proxy_signal_age_min: float | None
+    intraday_vol_proxy_close: float | None
     scale: float
     scaled_position_size: float
     scaled_shares: float
@@ -271,6 +276,116 @@ def _lookup_sentiment_signal(
     valid_window_scores = [score for score in window_scores if score is not None]
     recent_low = min(valid_window_scores) if valid_window_scores else None
     return sentiment_score, recent_low
+
+
+def _simple_moving_average(values: list[float], window: int) -> list[float | None]:
+    out: list[float | None] = [None] * len(values)
+    total = 0.0
+    for idx, value in enumerate(values):
+        total += value
+        if idx >= window:
+            total -= values[idx - window]
+        if idx >= window - 1:
+            out[idx] = total / window
+    return out
+
+
+def build_intraday_volatility_proxy_state(
+    *,
+    proxy_bars: list[dict],
+    short_ma_bars: int = 78,
+    long_ma_bars: int = 390,
+    interval_minutes: int = 5,
+) -> dict[str, list | int]:
+    if short_ma_bars <= 0 or long_ma_bars <= 0:
+        raise ValueError("intraday volatility proxy MA lengths must be positive")
+    bars = sorted(proxy_bars, key=lambda row: row["timestamp"])
+    timestamps = [row["timestamp"] for row in bars]
+    closes = [float(row["close"]) for row in bars]
+    return {
+        "timestamps": timestamps,
+        "closes": closes,
+        "sma_short": _simple_moving_average(closes, short_ma_bars),
+        "sma_long": _simple_moving_average(closes, long_ma_bars),
+        "short_ma_bars": short_ma_bars,
+        "long_ma_bars": long_ma_bars,
+        "interval_minutes": interval_minutes,
+    }
+
+
+def _intraday_volatility_regime(
+    *,
+    close: float,
+    sma_short: float | None,
+    sma_long: float | None,
+) -> str | None:
+    if sma_short is None or sma_long is None:
+        return None
+    if close <= sma_short and sma_short <= sma_long:
+        return "risk_on_micro"
+    if close > sma_short and sma_short > sma_long:
+        return "risk_off_micro"
+    return "neutral_micro"
+
+
+def _lookup_intraday_volatility_signal(
+    *,
+    entry_ts: datetime,
+    session_open: str,
+    direction: str,
+    proxy_state: dict[str, list | int] | None,
+    max_age_minutes: int,
+    lag_bars: int,
+    long_risk_on_mult: float,
+    long_neutral_mult: float,
+    long_risk_off_mult: float,
+    short_risk_on_mult: float,
+    short_neutral_mult: float,
+    short_risk_off_mult: float,
+) -> tuple[str | None, float, float | None, float | None]:
+    if (
+        not proxy_state
+        or session_open != "new_york_equity_open"
+        or direction not in {"long", "short"}
+    ):
+        return None, 1.0, None, None
+
+    interval_minutes = int(proxy_state.get("interval_minutes", 5) or 5)
+    lookup_ts = entry_ts - timedelta(minutes=max(lag_bars, 0) * interval_minutes)
+    timestamps = proxy_state["timestamps"]
+    idx = bisect.bisect_right(timestamps, lookup_ts) - 1
+    if idx < 0:
+        return None, 1.0, None, None
+
+    matched_ts = timestamps[idx]
+    signal_age_min = (entry_ts - matched_ts).total_seconds() / 60.0
+    if signal_age_min > max_age_minutes:
+        return None, 1.0, signal_age_min, None
+
+    closes = proxy_state["closes"]
+    sma_short = proxy_state["sma_short"]
+    sma_long = proxy_state["sma_long"]
+    regime = _intraday_volatility_regime(
+        close=float(closes[idx]),
+        sma_short=sma_short[idx],
+        sma_long=sma_long[idx],
+    )
+    if regime is None:
+        return None, 1.0, signal_age_min, float(closes[idx])
+
+    if direction == "long":
+        mult_map = {
+            "risk_on_micro": long_risk_on_mult,
+            "neutral_micro": long_neutral_mult,
+            "risk_off_micro": long_risk_off_mult,
+        }
+    else:
+        mult_map = {
+            "risk_on_micro": short_risk_on_mult,
+            "neutral_micro": short_neutral_mult,
+            "risk_off_micro": short_risk_off_mult,
+        }
+    return regime, float(mult_map.get(regime, 1.0)), signal_age_min, float(closes[idx])
 
 
 def _build_yearly_rows(executed_trades: list[dict], initial_capital: float) -> list[dict]:

@@ -1,0 +1,9 @@
+overlay,trade_level_proxy_pnl,delta_vs_baseline,affected_trades,fresh_signal_affected_trades
+baseline_no_overlay,9665.67,0.0,0,0
+half_long_risk_off,9718.9197,53.2496,13,13
+skip_long_risk_off,9772.1693,106.4993,13,13
+half_short_risk_on,9815.2419,149.5719,6,6
+skip_short_risk_on,9964.8138,299.1438,6,6
+half_both_mismatched,9868.4916,202.8216,19,19
+skip_both_mismatched,10071.3131,405.6431,19,19
+half_long_risk_off_plus_skip_short_risk_on,10018.0635,352.3934,19,19

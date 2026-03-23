@@ -1,0 +1,7 @@
+direction,regime,trades,wins,win_rate_pct,net_pnl,avg_pnl,avg_notional
+long,risk_on_micro,33,14,42.42,916.5304,27.7736,768.0659
+long,neutral_micro,27,15,55.56,646.2353,23.9346,799.965
+long,risk_off_micro,13,4,30.77,-106.4993,-8.1923,880.1766
+short,risk_on_micro,6,1,16.67,-299.1438,-49.8573,1184.5501
+short,neutral_micro,16,6,37.5,416.8596,26.0537,908.0829
+short,risk_off_micro,23,10,43.48,760.3915,33.0605,931.5627

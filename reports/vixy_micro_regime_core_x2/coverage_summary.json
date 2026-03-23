@@ -1,0 +1,37 @@
+{
+  "proxy_file": "cache\\cache\\tiingo\\VIX_5m.parquet",
+  "proxy_label": "VIXY",
+  "proxy_bar_count": 30000,
+  "proxy_start_utc": "2022-06-30T18:40:00",
+  "proxy_end_utc": "2026-02-23T20:55:00",
+  "proxy_unique_days": 387,
+  "spy_unique_days_in_proxy_window": 952,
+  "proxy_day_coverage_pct_vs_spy": 40.55,
+  "coverage_blocks": [
+    {
+      "start_date": "2022-06-30",
+      "end_date": "2022-12-27",
+      "calendar_days": 181
+    },
+    {
+      "start_date": "2024-07-02",
+      "end_date": "2024-12-27",
+      "calendar_days": 179
+    },
+    {
+      "start_date": "2025-08-27",
+      "end_date": "2026-02-23",
+      "calendar_days": 181
+    }
+  ],
+  "fresh_same_session_trade_matches": 118,
+  "baseline_trade_count": 375,
+  "fresh_same_session_trade_coverage_pct": 31.47,
+  "detected_proxy_label": "VIXY",
+  "fresh_signal_rule": "session_open == new_york_equity_open and last proxy bar <= 60 minutes old",
+  "short_ma_bars": 78,
+  "long_ma_bars": 390,
+  "shock_lookback_bars": 12,
+  "shock_up_threshold": 0.05,
+  "relief_down_threshold": -0.03
+}
