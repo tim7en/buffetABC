@@ -600,6 +600,19 @@ def generate_session_turtle_shared_account_report(
     bucket_sentiment_reversal_window: int = 10,
     bucket_sentiment_reversal_min_rise: float = 10.0,
     bucket_sentiment_reversal_mult: float = 0.75,
+    use_intraday_volatility_proxy: bool = False,
+    intraday_volatility_proxy_state: dict[str, list | int] | None = None,
+    intraday_volatility_proxy_label: str = "VIXY",
+    intraday_volatility_proxy_max_age_minutes: int = 60,
+    intraday_volatility_proxy_lag_bars: int = 1,
+    intraday_volatility_proxy_short_ma_bars: int = 78,
+    intraday_volatility_proxy_long_ma_bars: int = 390,
+    intraday_volatility_long_risk_on_mult: float = 1.0,
+    intraday_volatility_long_neutral_mult: float = 1.0,
+    intraday_volatility_long_risk_off_mult: float = 0.5,
+    intraday_volatility_short_risk_on_mult: float = 0.5,
+    intraday_volatility_short_neutral_mult: float = 1.0,
+    intraday_volatility_short_risk_off_mult: float = 1.0,
     precomputed_candidates: list[dict] | None = None,
 ) -> dict:
     if exposure_mult <= 0:
@@ -668,6 +681,24 @@ def generate_session_turtle_shared_account_report(
         raise ValueError("bucket_sentiment_reversal_mult must be <= 1.0")
     if bucket_sentiment_reversal_window < 0:
         raise ValueError("bucket_sentiment_reversal_window must be non-negative")
+    if use_intraday_volatility_proxy and not intraday_volatility_proxy_state:
+        raise ValueError("intraday_volatility_proxy_state is required when use_intraday_volatility_proxy=True")
+    if intraday_volatility_proxy_max_age_minutes < 0:
+        raise ValueError("intraday_volatility_proxy_max_age_minutes must be non-negative")
+    if intraday_volatility_proxy_lag_bars < 0:
+        raise ValueError("intraday_volatility_proxy_lag_bars must be non-negative")
+    if intraday_volatility_proxy_short_ma_bars <= 0 or intraday_volatility_proxy_long_ma_bars <= 0:
+        raise ValueError("intraday volatility proxy MA lengths must be positive")
+    for label, mult in (
+        ("intraday_volatility_long_risk_on_mult", intraday_volatility_long_risk_on_mult),
+        ("intraday_volatility_long_neutral_mult", intraday_volatility_long_neutral_mult),
+        ("intraday_volatility_long_risk_off_mult", intraday_volatility_long_risk_off_mult),
+        ("intraday_volatility_short_risk_on_mult", intraday_volatility_short_risk_on_mult),
+        ("intraday_volatility_short_neutral_mult", intraday_volatility_short_neutral_mult),
+        ("intraday_volatility_short_risk_off_mult", intraday_volatility_short_risk_off_mult),
+    ):
+        if mult <= 0 or mult > 1.0:
+            raise ValueError(f"{label} must be > 0 and <= 1.0")
     if precomputed_candidates is None:
         candidates = build_session_turtle_shared_account_candidates(
             basket=basket,
@@ -758,6 +789,18 @@ def generate_session_turtle_shared_account_report(
                         else None
                     ),
                     "direct_sentiment_size_mult": round(position.direct_sentiment_size_mult, 4),
+                    "intraday_vol_proxy_regime": position.intraday_vol_proxy_regime,
+                    "intraday_vol_proxy_mult": round(position.intraday_vol_proxy_mult, 4),
+                    "intraday_vol_proxy_signal_age_min": (
+                        round(position.intraday_vol_proxy_signal_age_min, 1)
+                        if position.intraday_vol_proxy_signal_age_min is not None
+                        else None
+                    ),
+                    "intraday_vol_proxy_close": (
+                        round(position.intraday_vol_proxy_close, 4)
+                        if position.intraday_vol_proxy_close is not None
+                        else None
+                    ),
                     "scale": round(position.scale, 6),
                     "entry_rel_volume": round(position.entry_rel_volume, 4),
                     "risk_model": position.risk_model,
@@ -834,6 +877,10 @@ def generate_session_turtle_shared_account_report(
         performance_peer_count = 0
         direct_sentiment_score: float | None = None
         direct_sentiment_size_mult = 1.0
+        intraday_vol_proxy_regime: str | None = None
+        intraday_vol_proxy_mult = 1.0
+        intraday_vol_proxy_signal_age_min: float | None = None
+        intraday_vol_proxy_close: float | None = None
         if use_performance_leadership_overlay:
             (
                 performance_risk_mult,
@@ -873,7 +920,33 @@ def generate_session_turtle_shared_account_report(
                     sentiment_reversal_mult=bucket_sentiment_reversal_mult,
                 )
 
-        target_position_size = float(candidate["position_size"]) * performance_risk_mult * direct_sentiment_size_mult
+        if use_intraday_volatility_proxy:
+            (
+                intraday_vol_proxy_regime,
+                intraday_vol_proxy_mult,
+                intraday_vol_proxy_signal_age_min,
+                intraday_vol_proxy_close,
+            ) = _lookup_intraday_volatility_signal(
+                entry_ts=candidate["entry_ts"],
+                session_open=str(candidate["session_open"]),
+                direction=str(candidate["direction"]),
+                proxy_state=intraday_volatility_proxy_state,
+                max_age_minutes=intraday_volatility_proxy_max_age_minutes,
+                lag_bars=intraday_volatility_proxy_lag_bars,
+                long_risk_on_mult=intraday_volatility_long_risk_on_mult,
+                long_neutral_mult=intraday_volatility_long_neutral_mult,
+                long_risk_off_mult=intraday_volatility_long_risk_off_mult,
+                short_risk_on_mult=intraday_volatility_short_risk_on_mult,
+                short_neutral_mult=intraday_volatility_short_neutral_mult,
+                short_risk_off_mult=intraday_volatility_short_risk_off_mult,
+            )
+
+        target_position_size = (
+            float(candidate["position_size"])
+            * performance_risk_mult
+            * direct_sentiment_size_mult
+            * intraday_vol_proxy_mult
+        )
         scaled_position_size = min(target_position_size, available_notional)
         if scaled_position_size <= 1e-9:
             skipped_no_capacity += 1
@@ -902,6 +975,10 @@ def generate_session_turtle_shared_account_report(
                 entry_sentiment_score=sentiment_score,
                 direct_sentiment_score=direct_sentiment_score,
                 direct_sentiment_size_mult=direct_sentiment_size_mult,
+                intraday_vol_proxy_regime=intraday_vol_proxy_regime,
+                intraday_vol_proxy_mult=intraday_vol_proxy_mult,
+                intraday_vol_proxy_signal_age_min=intraday_vol_proxy_signal_age_min,
+                intraday_vol_proxy_close=intraday_vol_proxy_close,
                 scale=scale,
                 scaled_position_size=scaled_position_size,
                 scaled_shares=float(candidate["shares"]) * scale,
@@ -947,6 +1024,12 @@ def generate_session_turtle_shared_account_report(
         exposure_counter[float(trade["entry_exposure_mult"])] += 1
     performance_mults = [float(trade.get("performance_risk_mult", 1.0) or 1.0) for trade in executed_trades]
     direct_sentiment_mults = [float(trade.get("direct_sentiment_size_mult", 1.0) or 1.0) for trade in executed_trades]
+    intraday_vol_proxy_mults = [float(trade.get("intraday_vol_proxy_mult", 1.0) or 1.0) for trade in executed_trades]
+    intraday_vol_proxy_regimes = Counter(
+        str(trade.get("intraday_vol_proxy_regime"))
+        for trade in executed_trades
+        if trade.get("intraday_vol_proxy_regime")
+    )
 
     label = f"Session Turtle Trend {basket.capitalize()} x{exposure_mult:g}"
     if use_drawdown_governor:
@@ -959,6 +1042,8 @@ def generate_session_turtle_shared_account_report(
         label += " With Sentiment Governor"
     if use_direct_bucket_sentiment_sizing:
         label += " With Direct Bucket Sentiment Sizing"
+    if use_intraday_volatility_proxy:
+        label += f" With {intraday_volatility_proxy_label} Micro Overlay"
     if any(cap is not None for cap in asset_class_caps.values()):
         label += " With Asset Class Caps"
 
@@ -1021,6 +1106,29 @@ def generate_session_turtle_shared_account_report(
             else 1.0
         ),
         "entries_direct_sentiment_downscaled": sum(1 for mult in direct_sentiment_mults if mult < 0.999999),
+        "use_intraday_volatility_proxy": use_intraday_volatility_proxy,
+        "intraday_volatility_proxy_label": intraday_volatility_proxy_label,
+        "intraday_volatility_proxy_max_age_minutes": intraday_volatility_proxy_max_age_minutes,
+        "intraday_volatility_proxy_lag_bars": intraday_volatility_proxy_lag_bars,
+        "intraday_volatility_proxy_short_ma_bars": intraday_volatility_proxy_short_ma_bars,
+        "intraday_volatility_proxy_long_ma_bars": intraday_volatility_proxy_long_ma_bars,
+        "intraday_volatility_long_risk_on_mult": intraday_volatility_long_risk_on_mult,
+        "intraday_volatility_long_neutral_mult": intraday_volatility_long_neutral_mult,
+        "intraday_volatility_long_risk_off_mult": intraday_volatility_long_risk_off_mult,
+        "intraday_volatility_short_risk_on_mult": intraday_volatility_short_risk_on_mult,
+        "intraday_volatility_short_neutral_mult": intraday_volatility_short_neutral_mult,
+        "intraday_volatility_short_risk_off_mult": intraday_volatility_short_risk_off_mult,
+        "avg_intraday_volatility_proxy_mult": (
+            round(sum(intraday_vol_proxy_mults) / len(intraday_vol_proxy_mults), 4)
+            if intraday_vol_proxy_mults
+            else 1.0
+        ),
+        "entries_intraday_volatility_proxy_scaled": sum(
+            1 for mult in intraday_vol_proxy_mults if mult < 0.999999
+        ),
+        "entries_intraday_volatility_risk_on_micro": intraday_vol_proxy_regimes["risk_on_micro"],
+        "entries_intraday_volatility_neutral_micro": intraday_vol_proxy_regimes["neutral_micro"],
+        "entries_intraday_volatility_risk_off_micro": intraday_vol_proxy_regimes["risk_off_micro"],
         "channel_period": channel_period,
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,

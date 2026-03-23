@@ -673,6 +673,121 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertTrue(summary["use_direct_bucket_sentiment_sizing"])
         self.assertEqual(summary["entries_direct_sentiment_downscaled"], 1)
 
+    def test_intraday_volatility_proxy_lookup_uses_prior_completed_bar(self):
+        from edgar.services.session_turtle_portfolio import _lookup_intraday_volatility_signal
+
+        proxy_state = {
+            "timestamps": [
+                datetime(2024, 1, 3, 9, 55, 0),
+                datetime(2024, 1, 3, 10, 0, 0),
+            ],
+            "closes": [31.0, 28.0],
+            "sma_short": [30.0, 29.0],
+            "sma_long": [29.0, 30.0],
+            "interval_minutes": 5,
+        }
+
+        regime, mult, age_min, close_value = _lookup_intraday_volatility_signal(
+            entry_ts=datetime(2024, 1, 3, 10, 0, 0),
+            session_open="new_york_equity_open",
+            direction="long",
+            proxy_state=proxy_state,
+            max_age_minutes=60,
+            lag_bars=1,
+            long_risk_on_mult=1.0,
+            long_neutral_mult=1.0,
+            long_risk_off_mult=0.5,
+            short_risk_on_mult=0.5,
+            short_neutral_mult=1.0,
+            short_risk_off_mult=1.0,
+        )
+
+        self.assertEqual(regime, "risk_off_micro")
+        self.assertEqual(mult, 0.5)
+        self.assertEqual(age_min, 5.0)
+        self.assertEqual(close_value, 31.0)
+
+    @patch("edgar.services.session_turtle_portfolio._resolve_universe")
+    @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")
+    def test_session_turtle_portfolio_supports_intraday_volatility_proxy_overlay(
+        self,
+        mock_backtest,
+        mock_resolve_universe,
+    ):
+        mock_resolve_universe.return_value = (
+            ("AAA", "tiingo", "new_york_equity_open"),
+            ("BBB", "tiingo", "new_york_equity_open"),
+            ("BTC-USD", "binance", "hong_kong_open"),
+        )
+
+        def _trade(entry_date: str, exit_date: str, pnl: float, direction: str) -> dict:
+            return {
+                "direction": direction,
+                "entry_date": entry_date,
+                "exit_date": exit_date,
+                "entry_price": 100.0,
+                "exit_price": 100.0 + pnl,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": pnl,
+                "risk_model": "directional_volume_boost",
+                "entry_rel_volume": 1.5,
+            }
+
+        payloads = {
+            "AAA": {"trades": [_trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 20.0, "long")]},
+            "BBB": {"trades": [_trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 20.0, "short")]},
+            "BTC-USD": {"trades": [_trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 20.0, "short")]},
+        }
+        mock_backtest.side_effect = lambda ticker, **kwargs: payloads[ticker]
+
+        proxy_state = {
+            "timestamps": [datetime(2024, 1, 3, 9, 55, 0)],
+            "closes": [31.0],
+            "sma_short": [30.0],
+            "sma_long": [29.0],
+            "interval_minutes": 5,
+        }
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=2.0,
+            use_intraday_volatility_proxy=True,
+            intraday_volatility_proxy_state=proxy_state,
+            intraday_volatility_proxy_label="VIXY",
+            intraday_volatility_proxy_max_age_minutes=60,
+            intraday_volatility_proxy_lag_bars=1,
+            intraday_volatility_long_risk_on_mult=1.0,
+            intraday_volatility_long_neutral_mult=1.0,
+            intraday_volatility_long_risk_off_mult=0.5,
+            intraday_volatility_short_risk_on_mult=0.5,
+            intraday_volatility_short_neutral_mult=1.0,
+            intraday_volatility_short_risk_off_mult=1.0,
+        )
+
+        aaa_trade = next(trade for trade in report["trades"] if trade["ticker"] == "AAA")
+        bbb_trade = next(trade for trade in report["trades"] if trade["ticker"] == "BBB")
+        btc_trade = next(trade for trade in report["trades"] if trade["ticker"] == "BTC-USD")
+
+        self.assertEqual(aaa_trade["intraday_vol_proxy_regime"], "risk_off_micro")
+        self.assertEqual(aaa_trade["intraday_vol_proxy_mult"], 0.5)
+        self.assertEqual(aaa_trade["notional"], 50.0)
+
+        self.assertEqual(bbb_trade["intraday_vol_proxy_regime"], "risk_off_micro")
+        self.assertEqual(bbb_trade["intraday_vol_proxy_mult"], 1.0)
+        self.assertEqual(bbb_trade["notional"], 100.0)
+
+        self.assertIsNone(btc_trade["intraday_vol_proxy_regime"])
+        self.assertEqual(btc_trade["intraday_vol_proxy_mult"], 1.0)
+        self.assertEqual(btc_trade["notional"], 100.0)
+
+        summary = report["summary"]
+        self.assertTrue(summary["use_intraday_volatility_proxy"])
+        self.assertEqual(summary["intraday_volatility_proxy_label"], "VIXY")
+        self.assertEqual(summary["entries_intraday_volatility_proxy_scaled"], 1)
+        self.assertEqual(summary["entries_intraday_volatility_risk_off_micro"], 2)
+
 
 class ApiTests(TestCase):
     def setUp(self):
