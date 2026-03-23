@@ -1022,9 +1022,20 @@ def generate_session_turtle_shared_account_report(
     for trade in executed_trades:
         bucket_pnl[trade["asset_bucket"]] += float(trade["net_pnl"])
         exposure_counter[float(trade["entry_exposure_mult"])] += 1
-    performance_mults = [float(trade.get("performance_risk_mult", 1.0) or 1.0) for trade in executed_trades]
-    direct_sentiment_mults = [float(trade.get("direct_sentiment_size_mult", 1.0) or 1.0) for trade in executed_trades]
-    intraday_vol_proxy_mults = [float(trade.get("intraday_vol_proxy_mult", 1.0) or 1.0) for trade in executed_trades]
+    performance_mults = [
+        float(trade.get("performance_risk_mult")) if trade.get("performance_risk_mult") is not None else 1.0
+        for trade in executed_trades
+    ]
+    direct_sentiment_mults = [
+        float(trade.get("direct_sentiment_size_mult"))
+        if trade.get("direct_sentiment_size_mult") is not None
+        else 1.0
+        for trade in executed_trades
+    ]
+    intraday_vol_proxy_mults = [
+        float(trade.get("intraday_vol_proxy_mult")) if trade.get("intraday_vol_proxy_mult") is not None else 1.0
+        for trade in executed_trades
+    ]
     intraday_vol_proxy_regimes = Counter(
         str(trade.get("intraday_vol_proxy_regime"))
         for trade in executed_trades
