@@ -399,6 +399,56 @@ class CommandPersistenceTests(TestCase):
         self.assertTrue(mock_report.call_args.kwargs["use_extended_hours_protective_exits"])
         self.assertEqual(mock_report.call_args.kwargs["extended_hours_core_session_minutes"], 390)
 
+    @patch("edgar.management.commands.generate_session_turtle_plots.load_vix_scores")
+    @patch("edgar.management.commands.generate_session_turtle_plots.generate_session_turtle_shared_account_report")
+    def test_generate_session_turtle_plots_forwards_sentiment_governor_settings(
+        self,
+        mock_report,
+        mock_load_vix_scores,
+    ):
+        mock_load_vix_scores.return_value = {"2024-01-02": 22.0}
+        mock_report.return_value = {
+            "summary": {
+                "label": "Session Turtle Trend Core x2 With Sentiment Governor",
+                "initial_capital": 1000.0,
+            },
+            "equity_curve": [
+                {"date": "2024-01-02T10:00:00", "equity": 1000.0},
+                {"date": "2024-01-10T10:00:00", "equity": 1125.0},
+            ],
+            "trades": [{"ticker": "BTC-USD"}],
+            "yearly_returns": [{"year": 2024, "pnl": 125.0}],
+            "asset_summary": [{"ticker": "BTC-USD", "pnl": 125.0}],
+        }
+
+        with TemporaryDirectory() as temp_dir:
+            call_command(
+                "generate_session_turtle_plots",
+                f"--output-dir={temp_dir}",
+                "--use-sentiment-governor",
+                "--sentiment-source=vix",
+                "--sentiment-lag-days=1",
+                "--sentiment-threshold-1=50",
+                "--sentiment-threshold-2=30",
+                "--sentiment-mult-1=1.25",
+                "--sentiment-mult-2=0.75",
+                "--sentiment-reversal-window=7",
+                "--sentiment-reversal-min-rise=8",
+                "--sentiment-reversal-mult=1.0",
+            )
+
+        mock_load_vix_scores.assert_called_once_with()
+        self.assertTrue(mock_report.call_args.kwargs["use_sentiment_governor"])
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_scores"], {"2024-01-02": 22.0})
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_lag_days"], 1)
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_threshold_1"], 50.0)
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_threshold_2"], 30.0)
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_exposure_mult_1"], 1.25)
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_exposure_mult_2"], 0.75)
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_reversal_window"], 7)
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_reversal_min_rise"], 8.0)
+        self.assertEqual(mock_report.call_args.kwargs["sentiment_reversal_mult"], 1.0)
+
 
 class SessionTurtlePortfolioTests(TestCase):
     @patch("edgar.services.session_turtle_portfolio._resolve_universe")
@@ -506,6 +556,53 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertFalse(second_call["use_extended_hours_protective_exits_only"])
         self.assertEqual(second_call["entry_window_minutes"], 480)
         self.assertIsNone(second_call["core_session_minutes"])
+
+    @patch("edgar.services.session_turtle_portfolio._resolve_universe")
+    @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")
+    def test_session_turtle_portfolio_lags_sentiment_to_avoid_forward_bias(
+        self,
+        mock_backtest,
+        mock_resolve_universe,
+    ):
+        mock_resolve_universe.return_value = (("AAA", "tiingo", "new_york_equity_open"),)
+        mock_backtest.return_value = {
+            "trades": [
+                {
+                    "direction": "long",
+                    "entry_date": "2024-01-03T10:00:00",
+                    "exit_date": "2024-01-04T10:00:00",
+                    "entry_price": 100.0,
+                    "exit_price": 120.0,
+                    "shares": 1.0,
+                    "position_size": 100.0,
+                    "pnl": 20.0,
+                    "risk_model": "directional_volume_boost",
+                    "entry_rel_volume": 1.5,
+                }
+            ]
+        }
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=2.0,
+            use_sentiment_governor=True,
+            sentiment_scores={
+                "2024-01-02": 20.0,
+                "2024-01-03": 80.0,
+            },
+            sentiment_lag_days=1,
+            sentiment_threshold_1=45.0,
+            sentiment_threshold_2=25.0,
+            sentiment_exposure_mult_1=1.0,
+            sentiment_exposure_mult_2=0.5,
+            sentiment_reversal_window=0,
+        )
+
+        trade = report["trades"][0]
+        self.assertEqual(trade["entry_sentiment_score"], 20.0)
+        self.assertEqual(trade["entry_exposure_mult"], 0.5)
+        self.assertEqual(report["summary"]["sentiment_lag_days"], 1)
 
 
 class ApiTests(TestCase):

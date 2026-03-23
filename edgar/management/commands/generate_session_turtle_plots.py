@@ -9,6 +9,12 @@ from edgar.services.backtest_plotting import (
     plot_yearly_pnl,
 )
 from edgar.services.session_turtle_portfolio import generate_session_turtle_shared_account_report
+from edgar.services.sentiment_data import (
+    load_aaii_scores,
+    load_cnn_fg_scores,
+    load_crypto_fg_scores,
+    load_vix_scores,
+)
 
 
 class Command(BaseCommand):
@@ -149,10 +155,90 @@ class Command(BaseCommand):
             default=390,
             help="Core-session length used before outside-hours protective exits take over (default: 390).",
         )
+        parser.add_argument(
+            "--use-sentiment-governor",
+            action="store_true",
+            help="Enable the sentiment-based exposure governor.",
+        )
+        parser.add_argument(
+            "--sentiment-source",
+            choices=["vix", "crypto_fg", "cnn_fg", "aaii"],
+            default="vix",
+            help="Which sentiment data source to use (default: vix).",
+        )
+        parser.add_argument(
+            "--sentiment-lag-days",
+            type=int,
+            default=1,
+            help="Calendar-day lag applied to daily sentiment inputs to avoid same-day look-ahead bias (default: 1).",
+        )
+        parser.add_argument(
+            "--sentiment-threshold-1",
+            type=float,
+            default=45.0,
+            help="Score below which exposure is reduced to --sentiment-mult-1 (default: 45).",
+        )
+        parser.add_argument(
+            "--sentiment-threshold-2",
+            type=float,
+            default=25.0,
+            help="Score below which exposure is reduced to --sentiment-mult-2 (default: 25).",
+        )
+        parser.add_argument(
+            "--sentiment-mult-1",
+            type=float,
+            default=1.0,
+            help="Exposure multiplier between threshold-1 and threshold-2 (default: 1.0).",
+        )
+        parser.add_argument(
+            "--sentiment-mult-2",
+            type=float,
+            default=0.5,
+            help="Exposure multiplier below threshold-2 (default: 0.5).",
+        )
+        parser.add_argument(
+            "--sentiment-reversal-window",
+            type=int,
+            default=10,
+            help="Look-back window for reversal detection while below the fear floor (default: 10).",
+        )
+        parser.add_argument(
+            "--sentiment-reversal-min-rise",
+            type=float,
+            default=10.0,
+            help="Minimum rise from the recent low to trigger reversal scale-up (default: 10).",
+        )
+        parser.add_argument(
+            "--sentiment-reversal-mult",
+            type=float,
+            default=1.0,
+            help="Exposure multiplier when reversal conditions are met (default: 1.0).",
+        )
+        parser.add_argument(
+            "--aaii-csv",
+            type=str,
+            default=None,
+            metavar="PATH",
+            help="Path to manually downloaded AAII CSV (used only when --sentiment-source aaii).",
+        )
 
     def handle(self, *args, **options):
         output_dir = Path(options["output_dir"]).resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
+
+        sentiment_scores = None
+        if options["use_sentiment_governor"]:
+            source = str(options["sentiment_source"])
+            self.stdout.write(f"Loading sentiment data: {source} ...")
+            if source == "vix":
+                sentiment_scores = load_vix_scores()
+            elif source == "crypto_fg":
+                sentiment_scores = load_crypto_fg_scores()
+            elif source == "cnn_fg":
+                sentiment_scores = load_cnn_fg_scores()
+            else:
+                sentiment_scores = load_aaii_scores(csv_path=options.get("aaii_csv"))
+            self.stdout.write(self.style.SUCCESS(f"  loaded {len(sentiment_scores)} dates"))
 
         exposure_mult = float(options["exposure_mult"])
         report = generate_session_turtle_shared_account_report(
@@ -178,6 +264,16 @@ class Command(BaseCommand):
             performance_min_history=int(options["performance_min_history"]),
             use_extended_hours_protective_exits=bool(options["use_extended_hours_protective_exits"]),
             extended_hours_core_session_minutes=int(options["extended_hours_core_session_minutes"]),
+            use_sentiment_governor=bool(options["use_sentiment_governor"]),
+            sentiment_scores=sentiment_scores,
+            sentiment_lag_days=int(options["sentiment_lag_days"]),
+            sentiment_threshold_1=float(options["sentiment_threshold_1"]),
+            sentiment_threshold_2=float(options["sentiment_threshold_2"]),
+            sentiment_exposure_mult_1=float(options["sentiment_mult_1"]),
+            sentiment_exposure_mult_2=float(options["sentiment_mult_2"]),
+            sentiment_reversal_window=int(options["sentiment_reversal_window"]),
+            sentiment_reversal_min_rise=float(options["sentiment_reversal_min_rise"]),
+            sentiment_reversal_mult=float(options["sentiment_reversal_mult"]),
         )
         summary = report["summary"]
 

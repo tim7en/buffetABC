@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
+from edgar.services.sentiment_data import get_score_for_date
 from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
 
 
@@ -76,6 +77,7 @@ class _OpenTrade:
     entry_rel_volume: float
     asset_bucket: str
     entry_exposure_mult: float
+    entry_sentiment_score: float | None
     scale: float
     scaled_position_size: float
     scaled_shares: float
@@ -163,20 +165,57 @@ def _active_exposure_mult(
     base_exposure_mult: float,
     capital: float,
     peak_capital: float,
+    # Drawdown governor
     use_drawdown_governor: bool,
     drawdown_trigger_1_pct: float,
     drawdown_exposure_mult_1: float,
     drawdown_trigger_2_pct: float,
     drawdown_exposure_mult_2: float,
-) -> float:
-    if not use_drawdown_governor:
-        return base_exposure_mult
-    drawdown_pct = _realized_drawdown_pct(capital=capital, peak_capital=peak_capital)
-    if drawdown_pct >= drawdown_trigger_2_pct:
-        return drawdown_exposure_mult_2
-    if drawdown_pct >= drawdown_trigger_1_pct:
-        return drawdown_exposure_mult_1
-    return base_exposure_mult
+    # Sentiment governor
+    use_sentiment_governor: bool = False,
+    sentiment_score: float | None = None,
+    sentiment_threshold_1: float = 45.0,
+    sentiment_threshold_2: float = 25.0,
+    sentiment_exposure_mult_1: float = 1.0,
+    sentiment_exposure_mult_2: float = 0.5,
+    sentiment_reversal_recent_low: float | None = None,
+    sentiment_reversal_min_rise: float = 10.0,
+    sentiment_reversal_mult: float = 1.0,
+) -> tuple[float, float | None]:
+    """
+    Return ``(active_mult, sentiment_score_used)``.
+
+    Drawdown governor and sentiment governor are independent layers.
+    The final multiplier is the minimum of both; the more conservative limit wins.
+    """
+    if use_drawdown_governor:
+        drawdown_pct = _realized_drawdown_pct(capital=capital, peak_capital=peak_capital)
+        if drawdown_pct >= drawdown_trigger_2_pct:
+            dd_mult = drawdown_exposure_mult_2
+        elif drawdown_pct >= drawdown_trigger_1_pct:
+            dd_mult = drawdown_exposure_mult_1
+        else:
+            dd_mult = base_exposure_mult
+    else:
+        dd_mult = base_exposure_mult
+
+    if not use_sentiment_governor or sentiment_score is None:
+        return dd_mult, sentiment_score
+
+    if sentiment_score < sentiment_threshold_2:
+        if (
+            sentiment_reversal_recent_low is not None
+            and (sentiment_score - sentiment_reversal_recent_low) >= sentiment_reversal_min_rise
+        ):
+            s_mult = sentiment_reversal_mult
+        else:
+            s_mult = sentiment_exposure_mult_2
+    elif sentiment_score < sentiment_threshold_1:
+        s_mult = sentiment_exposure_mult_1
+    else:
+        s_mult = base_exposure_mult
+
+    return min(dd_mult, s_mult), sentiment_score
 
 
 def _build_yearly_rows(executed_trades: list[dict], initial_capital: float) -> list[dict]:
@@ -270,19 +309,9 @@ def _build_asset_rows(executed_trades: list[dict], total_pnl: float) -> list[dic
     return rows
 
 
-def generate_session_turtle_shared_account_report(
+def build_session_turtle_shared_account_candidates(
     *,
     basket: str = "expanded",
-    exposure_mult: float = 2.0,
-    use_drawdown_governor: bool = False,
-    drawdown_trigger_1_pct: float = 10.0,
-    drawdown_exposure_mult_1: float = 1.5,
-    drawdown_trigger_2_pct: float = 20.0,
-    drawdown_exposure_mult_2: float = 1.0,
-    crypto_cap_mult: float | None = None,
-    gold_cap_mult: float | None = None,
-    metals_cap_mult: float | None = None,
-    equity_cap_mult: float | None = None,
     initial_capital: float = 1_000.0,
     lookback_years: float = 4.1,
     channel_period: int = 20,
@@ -291,52 +320,10 @@ def generate_session_turtle_shared_account_report(
     directional_volume_risk_pct: float = 0.07,
     trend_fast_period: int = 55,
     trend_slow_period: int = 200,
-    base_portfolio_cap_pct: float = 0.90,
-    use_performance_leadership_overlay: bool = False,
-    performance_lookback_trades: int = 6,
-    performance_decay: float = 0.75,
-    performance_floor_mult: float = 0.75,
-    performance_cap_mult: float = 1.25,
-    performance_min_history: int = 3,
     use_extended_hours_protective_exits: bool = False,
     extended_hours_core_session_minutes: int = 390,
-) -> dict:
-    if exposure_mult <= 0:
-        raise ValueError("exposure_mult must be positive")
-    if drawdown_trigger_1_pct < 0 or drawdown_trigger_2_pct < 0:
-        raise ValueError("drawdown triggers must be non-negative")
-    if drawdown_trigger_2_pct <= drawdown_trigger_1_pct:
-        raise ValueError("drawdown_trigger_2_pct must be greater than drawdown_trigger_1_pct")
-    if drawdown_exposure_mult_1 <= 0 or drawdown_exposure_mult_2 <= 0:
-        raise ValueError("drawdown exposure multipliers must be positive")
-    if drawdown_exposure_mult_1 > exposure_mult:
-        raise ValueError("drawdown_exposure_mult_1 must be <= exposure_mult")
-    if drawdown_exposure_mult_2 > drawdown_exposure_mult_1:
-        raise ValueError("drawdown_exposure_mult_2 must be <= drawdown_exposure_mult_1")
-    for label, cap_mult in (
-        ("crypto_cap_mult", crypto_cap_mult),
-        ("gold_cap_mult", gold_cap_mult),
-        ("metals_cap_mult", metals_cap_mult),
-        ("equity_cap_mult", equity_cap_mult),
-    ):
-        if cap_mult is not None and cap_mult <= 0:
-            raise ValueError(f"{label} must be positive when provided")
-    if performance_lookback_trades <= 0:
-        raise ValueError("performance_lookback_trades must be positive")
-    if not 0 < performance_decay <= 1.0:
-        raise ValueError("performance_decay must be between 0 and 1")
-    if performance_floor_mult <= 0 or performance_cap_mult <= 0:
-        raise ValueError("performance floor/cap multipliers must be positive")
-    if performance_floor_mult > performance_cap_mult:
-        raise ValueError("performance_floor_mult must be <= performance_cap_mult")
-    if not performance_floor_mult <= 1.0 <= performance_cap_mult:
-        raise ValueError("performance overlay must bracket neutral sizing at 1.0")
-    if performance_min_history <= 0:
-        raise ValueError("performance_min_history must be positive")
-    if extended_hours_core_session_minutes <= 0:
-        raise ValueError("extended_hours_core_session_minutes must be positive")
+) -> list[dict]:
     universe = _resolve_universe(basket)
-
     candidates: list[dict] = []
     for combo_idx, (ticker, source, session_open) in enumerate(universe):
         use_extended_hours_mode = (
@@ -390,6 +377,115 @@ def generate_session_turtle_shared_account_report(
                     "asset_bucket": _asset_bucket(ticker),
                 }
             )
+    return candidates
+
+
+def generate_session_turtle_shared_account_report(
+    *,
+    basket: str = "expanded",
+    exposure_mult: float = 2.0,
+    use_drawdown_governor: bool = False,
+    drawdown_trigger_1_pct: float = 10.0,
+    drawdown_exposure_mult_1: float = 1.5,
+    drawdown_trigger_2_pct: float = 20.0,
+    drawdown_exposure_mult_2: float = 1.0,
+    crypto_cap_mult: float | None = None,
+    gold_cap_mult: float | None = None,
+    metals_cap_mult: float | None = None,
+    equity_cap_mult: float | None = None,
+    initial_capital: float = 1_000.0,
+    lookback_years: float = 4.1,
+    channel_period: int = 20,
+    base_risk_pct: float = 0.05,
+    fixed_stop_pct: float = 0.10,
+    directional_volume_risk_pct: float = 0.07,
+    trend_fast_period: int = 55,
+    trend_slow_period: int = 200,
+    base_portfolio_cap_pct: float = 0.90,
+    use_performance_leadership_overlay: bool = False,
+    performance_lookback_trades: int = 6,
+    performance_decay: float = 0.75,
+    performance_floor_mult: float = 0.75,
+    performance_cap_mult: float = 1.25,
+    performance_min_history: int = 3,
+    use_extended_hours_protective_exits: bool = False,
+    extended_hours_core_session_minutes: int = 390,
+    use_sentiment_governor: bool = False,
+    sentiment_scores: dict[str, float] | None = None,
+    sentiment_lag_days: int = 1,
+    sentiment_threshold_1: float = 45.0,
+    sentiment_threshold_2: float = 25.0,
+    sentiment_exposure_mult_1: float = 1.0,
+    sentiment_exposure_mult_2: float = 0.5,
+    sentiment_reversal_window: int = 10,
+    sentiment_reversal_min_rise: float = 10.0,
+    sentiment_reversal_mult: float = 1.0,
+    precomputed_candidates: list[dict] | None = None,
+) -> dict:
+    if exposure_mult <= 0:
+        raise ValueError("exposure_mult must be positive")
+    if drawdown_trigger_1_pct < 0 or drawdown_trigger_2_pct < 0:
+        raise ValueError("drawdown triggers must be non-negative")
+    if drawdown_trigger_2_pct <= drawdown_trigger_1_pct:
+        raise ValueError("drawdown_trigger_2_pct must be greater than drawdown_trigger_1_pct")
+    if drawdown_exposure_mult_1 <= 0 or drawdown_exposure_mult_2 <= 0:
+        raise ValueError("drawdown exposure multipliers must be positive")
+    if drawdown_exposure_mult_1 > exposure_mult:
+        raise ValueError("drawdown_exposure_mult_1 must be <= exposure_mult")
+    if drawdown_exposure_mult_2 > drawdown_exposure_mult_1:
+        raise ValueError("drawdown_exposure_mult_2 must be <= drawdown_exposure_mult_1")
+    for label, cap_mult in (
+        ("crypto_cap_mult", crypto_cap_mult),
+        ("gold_cap_mult", gold_cap_mult),
+        ("metals_cap_mult", metals_cap_mult),
+        ("equity_cap_mult", equity_cap_mult),
+    ):
+        if cap_mult is not None and cap_mult <= 0:
+            raise ValueError(f"{label} must be positive when provided")
+    if performance_lookback_trades <= 0:
+        raise ValueError("performance_lookback_trades must be positive")
+    if not 0 < performance_decay <= 1.0:
+        raise ValueError("performance_decay must be between 0 and 1")
+    if performance_floor_mult <= 0 or performance_cap_mult <= 0:
+        raise ValueError("performance floor/cap multipliers must be positive")
+    if performance_floor_mult > performance_cap_mult:
+        raise ValueError("performance_floor_mult must be <= performance_cap_mult")
+    if not performance_floor_mult <= 1.0 <= performance_cap_mult:
+        raise ValueError("performance overlay must bracket neutral sizing at 1.0")
+    if performance_min_history <= 0:
+        raise ValueError("performance_min_history must be positive")
+    if extended_hours_core_session_minutes <= 0:
+        raise ValueError("extended_hours_core_session_minutes must be positive")
+    if sentiment_lag_days < 0:
+        raise ValueError("sentiment_lag_days must be non-negative")
+    if sentiment_threshold_2 >= sentiment_threshold_1:
+        raise ValueError("sentiment_threshold_2 must be less than sentiment_threshold_1")
+    if sentiment_exposure_mult_1 <= 0 or sentiment_exposure_mult_2 <= 0 or sentiment_reversal_mult <= 0:
+        raise ValueError("sentiment multipliers must be positive")
+    if sentiment_exposure_mult_1 > exposure_mult:
+        raise ValueError("sentiment_exposure_mult_1 must be <= exposure_mult")
+    if sentiment_exposure_mult_2 > sentiment_exposure_mult_1:
+        raise ValueError("sentiment_exposure_mult_2 must be <= sentiment_exposure_mult_1")
+    if sentiment_reversal_mult > exposure_mult:
+        raise ValueError("sentiment_reversal_mult must be <= exposure_mult")
+    if sentiment_reversal_window < 0:
+        raise ValueError("sentiment_reversal_window must be non-negative")
+    if precomputed_candidates is None:
+        candidates = build_session_turtle_shared_account_candidates(
+            basket=basket,
+            initial_capital=initial_capital,
+            lookback_years=lookback_years,
+            channel_period=channel_period,
+            base_risk_pct=base_risk_pct,
+            fixed_stop_pct=fixed_stop_pct,
+            directional_volume_risk_pct=directional_volume_risk_pct,
+            trend_fast_period=trend_fast_period,
+            trend_slow_period=trend_slow_period,
+            use_extended_hours_protective_exits=use_extended_hours_protective_exits,
+            extended_hours_core_session_minutes=extended_hours_core_session_minutes,
+        )
+    else:
+        candidates = list(precomputed_candidates)
 
     candidates.sort(key=lambda row: (row["entry_ts"], row["combo_idx"], row["trade_idx"]))
     closed_candidate_results = sorted(candidates, key=lambda row: (row["exit_ts"], row["combo_idx"], row["trade_idx"]))
@@ -453,6 +549,11 @@ def generate_session_turtle_shared_account_report(
                     "shares": round(position.scaled_shares, 6),
                     "notional": round(position.scaled_position_size, 4),
                     "entry_exposure_mult": round(position.entry_exposure_mult, 4),
+                    "entry_sentiment_score": (
+                        round(position.entry_sentiment_score, 2)
+                        if position.entry_sentiment_score is not None
+                        else None
+                    ),
                     "scale": round(position.scale, 6),
                     "entry_rel_volume": round(position.entry_rel_volume, 4),
                     "risk_model": position.risk_model,
@@ -480,7 +581,28 @@ def generate_session_turtle_shared_account_report(
             skipped_same_ticker += 1
             continue
 
-        active_exposure_mult = _active_exposure_mult(
+        # Lag daily sentiment by default so intraday entries do not consume
+        # same-day values that may only be known after the close.
+        sentiment_lookup_ts = candidate["entry_ts"] - timedelta(days=sentiment_lag_days)
+        sentiment_score: float | None = None
+        sentiment_reversal_recent_low: float | None = None
+        if use_sentiment_governor and sentiment_scores:
+            sentiment_score = get_score_for_date(
+                sentiment_lookup_ts.strftime("%Y-%m-%d"),
+                sentiment_scores,
+            )
+            if sentiment_score is not None and sentiment_reversal_window > 0:
+                window_scores = [
+                    get_score_for_date(
+                        (sentiment_lookup_ts - timedelta(days=offset)).strftime("%Y-%m-%d"),
+                        sentiment_scores,
+                    )
+                    for offset in range(1, sentiment_reversal_window + 1)
+                ]
+                valid_window_scores = [score for score in window_scores if score is not None]
+                sentiment_reversal_recent_low = min(valid_window_scores) if valid_window_scores else None
+
+        active_exposure_mult, _ = _active_exposure_mult(
             base_exposure_mult=exposure_mult,
             capital=capital,
             peak_capital=peak_capital,
@@ -489,6 +611,15 @@ def generate_session_turtle_shared_account_report(
             drawdown_exposure_mult_1=drawdown_exposure_mult_1,
             drawdown_trigger_2_pct=drawdown_trigger_2_pct,
             drawdown_exposure_mult_2=drawdown_exposure_mult_2,
+            use_sentiment_governor=use_sentiment_governor,
+            sentiment_score=sentiment_score,
+            sentiment_threshold_1=sentiment_threshold_1,
+            sentiment_threshold_2=sentiment_threshold_2,
+            sentiment_exposure_mult_1=sentiment_exposure_mult_1,
+            sentiment_exposure_mult_2=sentiment_exposure_mult_2,
+            sentiment_reversal_recent_low=sentiment_reversal_recent_low,
+            sentiment_reversal_min_rise=sentiment_reversal_min_rise,
+            sentiment_reversal_mult=sentiment_reversal_mult,
         )
         portfolio_cap = capital * base_portfolio_cap_pct * active_exposure_mult
         used_notional = sum(position.scaled_position_size for position in open_positions)
@@ -553,6 +684,7 @@ def generate_session_turtle_shared_account_report(
                 entry_rel_volume=float(candidate["entry_rel_volume"]),
                 asset_bucket=asset_bucket,
                 entry_exposure_mult=active_exposure_mult,
+                entry_sentiment_score=sentiment_score,
                 scale=scale,
                 scaled_position_size=scaled_position_size,
                 scaled_shares=float(candidate["shares"]) * scale,
@@ -605,6 +737,8 @@ def generate_session_turtle_shared_account_report(
         label += " With Extended Hours Protective Exits"
     if use_performance_leadership_overlay:
         label += " With Leadership Overlay"
+    if use_sentiment_governor:
+        label += " With Sentiment Governor"
     if any(cap is not None for cap in asset_class_caps.values()):
         label += " With Asset Class Caps"
 
@@ -642,6 +776,15 @@ def generate_session_turtle_shared_account_report(
         "entries_at_base_exposure": exposure_counter[float(exposure_mult)],
         "entries_at_drawdown_exposure_1": exposure_counter[float(drawdown_exposure_mult_1)],
         "entries_at_drawdown_exposure_2": exposure_counter[float(drawdown_exposure_mult_2)],
+        "use_sentiment_governor": use_sentiment_governor,
+        "sentiment_lag_days": sentiment_lag_days,
+        "sentiment_threshold_1": sentiment_threshold_1,
+        "sentiment_threshold_2": sentiment_threshold_2,
+        "sentiment_exposure_mult_1": sentiment_exposure_mult_1,
+        "sentiment_exposure_mult_2": sentiment_exposure_mult_2,
+        "sentiment_reversal_window": sentiment_reversal_window,
+        "sentiment_reversal_min_rise": sentiment_reversal_min_rise,
+        "sentiment_reversal_mult": sentiment_reversal_mult,
         "channel_period": channel_period,
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,
