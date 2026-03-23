@@ -164,6 +164,50 @@ def load_vix_scores(
     return scores
 
 
+def load_vix_closes(
+    start: str = "2018-01-01",
+    end: str | None = None,
+    force_refresh: bool = False,
+) -> dict[str, float]:
+    """
+    Fetch raw CBOE VIX daily closes via yfinance and cache them as JSON.
+
+    Returns a ``dict[str, float]`` mapping ISO date strings to the raw daily
+    close, which is useful when a strategy needs the prior day's actual VIX
+    level rather than the normalized fear/greed score.
+    """
+    cache_file = "vix_closes.json"
+    if not force_refresh:
+        cached = _load_json_cache(cache_file)
+        if cached:
+            logger.info("VIX raw closes: loaded %d rows from cache", len(cached))
+            return cached
+
+    try:
+        import yfinance as yf
+    except ImportError:
+        raise ImportError("yfinance is required: pip install yfinance")
+
+    end_str = end or date.today().strftime("%Y-%m-%d")
+    logger.info("VIX raw closes: downloading ^VIX from %s to %s ...", start, end_str)
+    raw = yf.download("^VIX", start=start, end=end_str, progress=False, auto_adjust=True)
+    if raw.empty:
+        raise RuntimeError("yfinance returned empty VIX data")
+
+    if hasattr(raw.columns, "levels"):
+        raw.columns = raw.columns.get_level_values(0)
+
+    closes: dict[str, float] = {}
+    for idx, row in raw.iterrows():
+        d = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)[:10]
+        vix_val = float(row["Close"].iloc[0]) if hasattr(row["Close"], "iloc") else float(row["Close"])
+        closes[d] = round(vix_val, 4)
+
+    _save_json_cache(cache_file, closes)
+    logger.info("VIX raw closes: %d rows saved", len(closes))
+    return closes
+
+
 # ---------------------------------------------------------------------------
 # Crypto Fear & Greed
 # ---------------------------------------------------------------------------

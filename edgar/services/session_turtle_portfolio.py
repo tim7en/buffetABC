@@ -3,7 +3,7 @@ from __future__ import annotations
 import bisect
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from edgar.services.sentiment_data import get_score_for_date
 from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
@@ -85,6 +85,12 @@ class _OpenTrade:
     intraday_vol_proxy_mult: float
     intraday_vol_proxy_signal_age_min: float | None
     intraday_vol_proxy_close: float | None
+    volatility_persistence_regime: str | None
+    volatility_persistence_mult: float
+    volatility_persistence_ratio: float | None
+    volatility_persistence_vix_rel: float | None
+    volatility_persistence_vixy_rel: float | None
+    volatility_persistence_signal_age_min: float | None
     scale: float
     scaled_position_size: float
     scaled_shares: float
@@ -290,6 +296,18 @@ def _simple_moving_average(values: list[float], window: int) -> list[float | Non
     return out
 
 
+def _exponential_moving_average(values: list[float], period: int) -> list[float | None]:
+    if period <= 0:
+        raise ValueError("EMA period must be positive")
+    out: list[float | None] = [None] * len(values)
+    alpha = 2.0 / (period + 1.0)
+    ema_value: float | None = None
+    for idx, value in enumerate(values):
+        ema_value = float(value) if ema_value is None else (alpha * float(value) + (1.0 - alpha) * ema_value)
+        out[idx] = ema_value
+    return out
+
+
 def build_intraday_volatility_proxy_state(
     *,
     proxy_bars: list[dict],
@@ -309,6 +327,44 @@ def build_intraday_volatility_proxy_state(
         "sma_long": _simple_moving_average(closes, long_ma_bars),
         "short_ma_bars": short_ma_bars,
         "long_ma_bars": long_ma_bars,
+        "interval_minutes": interval_minutes,
+    }
+
+
+def build_daily_volatility_reference_state(
+    *,
+    daily_closes: dict[str, float],
+    ema_period: int = 20,
+) -> dict[str, list | int]:
+    if ema_period <= 0:
+        raise ValueError("daily volatility EMA period must be positive")
+    ordered = sorted((date.fromisoformat(day), float(value)) for day, value in daily_closes.items())
+    dates = [item[0] for item in ordered]
+    closes = [item[1] for item in ordered]
+    return {
+        "dates": dates,
+        "closes": closes,
+        "ema": _exponential_moving_average(closes, ema_period),
+        "ema_period": ema_period,
+    }
+
+
+def build_intraday_volatility_relative_state(
+    *,
+    proxy_bars: list[dict],
+    ema_period: int = 78,
+    interval_minutes: int = 5,
+) -> dict[str, list | int]:
+    if ema_period <= 0:
+        raise ValueError("intraday volatility EMA period must be positive")
+    bars = sorted(proxy_bars, key=lambda row: row["timestamp"])
+    timestamps = [row["timestamp"] for row in bars]
+    closes = [float(row["close"]) for row in bars]
+    return {
+        "timestamps": timestamps,
+        "closes": closes,
+        "ema": _exponential_moving_average(closes, ema_period),
+        "ema_period": ema_period,
         "interval_minutes": interval_minutes,
     }
 
@@ -386,6 +442,89 @@ def _lookup_intraday_volatility_signal(
             "risk_off_micro": short_risk_off_mult,
         }
     return regime, float(mult_map.get(regime, 1.0)), signal_age_min, float(closes[idx])
+
+
+def _lookup_volatility_persistence_signal(
+    *,
+    entry_ts: datetime,
+    session_open: str,
+    direction: str,
+    daily_vix_state: dict[str, list | int] | None,
+    intraday_vixy_state: dict[str, list | int] | None,
+    daily_lag_days: int,
+    intraday_max_age_minutes: int,
+    intraday_lag_bars: int,
+    ratio_upper: float,
+    ratio_lower: float,
+    daily_stress_min_rel: float,
+    long_persistent_stress_mult: float,
+    long_neutral_mult: float,
+    long_fading_stress_mult: float,
+    short_persistent_stress_mult: float,
+    short_neutral_mult: float,
+    short_fading_stress_mult: float,
+) -> tuple[str | None, float, float | None, float | None, float | None, float | None]:
+    if (
+        not daily_vix_state
+        or not intraday_vixy_state
+        or session_open != "new_york_equity_open"
+        or direction not in {"long", "short"}
+    ):
+        return None, 1.0, None, None, None, None
+
+    target_day = (entry_ts - timedelta(days=max(daily_lag_days, 0))).date()
+    daily_dates = daily_vix_state["dates"]
+    daily_idx = bisect.bisect_right(daily_dates, target_day) - 1
+    if daily_idx < 0:
+        return None, 1.0, None, None, None, None
+
+    daily_closes = daily_vix_state["closes"]
+    daily_ema = daily_vix_state["ema"]
+    if daily_ema[daily_idx] in (None, 0):
+        return None, 1.0, None, None, None, None
+    vix_rel = float(daily_closes[daily_idx]) / float(daily_ema[daily_idx])
+
+    interval_minutes = int(intraday_vixy_state.get("interval_minutes", 5) or 5)
+    lookup_ts = entry_ts - timedelta(minutes=max(intraday_lag_bars, 0) * interval_minutes)
+    intraday_timestamps = intraday_vixy_state["timestamps"]
+    intraday_idx = bisect.bisect_right(intraday_timestamps, lookup_ts) - 1
+    if intraday_idx < 0:
+        return None, 1.0, None, vix_rel, None, None
+
+    matched_ts = intraday_timestamps[intraday_idx]
+    signal_age_min = (entry_ts - matched_ts).total_seconds() / 60.0
+    if signal_age_min > intraday_max_age_minutes:
+        return None, 1.0, signal_age_min, vix_rel, None, None
+
+    intraday_closes = intraday_vixy_state["closes"]
+    intraday_ema = intraday_vixy_state["ema"]
+    if intraday_ema[intraday_idx] in (None, 0):
+        return None, 1.0, signal_age_min, vix_rel, None, None
+    vixy_rel = float(intraday_closes[intraday_idx]) / float(intraday_ema[intraday_idx])
+    ratio = vixy_rel / vix_rel if vix_rel > 0 else None
+    if ratio is None:
+        return None, 1.0, signal_age_min, vix_rel, vixy_rel, None
+
+    regime = "neutral_persistence"
+    if vix_rel >= daily_stress_min_rel and ratio >= ratio_upper:
+        regime = "persistent_stress"
+    elif vix_rel >= daily_stress_min_rel and ratio <= ratio_lower:
+        regime = "fading_stress"
+
+    if direction == "long":
+        mult_map = {
+            "persistent_stress": long_persistent_stress_mult,
+            "neutral_persistence": long_neutral_mult,
+            "fading_stress": long_fading_stress_mult,
+        }
+    else:
+        mult_map = {
+            "persistent_stress": short_persistent_stress_mult,
+            "neutral_persistence": short_neutral_mult,
+            "fading_stress": short_fading_stress_mult,
+        }
+
+    return regime, float(mult_map.get(regime, 1.0)), signal_age_min, vix_rel, vixy_rel, ratio
 
 
 def _build_yearly_rows(executed_trades: list[dict], initial_capital: float) -> list[dict]:
@@ -613,6 +752,24 @@ def generate_session_turtle_shared_account_report(
     intraday_volatility_short_risk_on_mult: float = 0.5,
     intraday_volatility_short_neutral_mult: float = 1.0,
     intraday_volatility_short_risk_off_mult: float = 1.0,
+    use_volatility_persistence_overlay: bool = False,
+    daily_vix_reference_state: dict[str, list | int] | None = None,
+    intraday_vixy_relative_state: dict[str, list | int] | None = None,
+    volatility_persistence_label: str = "VIX/VIXY persistence",
+    volatility_persistence_daily_lag_days: int = 1,
+    volatility_persistence_intraday_max_age_minutes: int = 60,
+    volatility_persistence_intraday_lag_bars: int = 1,
+    volatility_persistence_daily_ema_period: int = 20,
+    volatility_persistence_intraday_ema_period: int = 78,
+    volatility_persistence_ratio_upper: float = 1.05,
+    volatility_persistence_ratio_lower: float = 0.95,
+    volatility_persistence_daily_stress_min_rel: float = 1.0,
+    volatility_persistence_long_persistent_stress_mult: float = 0.5,
+    volatility_persistence_long_neutral_mult: float = 1.0,
+    volatility_persistence_long_fading_stress_mult: float = 1.0,
+    volatility_persistence_short_persistent_stress_mult: float = 1.0,
+    volatility_persistence_short_neutral_mult: float = 1.0,
+    volatility_persistence_short_fading_stress_mult: float = 0.5,
     precomputed_candidates: list[dict] | None = None,
 ) -> dict:
     if exposure_mult <= 0:
@@ -696,6 +853,35 @@ def generate_session_turtle_shared_account_report(
         ("intraday_volatility_short_risk_on_mult", intraday_volatility_short_risk_on_mult),
         ("intraday_volatility_short_neutral_mult", intraday_volatility_short_neutral_mult),
         ("intraday_volatility_short_risk_off_mult", intraday_volatility_short_risk_off_mult),
+    ):
+        if mult <= 0 or mult > 1.0:
+            raise ValueError(f"{label} must be > 0 and <= 1.0")
+    if use_volatility_persistence_overlay and (not daily_vix_reference_state or not intraday_vixy_relative_state):
+        raise ValueError(
+            "daily_vix_reference_state and intraday_vixy_relative_state are required when "
+            "use_volatility_persistence_overlay=True"
+        )
+    if volatility_persistence_daily_lag_days < 0:
+        raise ValueError("volatility_persistence_daily_lag_days must be non-negative")
+    if volatility_persistence_intraday_max_age_minutes < 0:
+        raise ValueError("volatility_persistence_intraday_max_age_minutes must be non-negative")
+    if volatility_persistence_intraday_lag_bars < 0:
+        raise ValueError("volatility_persistence_intraday_lag_bars must be non-negative")
+    if volatility_persistence_daily_ema_period <= 0 or volatility_persistence_intraday_ema_period <= 0:
+        raise ValueError("volatility persistence EMA periods must be positive")
+    if volatility_persistence_ratio_lower <= 0 or volatility_persistence_ratio_upper <= 0:
+        raise ValueError("volatility persistence ratio thresholds must be positive")
+    if volatility_persistence_ratio_lower >= volatility_persistence_ratio_upper:
+        raise ValueError("volatility_persistence_ratio_lower must be < volatility_persistence_ratio_upper")
+    if volatility_persistence_daily_stress_min_rel <= 0:
+        raise ValueError("volatility_persistence_daily_stress_min_rel must be positive")
+    for label, mult in (
+        ("volatility_persistence_long_persistent_stress_mult", volatility_persistence_long_persistent_stress_mult),
+        ("volatility_persistence_long_neutral_mult", volatility_persistence_long_neutral_mult),
+        ("volatility_persistence_long_fading_stress_mult", volatility_persistence_long_fading_stress_mult),
+        ("volatility_persistence_short_persistent_stress_mult", volatility_persistence_short_persistent_stress_mult),
+        ("volatility_persistence_short_neutral_mult", volatility_persistence_short_neutral_mult),
+        ("volatility_persistence_short_fading_stress_mult", volatility_persistence_short_fading_stress_mult),
     ):
         if mult <= 0 or mult > 1.0:
             raise ValueError(f"{label} must be > 0 and <= 1.0")
@@ -801,6 +987,28 @@ def generate_session_turtle_shared_account_report(
                         if position.intraday_vol_proxy_close is not None
                         else None
                     ),
+                    "volatility_persistence_regime": position.volatility_persistence_regime,
+                    "volatility_persistence_mult": round(position.volatility_persistence_mult, 4),
+                    "volatility_persistence_ratio": (
+                        round(position.volatility_persistence_ratio, 4)
+                        if position.volatility_persistence_ratio is not None
+                        else None
+                    ),
+                    "volatility_persistence_vix_rel": (
+                        round(position.volatility_persistence_vix_rel, 4)
+                        if position.volatility_persistence_vix_rel is not None
+                        else None
+                    ),
+                    "volatility_persistence_vixy_rel": (
+                        round(position.volatility_persistence_vixy_rel, 4)
+                        if position.volatility_persistence_vixy_rel is not None
+                        else None
+                    ),
+                    "volatility_persistence_signal_age_min": (
+                        round(position.volatility_persistence_signal_age_min, 1)
+                        if position.volatility_persistence_signal_age_min is not None
+                        else None
+                    ),
                     "scale": round(position.scale, 6),
                     "entry_rel_volume": round(position.entry_rel_volume, 4),
                     "risk_model": position.risk_model,
@@ -881,6 +1089,12 @@ def generate_session_turtle_shared_account_report(
         intraday_vol_proxy_mult = 1.0
         intraday_vol_proxy_signal_age_min: float | None = None
         intraday_vol_proxy_close: float | None = None
+        volatility_persistence_regime: str | None = None
+        volatility_persistence_mult = 1.0
+        volatility_persistence_ratio: float | None = None
+        volatility_persistence_vix_rel: float | None = None
+        volatility_persistence_vixy_rel: float | None = None
+        volatility_persistence_signal_age_min: float | None = None
         if use_performance_leadership_overlay:
             (
                 performance_risk_mult,
@@ -941,11 +1155,40 @@ def generate_session_turtle_shared_account_report(
                 short_risk_off_mult=intraday_volatility_short_risk_off_mult,
             )
 
+        if use_volatility_persistence_overlay:
+            (
+                volatility_persistence_regime,
+                volatility_persistence_mult,
+                volatility_persistence_signal_age_min,
+                volatility_persistence_vix_rel,
+                volatility_persistence_vixy_rel,
+                volatility_persistence_ratio,
+            ) = _lookup_volatility_persistence_signal(
+                entry_ts=candidate["entry_ts"],
+                session_open=str(candidate["session_open"]),
+                direction=str(candidate["direction"]),
+                daily_vix_state=daily_vix_reference_state,
+                intraday_vixy_state=intraday_vixy_relative_state,
+                daily_lag_days=volatility_persistence_daily_lag_days,
+                intraday_max_age_minutes=volatility_persistence_intraday_max_age_minutes,
+                intraday_lag_bars=volatility_persistence_intraday_lag_bars,
+                ratio_upper=volatility_persistence_ratio_upper,
+                ratio_lower=volatility_persistence_ratio_lower,
+                daily_stress_min_rel=volatility_persistence_daily_stress_min_rel,
+                long_persistent_stress_mult=volatility_persistence_long_persistent_stress_mult,
+                long_neutral_mult=volatility_persistence_long_neutral_mult,
+                long_fading_stress_mult=volatility_persistence_long_fading_stress_mult,
+                short_persistent_stress_mult=volatility_persistence_short_persistent_stress_mult,
+                short_neutral_mult=volatility_persistence_short_neutral_mult,
+                short_fading_stress_mult=volatility_persistence_short_fading_stress_mult,
+            )
+
         target_position_size = (
             float(candidate["position_size"])
             * performance_risk_mult
             * direct_sentiment_size_mult
             * intraday_vol_proxy_mult
+            * volatility_persistence_mult
         )
         scaled_position_size = min(target_position_size, available_notional)
         if scaled_position_size <= 1e-9:
@@ -979,6 +1222,12 @@ def generate_session_turtle_shared_account_report(
                 intraday_vol_proxy_mult=intraday_vol_proxy_mult,
                 intraday_vol_proxy_signal_age_min=intraday_vol_proxy_signal_age_min,
                 intraday_vol_proxy_close=intraday_vol_proxy_close,
+                volatility_persistence_regime=volatility_persistence_regime,
+                volatility_persistence_mult=volatility_persistence_mult,
+                volatility_persistence_ratio=volatility_persistence_ratio,
+                volatility_persistence_vix_rel=volatility_persistence_vix_rel,
+                volatility_persistence_vixy_rel=volatility_persistence_vixy_rel,
+                volatility_persistence_signal_age_min=volatility_persistence_signal_age_min,
                 scale=scale,
                 scaled_position_size=scaled_position_size,
                 scaled_shares=float(candidate["shares"]) * scale,
@@ -1041,6 +1290,17 @@ def generate_session_turtle_shared_account_report(
         for trade in executed_trades
         if trade.get("intraday_vol_proxy_regime")
     )
+    volatility_persistence_mults = [
+        float(trade.get("volatility_persistence_mult"))
+        if trade.get("volatility_persistence_mult") is not None
+        else 1.0
+        for trade in executed_trades
+    ]
+    volatility_persistence_regimes = Counter(
+        str(trade.get("volatility_persistence_regime"))
+        for trade in executed_trades
+        if trade.get("volatility_persistence_regime")
+    )
 
     label = f"Session Turtle Trend {basket.capitalize()} x{exposure_mult:g}"
     if use_drawdown_governor:
@@ -1055,6 +1315,8 @@ def generate_session_turtle_shared_account_report(
         label += " With Direct Bucket Sentiment Sizing"
     if use_intraday_volatility_proxy:
         label += f" With {intraday_volatility_proxy_label} Micro Overlay"
+    if use_volatility_persistence_overlay:
+        label += f" With {volatility_persistence_label}"
     if any(cap is not None for cap in asset_class_caps.values()):
         label += " With Asset Class Caps"
 
@@ -1140,6 +1402,33 @@ def generate_session_turtle_shared_account_report(
         "entries_intraday_volatility_risk_on_micro": intraday_vol_proxy_regimes["risk_on_micro"],
         "entries_intraday_volatility_neutral_micro": intraday_vol_proxy_regimes["neutral_micro"],
         "entries_intraday_volatility_risk_off_micro": intraday_vol_proxy_regimes["risk_off_micro"],
+        "use_volatility_persistence_overlay": use_volatility_persistence_overlay,
+        "volatility_persistence_label": volatility_persistence_label,
+        "volatility_persistence_daily_lag_days": volatility_persistence_daily_lag_days,
+        "volatility_persistence_intraday_max_age_minutes": volatility_persistence_intraday_max_age_minutes,
+        "volatility_persistence_intraday_lag_bars": volatility_persistence_intraday_lag_bars,
+        "volatility_persistence_daily_ema_period": volatility_persistence_daily_ema_period,
+        "volatility_persistence_intraday_ema_period": volatility_persistence_intraday_ema_period,
+        "volatility_persistence_ratio_upper": volatility_persistence_ratio_upper,
+        "volatility_persistence_ratio_lower": volatility_persistence_ratio_lower,
+        "volatility_persistence_daily_stress_min_rel": volatility_persistence_daily_stress_min_rel,
+        "volatility_persistence_long_persistent_stress_mult": volatility_persistence_long_persistent_stress_mult,
+        "volatility_persistence_long_neutral_mult": volatility_persistence_long_neutral_mult,
+        "volatility_persistence_long_fading_stress_mult": volatility_persistence_long_fading_stress_mult,
+        "volatility_persistence_short_persistent_stress_mult": volatility_persistence_short_persistent_stress_mult,
+        "volatility_persistence_short_neutral_mult": volatility_persistence_short_neutral_mult,
+        "volatility_persistence_short_fading_stress_mult": volatility_persistence_short_fading_stress_mult,
+        "avg_volatility_persistence_mult": (
+            round(sum(volatility_persistence_mults) / len(volatility_persistence_mults), 4)
+            if volatility_persistence_mults
+            else 1.0
+        ),
+        "entries_volatility_persistence_scaled": sum(
+            1 for mult in volatility_persistence_mults if mult < 0.999999
+        ),
+        "entries_volatility_persistence_persistent_stress": volatility_persistence_regimes["persistent_stress"],
+        "entries_volatility_persistence_neutral": volatility_persistence_regimes["neutral_persistence"],
+        "entries_volatility_persistence_fading_stress": volatility_persistence_regimes["fading_stress"],
         "channel_period": channel_period,
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,

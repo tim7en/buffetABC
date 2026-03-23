@@ -788,6 +788,138 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertEqual(summary["entries_intraday_volatility_proxy_scaled"], 1)
         self.assertEqual(summary["entries_intraday_volatility_risk_off_micro"], 2)
 
+    def test_lookup_volatility_persistence_signal_uses_previous_day_vix_and_prior_bar(self):
+        from edgar.services.session_turtle_portfolio import _lookup_volatility_persistence_signal
+
+        regime, mult, age_min, vix_rel, vixy_rel, ratio = _lookup_volatility_persistence_signal(
+            entry_ts=datetime(2024, 1, 3, 10, 0, 0),
+            session_open="new_york_equity_open",
+            direction="long",
+            daily_vix_state={
+                "dates": [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)],
+                "closes": [18.0, 24.0, 12.0],
+                "ema": [18.0, 20.0, 16.0],
+            },
+            intraday_vixy_state={
+                "timestamps": [datetime(2024, 1, 3, 9, 55, 0), datetime(2024, 1, 3, 10, 0, 0)],
+                "closes": [26.0, 10.0],
+                "ema": [20.0, 18.0],
+                "interval_minutes": 5,
+            },
+            daily_lag_days=1,
+            intraday_max_age_minutes=60,
+            intraday_lag_bars=1,
+            ratio_upper=1.05,
+            ratio_lower=0.95,
+            daily_stress_min_rel=1.0,
+            long_persistent_stress_mult=0.5,
+            long_neutral_mult=1.0,
+            long_fading_stress_mult=1.0,
+            short_persistent_stress_mult=1.0,
+            short_neutral_mult=1.0,
+            short_fading_stress_mult=0.5,
+        )
+
+        self.assertEqual(regime, "persistent_stress")
+        self.assertEqual(mult, 0.5)
+        self.assertEqual(age_min, 5.0)
+        self.assertAlmostEqual(vix_rel, 1.2)
+        self.assertAlmostEqual(vixy_rel, 1.3)
+        self.assertAlmostEqual(ratio, 1.3 / 1.2)
+
+    @patch("edgar.services.session_turtle_portfolio._resolve_universe")
+    @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")
+    def test_session_turtle_portfolio_supports_volatility_persistence_overlay(
+        self,
+        mock_backtest,
+        mock_resolve_universe,
+    ):
+        mock_resolve_universe.return_value = (
+            ("AAA", "tiingo", "new_york_equity_open"),
+            ("BBB", "tiingo", "new_york_equity_open"),
+            ("CCC", "tiingo", "new_york_equity_open"),
+        )
+
+        def _trade(entry_date: str, exit_date: str, pnl: float, direction: str) -> dict:
+            return {
+                "direction": direction,
+                "entry_date": entry_date,
+                "exit_date": exit_date,
+                "entry_price": 100.0,
+                "exit_price": 100.0 + pnl,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": pnl,
+                "risk_model": "directional_volume_boost",
+                "entry_rel_volume": 1.5,
+            }
+
+        payloads = {
+            "AAA": {"trades": [_trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 20.0, "long")]},
+            "BBB": {"trades": [_trade("2024-01-03T11:00:00", "2024-01-04T11:00:00", 20.0, "short")]},
+            "CCC": {"trades": [_trade("2024-01-03T12:00:00", "2024-01-04T12:00:00", 20.0, "long")]},
+        }
+        mock_backtest.side_effect = lambda ticker, **kwargs: payloads[ticker]
+
+        daily_state = {
+            "dates": [date(2024, 1, 1), date(2024, 1, 2)],
+            "closes": [18.0, 24.0],
+            "ema": [18.0, 20.0],
+        }
+        intraday_state = {
+            "timestamps": [
+                datetime(2024, 1, 3, 9, 55, 0),
+                datetime(2024, 1, 3, 10, 55, 0),
+                datetime(2024, 1, 3, 11, 55, 0),
+            ],
+            "closes": [26.0, 18.0, 24.6],
+            "ema": [20.0, 20.0, 20.0],
+            "interval_minutes": 5,
+        }
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=2.0,
+            use_volatility_persistence_overlay=True,
+            daily_vix_reference_state=daily_state,
+            intraday_vixy_relative_state=intraday_state,
+            volatility_persistence_daily_lag_days=1,
+            volatility_persistence_intraday_max_age_minutes=60,
+            volatility_persistence_intraday_lag_bars=1,
+            volatility_persistence_ratio_upper=1.05,
+            volatility_persistence_ratio_lower=0.95,
+            volatility_persistence_daily_stress_min_rel=1.0,
+            volatility_persistence_long_persistent_stress_mult=0.5,
+            volatility_persistence_long_neutral_mult=1.0,
+            volatility_persistence_long_fading_stress_mult=1.0,
+            volatility_persistence_short_persistent_stress_mult=1.0,
+            volatility_persistence_short_neutral_mult=1.0,
+            volatility_persistence_short_fading_stress_mult=0.5,
+        )
+
+        aaa_trade = next(trade for trade in report["trades"] if trade["ticker"] == "AAA")
+        bbb_trade = next(trade for trade in report["trades"] if trade["ticker"] == "BBB")
+        ccc_trade = next(trade for trade in report["trades"] if trade["ticker"] == "CCC")
+
+        self.assertEqual(aaa_trade["volatility_persistence_regime"], "persistent_stress")
+        self.assertEqual(aaa_trade["volatility_persistence_mult"], 0.5)
+        self.assertEqual(aaa_trade["notional"], 50.0)
+
+        self.assertEqual(bbb_trade["volatility_persistence_regime"], "fading_stress")
+        self.assertEqual(bbb_trade["volatility_persistence_mult"], 0.5)
+        self.assertEqual(bbb_trade["notional"], 50.0)
+
+        self.assertEqual(ccc_trade["volatility_persistence_regime"], "neutral_persistence")
+        self.assertEqual(ccc_trade["volatility_persistence_mult"], 1.0)
+        self.assertEqual(ccc_trade["notional"], 100.0)
+
+        summary = report["summary"]
+        self.assertTrue(summary["use_volatility_persistence_overlay"])
+        self.assertEqual(summary["entries_volatility_persistence_scaled"], 2)
+        self.assertEqual(summary["entries_volatility_persistence_persistent_stress"], 1)
+        self.assertEqual(summary["entries_volatility_persistence_fading_stress"], 1)
+
 
 class ApiTests(TestCase):
     def setUp(self):
