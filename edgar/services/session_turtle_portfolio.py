@@ -5,6 +5,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+from edgar.services.binance_data import get_local_binance_time_bounds
+from edgar.services.local_tiingo_data import get_local_tiingo_time_bounds
 from edgar.services.sentiment_data import get_score_for_date
 from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
 
@@ -57,6 +59,54 @@ def _resolve_universe(basket: str) -> tuple[tuple[str, str, str], ...]:
     if key == "expanded":
         return EXPANDED_SESSION_TURTLE_UNIVERSE
     raise ValueError("basket must be one of {'core', 'index', 'expanded'}")
+
+
+def _normalize_asof_date(investable_universe_asof: date | datetime | str | None) -> date | None:
+    if investable_universe_asof is None:
+        return None
+    if isinstance(investable_universe_asof, datetime):
+        return investable_universe_asof.date()
+    if isinstance(investable_universe_asof, date):
+        return investable_universe_asof
+    text = str(investable_universe_asof).strip()
+    if not text:
+        return None
+    return date.fromisoformat(text)
+
+
+def _market_data_start_timestamp(
+    *,
+    ticker: str,
+    source: str,
+) -> datetime | None:
+    source_key = (source or "").strip().lower()
+    if source_key == "tiingo":
+        start_ts, _, _, _ = get_local_tiingo_time_bounds(ticker=ticker)
+        return start_ts
+    if source_key == "binance":
+        start_ts, _, _, _ = get_local_binance_time_bounds(ticker=ticker)
+        return start_ts
+    return None
+
+
+def _resolve_investable_universe(
+    *,
+    basket: str,
+    investable_universe_asof: date | datetime | str | None = None,
+) -> tuple[tuple[str, str, str], ...]:
+    universe = _resolve_universe(basket)
+    asof_date = _normalize_asof_date(investable_universe_asof)
+    if asof_date is None:
+        return universe
+
+    filtered: list[tuple[str, str, str]] = []
+    for ticker, source, session_open in universe:
+        start_ts = _market_data_start_timestamp(ticker=ticker, source=source)
+        if start_ts is not None and start_ts.date() <= asof_date:
+            filtered.append((ticker, source, session_open))
+    if not filtered:
+        raise ValueError(f"No investable universe members remain for as-of date {asof_date.isoformat()}")
+    return tuple(filtered)
 
 
 @dataclass
@@ -124,6 +174,30 @@ def _candidate_return_pct(candidate: dict) -> float:
     if position_size <= 0:
         return 0.0
     return float(candidate.get("pnl", 0.0) or 0.0) / position_size
+
+
+def _candidate_requested_position_size(
+    *,
+    candidate: dict,
+    capital: float,
+    max_position_pct: float,
+) -> float:
+    entry_price = float(candidate.get("entry_price", 0.0) or 0.0)
+    if capital <= 0 or entry_price <= 0:
+        return 0.0
+
+    risk_pct = float(candidate.get("risk_pct", 0.0) or 0.0)
+    stop_loss_raw = candidate.get("stop_loss")
+    stop_loss = float(stop_loss_raw) if stop_loss_raw is not None else None
+    sl_distance = abs(entry_price - stop_loss) if stop_loss is not None else 0.0
+    if risk_pct > 0 and sl_distance > 1e-9:
+        requested_risk_amount = capital * risk_pct
+        requested_shares = requested_risk_amount / sl_distance
+        requested_notional = requested_shares * entry_price
+        return min(requested_notional, capital * max_position_pct)
+
+    # Backward-compatible fallback for older precomputed candidate payloads.
+    return float(candidate.get("position_size", 0.0) or 0.0)
 
 
 def _decayed_trade_return_score(returns: list[float], lookback_trades: int, decay: float) -> float:
@@ -621,6 +695,7 @@ def _build_asset_rows(executed_trades: list[dict], total_pnl: float) -> list[dic
 def build_session_turtle_shared_account_candidates(
     *,
     basket: str = "expanded",
+    investable_universe_asof: date | datetime | str | None = None,
     initial_capital: float = 1_000.0,
     lookback_years: float = 4.1,
     channel_period: int = 20,
@@ -632,7 +707,10 @@ def build_session_turtle_shared_account_candidates(
     use_extended_hours_protective_exits: bool = False,
     extended_hours_core_session_minutes: int = 390,
 ) -> list[dict]:
-    universe = _resolve_universe(basket)
+    universe = _resolve_investable_universe(
+        basket=basket,
+        investable_universe_asof=investable_universe_asof,
+    )
     candidates: list[dict] = []
     for combo_idx, (ticker, source, session_open) in enumerate(universe):
         use_extended_hours_mode = (
@@ -666,6 +744,13 @@ def build_session_turtle_shared_account_candidates(
             use_chandelier_exit=False,
         )
         for trade_idx, trade in enumerate(payload["trades"]):
+            entry_price = float(trade["entry_price"])
+            stop_loss = trade.get("stop_loss")
+            if stop_loss is None and fixed_stop_pct is not None:
+                if str(trade["direction"]) == "long":
+                    stop_loss = entry_price * (1.0 - fixed_stop_pct)
+                else:
+                    stop_loss = entry_price * (1.0 + fixed_stop_pct)
             candidates.append(
                 {
                     "combo_idx": combo_idx,
@@ -676,8 +761,10 @@ def build_session_turtle_shared_account_candidates(
                     "direction": trade["direction"],
                     "entry_ts": datetime.fromisoformat(trade["entry_date"]),
                     "exit_ts": datetime.fromisoformat(trade["exit_date"]),
-                    "entry_price": float(trade["entry_price"]),
+                    "entry_price": entry_price,
                     "exit_price": float(trade["exit_price"]),
+                    "stop_loss": float(stop_loss) if stop_loss is not None else None,
+                    "risk_pct": float(trade.get("risk_pct", 0.0) or 0.0),
                     "shares": float(trade["shares"]),
                     "position_size": float(trade["position_size"]),
                     "pnl": float(trade["pnl"]),
@@ -692,6 +779,7 @@ def build_session_turtle_shared_account_candidates(
 def generate_session_turtle_shared_account_report(
     *,
     basket: str = "expanded",
+    investable_universe_asof: date | datetime | str | None = None,
     exposure_mult: float = 2.0,
     use_drawdown_governor: bool = False,
     drawdown_trigger_1_pct: float = 10.0,
@@ -885,9 +973,11 @@ def generate_session_turtle_shared_account_report(
     ):
         if mult <= 0 or mult > 1.0:
             raise ValueError(f"{label} must be > 0 and <= 1.0")
+    asof_date = _normalize_asof_date(investable_universe_asof)
     if precomputed_candidates is None:
         candidates = build_session_turtle_shared_account_candidates(
             basket=basket,
+            investable_universe_asof=investable_universe_asof,
             initial_capital=initial_capital,
             lookback_years=lookback_years,
             channel_period=channel_period,
@@ -1029,15 +1119,26 @@ def generate_session_turtle_shared_account_report(
                 }
             )
 
-    for candidate in candidates:
-        close_positions_up_to(candidate["entry_ts"])
-        close_candidate_history_up_to(candidate["entry_ts"])
-        if any(position.ticker == candidate["ticker"] for position in open_positions):
-            skipped_same_ticker += 1
+    candidate_idx = 0
+    while candidate_idx < len(candidates):
+        batch_entry_ts = candidates[candidate_idx]["entry_ts"]
+        close_positions_up_to(batch_entry_ts)
+        close_candidate_history_up_to(batch_entry_ts)
+
+        batch_candidates: list[dict] = []
+        while candidate_idx < len(candidates) and candidates[candidate_idx]["entry_ts"] == batch_entry_ts:
+            candidate = candidates[candidate_idx]
+            candidate_idx += 1
+            if any(position.ticker == candidate["ticker"] for position in open_positions):
+                skipped_same_ticker += 1
+                continue
+            batch_candidates.append(candidate)
+
+        if not batch_candidates:
             continue
 
         sentiment_score, sentiment_reversal_recent_low = _lookup_sentiment_signal(
-            entry_ts=candidate["entry_ts"],
+            entry_ts=batch_entry_ts,
             sentiment_scores=sentiment_scores if use_sentiment_governor else None,
             sentiment_lag_days=sentiment_lag_days,
             sentiment_reversal_window=sentiment_reversal_window,
@@ -1062,182 +1163,281 @@ def generate_session_turtle_shared_account_report(
             sentiment_reversal_min_rise=sentiment_reversal_min_rise,
             sentiment_reversal_mult=sentiment_reversal_mult,
         )
+
         portfolio_cap = capital * base_portfolio_cap_pct * active_exposure_mult
         used_notional = sum(position.scaled_position_size for position in open_positions)
-        available_notional = max(portfolio_cap - used_notional, 0.0)
-        asset_bucket = str(candidate["asset_bucket"])
-        asset_class_cap_mult = asset_class_caps.get(asset_bucket)
-        if asset_class_cap_mult is not None:
-            class_cap = capital * base_portfolio_cap_pct * asset_class_cap_mult
+        available_portfolio_notional = max(portfolio_cap - used_notional, 0.0)
+        if available_portfolio_notional <= 1e-9:
+            skipped_no_capacity += len(batch_candidates)
+            continue
+
+        class_available_notional: dict[str, float | None] = {}
+        for bucket_name, cap_mult in asset_class_caps.items():
+            if cap_mult is None:
+                class_available_notional[bucket_name] = None
+                continue
+            class_cap = capital * base_portfolio_cap_pct * cap_mult
             used_class_notional = sum(
                 position.scaled_position_size
                 for position in open_positions
-                if position.asset_bucket == asset_bucket
+                if position.asset_bucket == bucket_name
             )
-            available_notional = min(available_notional, max(class_cap - used_class_notional, 0.0))
-        if available_notional <= 1e-9:
-            skipped_no_capacity += 1
-            continue
+            class_available_notional[bucket_name] = max(class_cap - used_class_notional, 0.0)
 
-        performance_risk_mult = 1.0
-        performance_score: float | None = None
-        performance_rank_pct: float | None = None
-        performance_peer_count = 0
-        direct_sentiment_score: float | None = None
-        direct_sentiment_size_mult = 1.0
-        intraday_vol_proxy_regime: str | None = None
-        intraday_vol_proxy_mult = 1.0
-        intraday_vol_proxy_signal_age_min: float | None = None
-        intraday_vol_proxy_close: float | None = None
-        volatility_persistence_regime: str | None = None
-        volatility_persistence_mult = 1.0
-        volatility_persistence_ratio: float | None = None
-        volatility_persistence_vix_rel: float | None = None
-        volatility_persistence_vixy_rel: float | None = None
-        volatility_persistence_signal_age_min: float | None = None
-        if use_performance_leadership_overlay:
-            (
-                performance_risk_mult,
-                performance_score,
-                performance_rank_pct,
-                performance_peer_count,
-            ) = _performance_leadership_scale(
-                ticker=str(candidate["ticker"]),
-                closed_trade_returns_by_ticker=closed_trade_returns_by_ticker,
-                lookback_trades=performance_lookback_trades,
-                decay=performance_decay,
-                floor_mult=performance_floor_mult,
-                cap_mult=performance_cap_mult,
-                min_history=performance_min_history,
-            )
+        request_records: list[dict] = []
+        for candidate in batch_candidates:
+            asset_bucket = str(candidate["asset_bucket"])
+            performance_risk_mult = 1.0
+            performance_score: float | None = None
+            performance_rank_pct: float | None = None
+            performance_peer_count = 0
+            direct_sentiment_score: float | None = None
+            direct_sentiment_size_mult = 1.0
+            intraday_vol_proxy_regime: str | None = None
+            intraday_vol_proxy_mult = 1.0
+            intraday_vol_proxy_signal_age_min: float | None = None
+            intraday_vol_proxy_close: float | None = None
+            volatility_persistence_regime: str | None = None
+            volatility_persistence_mult = 1.0
+            volatility_persistence_ratio: float | None = None
+            volatility_persistence_vix_rel: float | None = None
+            volatility_persistence_vixy_rel: float | None = None
+            volatility_persistence_signal_age_min: float | None = None
 
-        bucket_scores = None
-        if use_direct_bucket_sentiment_sizing and bucket_sentiment_scores:
-            bucket_scores = bucket_sentiment_scores.get(asset_bucket)
-        if bucket_scores:
-            direct_sentiment_score, direct_sentiment_recent_low = _lookup_sentiment_signal(
-                entry_ts=candidate["entry_ts"],
-                sentiment_scores=bucket_scores,
-                sentiment_lag_days=bucket_sentiment_lag_days,
-                sentiment_reversal_window=bucket_sentiment_reversal_window,
-            )
-            if direct_sentiment_score is not None:
-                direct_sentiment_size_mult = _sentiment_regime_mult(
-                    base_mult=1.0,
-                    sentiment_score=direct_sentiment_score,
-                    sentiment_threshold_1=bucket_sentiment_threshold_1,
-                    sentiment_threshold_2=bucket_sentiment_threshold_2,
-                    sentiment_mult_1=bucket_sentiment_size_mult_1,
-                    sentiment_mult_2=bucket_sentiment_size_mult_2,
-                    sentiment_reversal_recent_low=direct_sentiment_recent_low,
-                    sentiment_reversal_min_rise=bucket_sentiment_reversal_min_rise,
-                    sentiment_reversal_mult=bucket_sentiment_reversal_mult,
+            if use_performance_leadership_overlay:
+                (
+                    performance_risk_mult,
+                    performance_score,
+                    performance_rank_pct,
+                    performance_peer_count,
+                ) = _performance_leadership_scale(
+                    ticker=str(candidate["ticker"]),
+                    closed_trade_returns_by_ticker=closed_trade_returns_by_ticker,
+                    lookback_trades=performance_lookback_trades,
+                    decay=performance_decay,
+                    floor_mult=performance_floor_mult,
+                    cap_mult=performance_cap_mult,
+                    min_history=performance_min_history,
                 )
 
-        if use_intraday_volatility_proxy:
-            (
-                intraday_vol_proxy_regime,
-                intraday_vol_proxy_mult,
-                intraday_vol_proxy_signal_age_min,
-                intraday_vol_proxy_close,
-            ) = _lookup_intraday_volatility_signal(
-                entry_ts=candidate["entry_ts"],
-                session_open=str(candidate["session_open"]),
-                direction=str(candidate["direction"]),
-                proxy_state=intraday_volatility_proxy_state,
-                max_age_minutes=intraday_volatility_proxy_max_age_minutes,
-                lag_bars=intraday_volatility_proxy_lag_bars,
-                long_risk_on_mult=intraday_volatility_long_risk_on_mult,
-                long_neutral_mult=intraday_volatility_long_neutral_mult,
-                long_risk_off_mult=intraday_volatility_long_risk_off_mult,
-                short_risk_on_mult=intraday_volatility_short_risk_on_mult,
-                short_neutral_mult=intraday_volatility_short_neutral_mult,
-                short_risk_off_mult=intraday_volatility_short_risk_off_mult,
+            bucket_scores = None
+            if use_direct_bucket_sentiment_sizing and bucket_sentiment_scores:
+                bucket_scores = bucket_sentiment_scores.get(asset_bucket)
+            if bucket_scores:
+                direct_sentiment_score, direct_sentiment_recent_low = _lookup_sentiment_signal(
+                    entry_ts=batch_entry_ts,
+                    sentiment_scores=bucket_scores,
+                    sentiment_lag_days=bucket_sentiment_lag_days,
+                    sentiment_reversal_window=bucket_sentiment_reversal_window,
+                )
+                if direct_sentiment_score is not None:
+                    direct_sentiment_size_mult = _sentiment_regime_mult(
+                        base_mult=1.0,
+                        sentiment_score=direct_sentiment_score,
+                        sentiment_threshold_1=bucket_sentiment_threshold_1,
+                        sentiment_threshold_2=bucket_sentiment_threshold_2,
+                        sentiment_mult_1=bucket_sentiment_size_mult_1,
+                        sentiment_mult_2=bucket_sentiment_size_mult_2,
+                        sentiment_reversal_recent_low=direct_sentiment_recent_low,
+                        sentiment_reversal_min_rise=bucket_sentiment_reversal_min_rise,
+                        sentiment_reversal_mult=bucket_sentiment_reversal_mult,
+                    )
+
+            if use_intraday_volatility_proxy:
+                (
+                    intraday_vol_proxy_regime,
+                    intraday_vol_proxy_mult,
+                    intraday_vol_proxy_signal_age_min,
+                    intraday_vol_proxy_close,
+                ) = _lookup_intraday_volatility_signal(
+                    entry_ts=batch_entry_ts,
+                    session_open=str(candidate["session_open"]),
+                    direction=str(candidate["direction"]),
+                    proxy_state=intraday_volatility_proxy_state,
+                    max_age_minutes=intraday_volatility_proxy_max_age_minutes,
+                    lag_bars=intraday_volatility_proxy_lag_bars,
+                    long_risk_on_mult=intraday_volatility_long_risk_on_mult,
+                    long_neutral_mult=intraday_volatility_long_neutral_mult,
+                    long_risk_off_mult=intraday_volatility_long_risk_off_mult,
+                    short_risk_on_mult=intraday_volatility_short_risk_on_mult,
+                    short_neutral_mult=intraday_volatility_short_neutral_mult,
+                    short_risk_off_mult=intraday_volatility_short_risk_off_mult,
+                )
+
+            if use_volatility_persistence_overlay:
+                (
+                    volatility_persistence_regime,
+                    volatility_persistence_mult,
+                    volatility_persistence_signal_age_min,
+                    volatility_persistence_vix_rel,
+                    volatility_persistence_vixy_rel,
+                    volatility_persistence_ratio,
+                ) = _lookup_volatility_persistence_signal(
+                    entry_ts=batch_entry_ts,
+                    session_open=str(candidate["session_open"]),
+                    direction=str(candidate["direction"]),
+                    daily_vix_state=daily_vix_reference_state,
+                    intraday_vixy_state=intraday_vixy_relative_state,
+                    daily_lag_days=volatility_persistence_daily_lag_days,
+                    intraday_max_age_minutes=volatility_persistence_intraday_max_age_minutes,
+                    intraday_lag_bars=volatility_persistence_intraday_lag_bars,
+                    ratio_upper=volatility_persistence_ratio_upper,
+                    ratio_lower=volatility_persistence_ratio_lower,
+                    daily_stress_min_rel=volatility_persistence_daily_stress_min_rel,
+                    long_persistent_stress_mult=volatility_persistence_long_persistent_stress_mult,
+                    long_neutral_mult=volatility_persistence_long_neutral_mult,
+                    long_fading_stress_mult=volatility_persistence_long_fading_stress_mult,
+                    short_persistent_stress_mult=volatility_persistence_short_persistent_stress_mult,
+                    short_neutral_mult=volatility_persistence_short_neutral_mult,
+                    short_fading_stress_mult=volatility_persistence_short_fading_stress_mult,
+                )
+
+            base_position_size = _candidate_requested_position_size(
+                candidate=candidate,
+                capital=capital,
+                max_position_pct=base_portfolio_cap_pct,
+            )
+            target_position_size = (
+                base_position_size
+                * performance_risk_mult
+                * direct_sentiment_size_mult
+                * intraday_vol_proxy_mult
+                * volatility_persistence_mult
+            )
+            if target_position_size <= 1e-9:
+                skipped_no_capacity += 1
+                continue
+
+            request_records.append(
+                {
+                    "candidate": candidate,
+                    "asset_bucket": asset_bucket,
+                    "target_position_size": target_position_size,
+                    "performance_risk_mult": performance_risk_mult,
+                    "performance_score": performance_score,
+                    "performance_rank_pct": performance_rank_pct,
+                    "performance_peer_count": performance_peer_count,
+                    "direct_sentiment_score": direct_sentiment_score,
+                    "direct_sentiment_size_mult": direct_sentiment_size_mult,
+                    "intraday_vol_proxy_regime": intraday_vol_proxy_regime,
+                    "intraday_vol_proxy_mult": intraday_vol_proxy_mult,
+                    "intraday_vol_proxy_signal_age_min": intraday_vol_proxy_signal_age_min,
+                    "intraday_vol_proxy_close": intraday_vol_proxy_close,
+                    "volatility_persistence_regime": volatility_persistence_regime,
+                    "volatility_persistence_mult": volatility_persistence_mult,
+                    "volatility_persistence_ratio": volatility_persistence_ratio,
+                    "volatility_persistence_vix_rel": volatility_persistence_vix_rel,
+                    "volatility_persistence_vixy_rel": volatility_persistence_vixy_rel,
+                    "volatility_persistence_signal_age_min": volatility_persistence_signal_age_min,
+                    "entry_exposure_mult": active_exposure_mult,
+                    "entry_sentiment_score": sentiment_score,
+                    "stable_key": (
+                        str(candidate["ticker"]),
+                        str(candidate["source"]),
+                        str(candidate["session_open"]),
+                        str(candidate["direction"]),
+                        int(candidate["trade_idx"]),
+                    ),
+                }
             )
 
-        if use_volatility_persistence_overlay:
-            (
-                volatility_persistence_regime,
-                volatility_persistence_mult,
-                volatility_persistence_signal_age_min,
-                volatility_persistence_vix_rel,
-                volatility_persistence_vixy_rel,
-                volatility_persistence_ratio,
-            ) = _lookup_volatility_persistence_signal(
-                entry_ts=candidate["entry_ts"],
-                session_open=str(candidate["session_open"]),
-                direction=str(candidate["direction"]),
-                daily_vix_state=daily_vix_reference_state,
-                intraday_vixy_state=intraday_vixy_relative_state,
-                daily_lag_days=volatility_persistence_daily_lag_days,
-                intraday_max_age_minutes=volatility_persistence_intraday_max_age_minutes,
-                intraday_lag_bars=volatility_persistence_intraday_lag_bars,
-                ratio_upper=volatility_persistence_ratio_upper,
-                ratio_lower=volatility_persistence_ratio_lower,
-                daily_stress_min_rel=volatility_persistence_daily_stress_min_rel,
-                long_persistent_stress_mult=volatility_persistence_long_persistent_stress_mult,
-                long_neutral_mult=volatility_persistence_long_neutral_mult,
-                long_fading_stress_mult=volatility_persistence_long_fading_stress_mult,
-                short_persistent_stress_mult=volatility_persistence_short_persistent_stress_mult,
-                short_neutral_mult=volatility_persistence_short_neutral_mult,
-                short_fading_stress_mult=volatility_persistence_short_fading_stress_mult,
-            )
-
-        target_position_size = (
-            float(candidate["position_size"])
-            * performance_risk_mult
-            * direct_sentiment_size_mult
-            * intraday_vol_proxy_mult
-            * volatility_persistence_mult
-        )
-        scaled_position_size = min(target_position_size, available_notional)
-        if scaled_position_size <= 1e-9:
-            skipped_no_capacity += 1
+        if not request_records:
             continue
 
-        scale = scaled_position_size / float(candidate["position_size"]) if float(candidate["position_size"]) > 0 else 0.0
-        open_positions.append(
-            _OpenTrade(
-                combo_idx=int(candidate["combo_idx"]),
-                trade_idx=int(candidate["trade_idx"]),
-                ticker=str(candidate["ticker"]),
-                source=str(candidate["source"]),
-                session_open=str(candidate["session_open"]),
-                direction=str(candidate["direction"]),
-                entry_ts=candidate["entry_ts"],
-                exit_ts=candidate["exit_ts"],
-                entry_price=float(candidate["entry_price"]),
-                exit_price=float(candidate["exit_price"]),
-                shares=float(candidate["shares"]),
-                position_size=float(candidate["position_size"]),
-                pnl=float(candidate["pnl"]),
-                risk_model=str(candidate["risk_model"]),
-                entry_rel_volume=float(candidate["entry_rel_volume"]),
-                asset_bucket=asset_bucket,
-                entry_exposure_mult=active_exposure_mult,
-                entry_sentiment_score=sentiment_score,
-                direct_sentiment_score=direct_sentiment_score,
-                direct_sentiment_size_mult=direct_sentiment_size_mult,
-                intraday_vol_proxy_regime=intraday_vol_proxy_regime,
-                intraday_vol_proxy_mult=intraday_vol_proxy_mult,
-                intraday_vol_proxy_signal_age_min=intraday_vol_proxy_signal_age_min,
-                intraday_vol_proxy_close=intraday_vol_proxy_close,
-                volatility_persistence_regime=volatility_persistence_regime,
-                volatility_persistence_mult=volatility_persistence_mult,
-                volatility_persistence_ratio=volatility_persistence_ratio,
-                volatility_persistence_vix_rel=volatility_persistence_vix_rel,
-                volatility_persistence_vixy_rel=volatility_persistence_vixy_rel,
-                volatility_persistence_signal_age_min=volatility_persistence_signal_age_min,
-                scale=scale,
-                scaled_position_size=scaled_position_size,
-                scaled_shares=float(candidate["shares"]) * scale,
-                scaled_pnl=float(candidate["pnl"]) * scale,
-                performance_risk_mult=performance_risk_mult,
-                performance_score=performance_score,
-                performance_rank_pct=performance_rank_pct,
-                performance_peer_count=performance_peer_count,
+        unique_by_ticker: dict[str, dict] = {}
+        for record in request_records:
+            ticker = str(record["candidate"]["ticker"])
+            incumbent = unique_by_ticker.get(ticker)
+            if incumbent is None:
+                unique_by_ticker[ticker] = record
+                continue
+            better = record["target_position_size"] > incumbent["target_position_size"] + 1e-9 or (
+                abs(record["target_position_size"] - incumbent["target_position_size"]) <= 1e-9
+                and record["stable_key"] < incumbent["stable_key"]
             )
+            if better:
+                skipped_same_ticker += 1
+                unique_by_ticker[ticker] = record
+            else:
+                skipped_same_ticker += 1
+        batch_records = list(unique_by_ticker.values())
+        if not batch_records:
+            continue
+
+        bucket_request_totals = Counter()
+        for record in batch_records:
+            bucket_request_totals[str(record["asset_bucket"])] += float(record["target_position_size"])
+
+        bucket_scales: dict[str, float] = {}
+        for bucket_name, requested_total in bucket_request_totals.items():
+            available_bucket = class_available_notional.get(bucket_name)
+            if available_bucket is None or requested_total <= 1e-9:
+                bucket_scales[bucket_name] = 1.0
+            else:
+                bucket_scales[bucket_name] = min(1.0, max(float(available_bucket), 0.0) / requested_total)
+
+        bucket_adjusted_total = sum(
+            float(record["target_position_size"]) * bucket_scales.get(str(record["asset_bucket"]), 1.0)
+            for record in batch_records
         )
+        overall_scale = (
+            min(1.0, available_portfolio_notional / bucket_adjusted_total)
+            if bucket_adjusted_total > 1e-9
+            else 0.0
+        )
+
+        for record in batch_records:
+            candidate = record["candidate"]
+            bucket_scale = bucket_scales.get(str(record["asset_bucket"]), 1.0)
+            scaled_position_size = float(record["target_position_size"]) * bucket_scale * overall_scale
+            if scaled_position_size <= 1e-9:
+                skipped_no_capacity += 1
+                continue
+
+            candidate_position_size = float(candidate["position_size"])
+            scale = scaled_position_size / candidate_position_size if candidate_position_size > 0 else 0.0
+            open_positions.append(
+                _OpenTrade(
+                    combo_idx=int(candidate["combo_idx"]),
+                    trade_idx=int(candidate["trade_idx"]),
+                    ticker=str(candidate["ticker"]),
+                    source=str(candidate["source"]),
+                    session_open=str(candidate["session_open"]),
+                    direction=str(candidate["direction"]),
+                    entry_ts=candidate["entry_ts"],
+                    exit_ts=candidate["exit_ts"],
+                    entry_price=float(candidate["entry_price"]),
+                    exit_price=float(candidate["exit_price"]),
+                    shares=float(candidate["shares"]),
+                    position_size=candidate_position_size,
+                    pnl=float(candidate["pnl"]),
+                    risk_model=str(candidate["risk_model"]),
+                    entry_rel_volume=float(candidate["entry_rel_volume"]),
+                    asset_bucket=str(record["asset_bucket"]),
+                    entry_exposure_mult=float(record["entry_exposure_mult"]),
+                    entry_sentiment_score=record["entry_sentiment_score"],
+                    direct_sentiment_score=record["direct_sentiment_score"],
+                    direct_sentiment_size_mult=float(record["direct_sentiment_size_mult"]),
+                    intraday_vol_proxy_regime=record["intraday_vol_proxy_regime"],
+                    intraday_vol_proxy_mult=float(record["intraday_vol_proxy_mult"]),
+                    intraday_vol_proxy_signal_age_min=record["intraday_vol_proxy_signal_age_min"],
+                    intraday_vol_proxy_close=record["intraday_vol_proxy_close"],
+                    volatility_persistence_regime=record["volatility_persistence_regime"],
+                    volatility_persistence_mult=float(record["volatility_persistence_mult"]),
+                    volatility_persistence_ratio=record["volatility_persistence_ratio"],
+                    volatility_persistence_vix_rel=record["volatility_persistence_vix_rel"],
+                    volatility_persistence_vixy_rel=record["volatility_persistence_vixy_rel"],
+                    volatility_persistence_signal_age_min=record["volatility_persistence_signal_age_min"],
+                    scale=scale,
+                    scaled_position_size=scaled_position_size,
+                    scaled_shares=float(candidate["shares"]) * scale,
+                    scaled_pnl=float(candidate["pnl"]) * scale,
+                    performance_risk_mult=float(record["performance_risk_mult"]),
+                    performance_score=record["performance_score"],
+                    performance_rank_pct=record["performance_rank_pct"],
+                    performance_peer_count=int(record["performance_peer_count"]),
+                )
+            )
 
     close_positions_up_to(datetime.max)
 
@@ -1303,6 +1503,8 @@ def generate_session_turtle_shared_account_report(
     )
 
     label = f"Session Turtle Trend {basket.capitalize()} x{exposure_mult:g}"
+    if asof_date is not None:
+        label += f" Universe As Of {asof_date.isoformat()}"
     if use_drawdown_governor:
         label += " With DD Governor"
     if use_extended_hours_protective_exits:
@@ -1324,6 +1526,8 @@ def generate_session_turtle_shared_account_report(
         "strategy_variant": "session_turtle_trend_shared_account",
         "label": label,
         "basket": basket,
+        "investable_universe_asof": asof_date.isoformat() if asof_date is not None else None,
+        "candidate_universe_size": len({(row["ticker"], row["source"], row["session_open"]) for row in candidates}),
         "start_date": start_date,
         "end_date": end_date,
         "candidate_trades": len(candidates),

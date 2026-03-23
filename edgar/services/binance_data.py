@@ -237,8 +237,38 @@ def resolve_binance_symbol(ticker: str, explicit_symbol: str | None = None) -> s
     if text.endswith("USD") and len(text) > 3:
         base = text[:-3]
         return f"{base}USDT"
-
     return text
+
+
+def get_local_binance_time_bounds(
+    ticker: str,
+    market_data_symbol: str | None = None,
+) -> tuple[datetime | None, datetime | None, str, str]:
+    symbol = resolve_binance_symbol(ticker=ticker, explicit_symbol=market_data_symbol)
+    cache_file = _locate_local_cache_file(symbol)
+    if cache_file is None:
+        raise FileNotFoundError(
+            f"No local Binance cache is available for {symbol}. Expected it under cache/binance_asia_orb/."
+        )
+
+    first_ts: datetime | None = None
+    last_ts: datetime | None = None
+    with gzip.open(cache_file, "rt", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            try:
+                open_time = int(row["open_time"])
+            except Exception:
+                continue
+            ts = (
+                datetime.fromtimestamp(open_time / 1000, tz=timezone.utc)
+                .astimezone(timezone.utc)
+                .replace(tzinfo=None)
+            )
+            if first_ts is None:
+                first_ts = ts
+            last_ts = ts
+    return first_ts, last_ts, symbol, str(cache_file)
 
 
 def fetch_binance_klines(

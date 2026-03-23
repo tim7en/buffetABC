@@ -151,3 +151,28 @@ def load_local_tiingo_klines(
     total_days = lookback_days + max(int(warmup_days), 1)
     cutoff = bars[-1]["timestamp"] - timedelta(days=total_days)
     return ([bar for bar in bars if bar["timestamp"] >= cutoff], symbol, str(path))
+
+
+def get_local_tiingo_time_bounds(
+    ticker: str,
+    market_data_symbol: str | None = None,
+) -> tuple[datetime | None, datetime | None, str, str]:
+    symbol = resolve_tiingo_symbol(ticker=ticker, explicit_symbol=market_data_symbol)
+    path = _locate_tiingo_file(symbol)
+
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("pyarrow is required to read the local Tiingo parquet cache") from exc
+
+    table = pq.read_table(path, columns=["time"])
+    values = table["time"].to_pylist()
+    if not values:
+        return None, None, symbol, str(path)
+
+    def _normalize(ts: datetime) -> datetime:
+        if getattr(ts, "tzinfo", None) is not None:
+            return ts.astimezone(timezone.utc).replace(tzinfo=None)
+        return ts
+
+    return _normalize(values[0]), _normalize(values[-1]), symbol, str(path)

@@ -920,6 +920,181 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertEqual(summary["entries_volatility_persistence_persistent_stress"], 1)
         self.assertEqual(summary["entries_volatility_persistence_fading_stress"], 1)
 
+    def test_session_turtle_portfolio_recomputes_position_size_from_live_capital(self):
+        candidates = [
+            {
+                "combo_idx": 0,
+                "trade_idx": 0,
+                "ticker": "AAA",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "long",
+                "entry_ts": datetime(2024, 1, 1, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 2, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 80.0,
+                "stop_loss": 90.0,
+                "risk_pct": 0.05,
+                "shares": 5.0,
+                "position_size": 500.0,
+                "pnl": -100.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "equity",
+            },
+            {
+                "combo_idx": 1,
+                "trade_idx": 0,
+                "ticker": "BBB",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "long",
+                "entry_ts": datetime(2024, 1, 3, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 4, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 120.0,
+                "stop_loss": 90.0,
+                "risk_pct": 0.05,
+                "shares": 7.0,
+                "position_size": 700.0,
+                "pnl": 140.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "equity",
+            },
+        ]
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=1.0,
+            drawdown_exposure_mult_1=1.0,
+            drawdown_exposure_mult_2=1.0,
+            precomputed_candidates=candidates,
+        )
+
+        aaa_trade = next(trade for trade in report["trades"] if trade["ticker"] == "AAA")
+        bbb_trade = next(trade for trade in report["trades"] if trade["ticker"] == "BBB")
+        self.assertEqual(aaa_trade["notional"], 500.0)
+        self.assertEqual(bbb_trade["notional"], 450.0)
+        self.assertEqual(report["summary"]["final_equity"], 990.0)
+
+    def test_session_turtle_portfolio_is_order_invariant_for_same_timestamp_capacity(self):
+        base_candidates = [
+            {
+                "combo_idx": 0,
+                "trade_idx": 0,
+                "ticker": "AAA",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "long",
+                "entry_ts": datetime(2024, 1, 1, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 2, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 120.0,
+                "stop_loss": 90.0,
+                "risk_pct": 0.06,
+                "shares": 6.0,
+                "position_size": 600.0,
+                "pnl": 120.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "equity",
+            },
+            {
+                "combo_idx": 1,
+                "trade_idx": 0,
+                "ticker": "BBB",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "long",
+                "entry_ts": datetime(2024, 1, 1, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 2, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 100.0,
+                "stop_loss": 90.0,
+                "risk_pct": 0.06,
+                "shares": 6.0,
+                "position_size": 600.0,
+                "pnl": 0.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "equity",
+            },
+        ]
+        reversed_candidates = [dict(candidate, combo_idx=1 - int(candidate["combo_idx"])) for candidate in base_candidates]
+
+        report_a = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=1.0,
+            drawdown_exposure_mult_1=1.0,
+            drawdown_exposure_mult_2=1.0,
+            precomputed_candidates=base_candidates,
+        )
+        report_b = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=1.0,
+            drawdown_exposure_mult_1=1.0,
+            drawdown_exposure_mult_2=1.0,
+            precomputed_candidates=reversed_candidates,
+        )
+
+        notionals_a = sorted(float(trade["notional"]) for trade in report_a["trades"])
+        notionals_b = sorted(float(trade["notional"]) for trade in report_b["trades"])
+        self.assertEqual(notionals_a, [450.0, 450.0])
+        self.assertEqual(notionals_b, [450.0, 450.0])
+        self.assertEqual(report_a["summary"]["final_equity"], 1090.0)
+        self.assertEqual(report_a["summary"]["final_equity"], report_b["summary"]["final_equity"])
+
+    @patch("edgar.services.session_turtle_portfolio._market_data_start_timestamp")
+    @patch("edgar.services.session_turtle_portfolio._resolve_universe")
+    @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")
+    def test_build_candidates_filters_investable_universe_asof_date(
+        self,
+        mock_backtest,
+        mock_resolve_universe,
+        mock_market_data_start_timestamp,
+    ):
+        from edgar.services.session_turtle_portfolio import build_session_turtle_shared_account_candidates
+
+        mock_resolve_universe.return_value = (
+            ("AAA", "tiingo", "new_york_equity_open"),
+            ("BBB", "tiingo", "new_york_equity_open"),
+        )
+        mock_market_data_start_timestamp.side_effect = lambda ticker, source: {
+            "AAA": datetime(2023, 1, 3, 14, 30, 0),
+            "BBB": datetime(2025, 1, 2, 14, 30, 0),
+        }[ticker]
+        mock_backtest.return_value = {
+            "trades": [
+                {
+                    "direction": "long",
+                    "entry_date": "2024-01-03T10:00:00",
+                    "exit_date": "2024-01-04T10:00:00",
+                    "entry_price": 100.0,
+                    "exit_price": 110.0,
+                    "stop_loss": 90.0,
+                    "risk_pct": 0.05,
+                    "shares": 5.0,
+                    "position_size": 500.0,
+                    "pnl": 50.0,
+                    "risk_model": "base",
+                    "entry_rel_volume": 1.0,
+                }
+            ]
+        }
+
+        candidates = build_session_turtle_shared_account_candidates(
+            basket="core",
+            investable_universe_asof=date(2024, 1, 1),
+        )
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0]["ticker"], "AAA")
+        self.assertEqual(mock_backtest.call_count, 1)
+
 
 class ApiTests(TestCase):
     def setUp(self):

@@ -109,6 +109,11 @@ def main() -> None:
     parser.add_argument("--max-age-minutes", type=int, default=60, help="Freshness limit in minutes (default: 60).")
     parser.add_argument("--lag-bars", type=int, default=1, help="Completed-bar lag to avoid look-ahead (default: 1).")
     parser.add_argument(
+        "--investable-universe-asof",
+        default=None,
+        help="Optional YYYY-MM-DD date used to freeze the investable universe.",
+    )
+    parser.add_argument(
         "--output-dir",
         default="reports/vixy_micro_backtest_core_x2",
         help="Output directory for CSV artifacts.",
@@ -135,6 +140,7 @@ def main() -> None:
     print("\nBuilding baseline candidate trade set once...")
     precomputed_candidates = build_session_turtle_shared_account_candidates(
         basket=_BASE_KWARGS["basket"],
+        investable_universe_asof=args.investable_universe_asof,
         initial_capital=1_000.0,
         lookback_years=4.1,
         channel_period=20,
@@ -147,6 +153,7 @@ def main() -> None:
     print(f"  built {len(precomputed_candidates)} candidate trades")
 
     overlay_common = {
+        "investable_universe_asof": args.investable_universe_asof,
         "use_intraday_volatility_proxy": True,
         "intraday_volatility_proxy_state": proxy_state,
         "intraday_volatility_proxy_label": args.proxy_label,
@@ -164,7 +171,7 @@ def main() -> None:
     results = [
         _run(
             label="Baseline",
-            overlay_kwargs={},
+            overlay_kwargs={"investable_universe_asof": args.investable_universe_asof},
             precomputed_candidates=precomputed_candidates,
         ),
         _run(
