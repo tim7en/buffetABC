@@ -135,6 +135,10 @@ class _OpenTrade:
     intraday_vol_proxy_mult: float
     intraday_vol_proxy_signal_age_min: float | None
     intraday_vol_proxy_close: float | None
+    ext_hours_proxy_regime: str | None
+    ext_hours_proxy_mult: float
+    ext_hours_proxy_source: str | None
+    ext_hours_proxy_score: float | None
     volatility_persistence_regime: str | None
     volatility_persistence_mult: float
     volatility_persistence_ratio: float | None
@@ -441,6 +445,110 @@ def build_intraday_volatility_relative_state(
         "ema_period": ema_period,
         "interval_minutes": interval_minutes,
     }
+
+
+def build_extended_hours_proxy_state(
+    *,
+    daily_vix_closes: dict[str, float],
+    crypto_fg_scores: dict[str, float],
+) -> dict:
+    """Pre-computed state for the extended-hours overlay.
+
+    Used for sessions outside US equity hours (e.g. hong_kong_open):
+      - non-crypto asset buckets  → daily VIX close threshold regime
+      - crypto asset bucket       → Crypto Fear & Greed score regime
+    """
+    return {
+        "daily_vix_closes": {str(k): float(v) for k, v in daily_vix_closes.items()},
+        "crypto_fg_scores":  {str(k): float(v) for k, v in crypto_fg_scores.items()},
+    }
+
+
+def _score_with_fallback(scores: dict[str, float], date_str: str, max_lag: int = 5) -> float | None:
+    """Return the score for date_str, falling back up to max_lag days earlier."""
+    from datetime import date as _date
+    d = _date.fromisoformat(date_str)
+    for lag in range(max_lag + 1):
+        key = (d - timedelta(days=lag)).isoformat()
+        if key in scores:
+            return float(scores[key])
+    return None
+
+
+def _lookup_extended_hours_signal(
+    *,
+    entry_ts: datetime,
+    session_open: str,
+    asset_bucket: str,
+    direction: str,
+    extended_hours_state: dict | None,
+    lag_days: int = 1,
+    vix_risk_on_threshold: float = 15.0,
+    vix_risk_off_threshold: float = 25.0,
+    fg_greed_threshold: float = 60.0,
+    fg_fear_threshold: float = 30.0,
+    long_risk_on_mult: float = 1.0,
+    long_neutral_mult: float = 1.0,
+    long_risk_off_mult: float = 0.5,
+    short_risk_on_mult: float = 0.5,
+    short_neutral_mult: float = 1.0,
+    short_risk_off_mult: float = 1.0,
+) -> tuple[str | None, float, str | None, float | None]:
+    """Regime signal for trades outside the US equity session.
+
+    Returns (regime, multiplier, source_label, raw_score).
+    NY equity-open trades are left to the intraday VIXY proxy and return no-op.
+    For all other sessions:
+      - crypto bucket  → Crypto Fear & Greed (0-100; high = greed = risk-on)
+      - other buckets  → daily VIX close (low = calm = risk-on)
+    """
+    if (
+        not extended_hours_state
+        or session_open == "new_york_equity_open"
+        or direction not in {"long", "short"}
+    ):
+        return None, 1.0, None, None
+
+    lookup_date = (entry_ts.date() - timedelta(days=max(lag_days, 0))).isoformat()
+
+    if asset_bucket == "crypto":
+        scores = extended_hours_state.get("crypto_fg_scores", {})
+        raw = _score_with_fallback(scores, lookup_date)
+        if raw is None:
+            return None, 1.0, "CryptoFG", None
+        if raw >= fg_greed_threshold:
+            regime = "risk_on_micro"
+        elif raw <= fg_fear_threshold:
+            regime = "risk_off_micro"
+        else:
+            regime = "neutral_micro"
+        source = "CryptoFG"
+    else:
+        vix_closes = extended_hours_state.get("daily_vix_closes", {})
+        raw = _score_with_fallback(vix_closes, lookup_date)
+        if raw is None:
+            return None, 1.0, "VIX_daily", None
+        if raw <= vix_risk_on_threshold:
+            regime = "risk_on_micro"
+        elif raw >= vix_risk_off_threshold:
+            regime = "risk_off_micro"
+        else:
+            regime = "neutral_micro"
+        source = "VIX_daily"
+
+    if direction == "long":
+        mult_map = {
+            "risk_on_micro":  long_risk_on_mult,
+            "neutral_micro":  long_neutral_mult,
+            "risk_off_micro": long_risk_off_mult,
+        }
+    else:
+        mult_map = {
+            "risk_on_micro":  short_risk_on_mult,
+            "neutral_micro":  short_neutral_mult,
+            "risk_off_micro": short_risk_off_mult,
+        }
+    return regime, float(mult_map.get(regime, 1.0)), source, raw
 
 
 def _intraday_volatility_regime(
@@ -840,6 +948,19 @@ def generate_session_turtle_shared_account_report(
     intraday_volatility_short_risk_on_mult: float = 0.5,
     intraday_volatility_short_neutral_mult: float = 1.0,
     intraday_volatility_short_risk_off_mult: float = 1.0,
+    use_extended_hours_proxy: bool = False,
+    extended_hours_proxy_state: dict | None = None,
+    extended_hours_proxy_lag_days: int = 1,
+    extended_hours_vix_risk_on_threshold: float = 15.0,
+    extended_hours_vix_risk_off_threshold: float = 25.0,
+    extended_hours_fg_greed_threshold: float = 60.0,
+    extended_hours_fg_fear_threshold: float = 30.0,
+    extended_hours_long_risk_on_mult: float = 1.0,
+    extended_hours_long_neutral_mult: float = 1.0,
+    extended_hours_long_risk_off_mult: float = 0.5,
+    extended_hours_short_risk_on_mult: float = 0.5,
+    extended_hours_short_neutral_mult: float = 1.0,
+    extended_hours_short_risk_off_mult: float = 1.0,
     use_volatility_persistence_overlay: bool = False,
     daily_vix_reference_state: dict[str, list | int] | None = None,
     intraday_vixy_relative_state: dict[str, list | int] | None = None,
@@ -1077,6 +1198,14 @@ def generate_session_turtle_shared_account_report(
                         if position.intraday_vol_proxy_close is not None
                         else None
                     ),
+                    "ext_hours_proxy_regime": position.ext_hours_proxy_regime,
+                    "ext_hours_proxy_mult": round(position.ext_hours_proxy_mult, 4),
+                    "ext_hours_proxy_source": position.ext_hours_proxy_source,
+                    "ext_hours_proxy_score": (
+                        round(position.ext_hours_proxy_score, 2)
+                        if position.ext_hours_proxy_score is not None
+                        else None
+                    ),
                     "volatility_persistence_regime": position.volatility_persistence_regime,
                     "volatility_persistence_mult": round(position.volatility_persistence_mult, 4),
                     "volatility_persistence_ratio": (
@@ -1197,6 +1326,10 @@ def generate_session_turtle_shared_account_report(
             intraday_vol_proxy_mult = 1.0
             intraday_vol_proxy_signal_age_min: float | None = None
             intraday_vol_proxy_close: float | None = None
+            ext_hours_proxy_regime: str | None = None
+            ext_hours_proxy_mult = 1.0
+            ext_hours_proxy_source: str | None = None
+            ext_hours_proxy_score: float | None = None
             volatility_persistence_regime: str | None = None
             volatility_persistence_mult = 1.0
             volatility_persistence_ratio: float | None = None
@@ -1264,6 +1397,31 @@ def generate_session_turtle_shared_account_report(
                     short_risk_off_mult=intraday_volatility_short_risk_off_mult,
                 )
 
+            if use_extended_hours_proxy:
+                (
+                    ext_hours_proxy_regime,
+                    ext_hours_proxy_mult,
+                    ext_hours_proxy_source,
+                    ext_hours_proxy_score,
+                ) = _lookup_extended_hours_signal(
+                    entry_ts=batch_entry_ts,
+                    session_open=str(candidate["session_open"]),
+                    asset_bucket=asset_bucket,
+                    direction=str(candidate["direction"]),
+                    extended_hours_state=extended_hours_proxy_state,
+                    lag_days=extended_hours_proxy_lag_days,
+                    vix_risk_on_threshold=extended_hours_vix_risk_on_threshold,
+                    vix_risk_off_threshold=extended_hours_vix_risk_off_threshold,
+                    fg_greed_threshold=extended_hours_fg_greed_threshold,
+                    fg_fear_threshold=extended_hours_fg_fear_threshold,
+                    long_risk_on_mult=extended_hours_long_risk_on_mult,
+                    long_neutral_mult=extended_hours_long_neutral_mult,
+                    long_risk_off_mult=extended_hours_long_risk_off_mult,
+                    short_risk_on_mult=extended_hours_short_risk_on_mult,
+                    short_neutral_mult=extended_hours_short_neutral_mult,
+                    short_risk_off_mult=extended_hours_short_risk_off_mult,
+                )
+
             if use_volatility_persistence_overlay:
                 (
                     volatility_persistence_regime,
@@ -1302,6 +1460,7 @@ def generate_session_turtle_shared_account_report(
                 * performance_risk_mult
                 * direct_sentiment_size_mult
                 * intraday_vol_proxy_mult
+                * ext_hours_proxy_mult
                 * volatility_persistence_mult
             )
             if target_position_size <= 1e-9:
@@ -1323,6 +1482,10 @@ def generate_session_turtle_shared_account_report(
                     "intraday_vol_proxy_mult": intraday_vol_proxy_mult,
                     "intraday_vol_proxy_signal_age_min": intraday_vol_proxy_signal_age_min,
                     "intraday_vol_proxy_close": intraday_vol_proxy_close,
+                    "ext_hours_proxy_regime": ext_hours_proxy_regime,
+                    "ext_hours_proxy_mult": ext_hours_proxy_mult,
+                    "ext_hours_proxy_source": ext_hours_proxy_source,
+                    "ext_hours_proxy_score": ext_hours_proxy_score,
                     "volatility_persistence_regime": volatility_persistence_regime,
                     "volatility_persistence_mult": volatility_persistence_mult,
                     "volatility_persistence_ratio": volatility_persistence_ratio,
@@ -1422,6 +1585,10 @@ def generate_session_turtle_shared_account_report(
                     intraday_vol_proxy_mult=float(record["intraday_vol_proxy_mult"]),
                     intraday_vol_proxy_signal_age_min=record["intraday_vol_proxy_signal_age_min"],
                     intraday_vol_proxy_close=record["intraday_vol_proxy_close"],
+                    ext_hours_proxy_regime=record["ext_hours_proxy_regime"],
+                    ext_hours_proxy_mult=float(record["ext_hours_proxy_mult"]),
+                    ext_hours_proxy_source=record["ext_hours_proxy_source"],
+                    ext_hours_proxy_score=record["ext_hours_proxy_score"],
                     volatility_persistence_regime=record["volatility_persistence_regime"],
                     volatility_persistence_mult=float(record["volatility_persistence_mult"]),
                     volatility_persistence_ratio=record["volatility_persistence_ratio"],
@@ -1490,6 +1657,15 @@ def generate_session_turtle_shared_account_report(
         for trade in executed_trades
         if trade.get("intraday_vol_proxy_regime")
     )
+    ext_hours_proxy_mults = [
+        float(trade.get("ext_hours_proxy_mult")) if trade.get("ext_hours_proxy_mult") is not None else 1.0
+        for trade in executed_trades
+    ]
+    ext_hours_proxy_regimes = Counter(
+        str(trade.get("ext_hours_proxy_regime"))
+        for trade in executed_trades
+        if trade.get("ext_hours_proxy_regime")
+    )
     volatility_persistence_mults = [
         float(trade.get("volatility_persistence_mult"))
         if trade.get("volatility_persistence_mult") is not None
@@ -1517,6 +1693,8 @@ def generate_session_turtle_shared_account_report(
         label += " With Direct Bucket Sentiment Sizing"
     if use_intraday_volatility_proxy:
         label += f" With {intraday_volatility_proxy_label} Micro Overlay"
+    if use_extended_hours_proxy:
+        label += " With Extended Hours VIX/FG Proxy"
     if use_volatility_persistence_overlay:
         label += f" With {volatility_persistence_label}"
     if any(cap is not None for cap in asset_class_caps.values()):
@@ -1606,6 +1784,27 @@ def generate_session_turtle_shared_account_report(
         "entries_intraday_volatility_risk_on_micro": intraday_vol_proxy_regimes["risk_on_micro"],
         "entries_intraday_volatility_neutral_micro": intraday_vol_proxy_regimes["neutral_micro"],
         "entries_intraday_volatility_risk_off_micro": intraday_vol_proxy_regimes["risk_off_micro"],
+        "use_extended_hours_proxy": use_extended_hours_proxy,
+        "extended_hours_proxy_lag_days": extended_hours_proxy_lag_days,
+        "extended_hours_vix_risk_on_threshold": extended_hours_vix_risk_on_threshold,
+        "extended_hours_vix_risk_off_threshold": extended_hours_vix_risk_off_threshold,
+        "extended_hours_fg_greed_threshold": extended_hours_fg_greed_threshold,
+        "extended_hours_fg_fear_threshold": extended_hours_fg_fear_threshold,
+        "extended_hours_long_risk_on_mult": extended_hours_long_risk_on_mult,
+        "extended_hours_long_neutral_mult": extended_hours_long_neutral_mult,
+        "extended_hours_long_risk_off_mult": extended_hours_long_risk_off_mult,
+        "extended_hours_short_risk_on_mult": extended_hours_short_risk_on_mult,
+        "extended_hours_short_neutral_mult": extended_hours_short_neutral_mult,
+        "extended_hours_short_risk_off_mult": extended_hours_short_risk_off_mult,
+        "avg_ext_hours_proxy_mult": (
+            round(sum(ext_hours_proxy_mults) / len(ext_hours_proxy_mults), 4)
+            if ext_hours_proxy_mults
+            else 1.0
+        ),
+        "entries_ext_hours_proxy_scaled": sum(1 for mult in ext_hours_proxy_mults if mult < 0.999999),
+        "entries_ext_hours_risk_on_micro": ext_hours_proxy_regimes["risk_on_micro"],
+        "entries_ext_hours_neutral_micro": ext_hours_proxy_regimes["neutral_micro"],
+        "entries_ext_hours_risk_off_micro": ext_hours_proxy_regimes["risk_off_micro"],
         "use_volatility_persistence_overlay": use_volatility_persistence_overlay,
         "volatility_persistence_label": volatility_persistence_label,
         "volatility_persistence_daily_lag_days": volatility_persistence_daily_lag_days,
