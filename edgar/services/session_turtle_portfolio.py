@@ -5,8 +5,9 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from edgar.services.binance_data import get_local_binance_time_bounds
-from edgar.services.local_tiingo_data import get_local_tiingo_time_bounds
+from edgar.services.binance_data import get_local_binance_time_bounds, load_local_binance_klines
+from edgar.services.intraday_strategy import _ema
+from edgar.services.local_tiingo_data import get_local_tiingo_time_bounds, load_local_tiingo_klines
 from edgar.services.sentiment_data import get_score_for_date
 from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
 
@@ -153,6 +154,10 @@ class _OpenTrade:
     performance_score: float | None
     performance_rank_pct: float | None
     performance_peer_count: int
+    technical_ema_regime: str | None
+    technical_ema_mult: float
+    technical_adx_value: float | None
+    technical_adx_mult: float
 
 
 def _asset_bucket(ticker: str) -> str:
@@ -165,6 +170,234 @@ def _asset_bucket(ticker: str) -> str:
     if ticker in METAL_TICKERS:
         return "metals"
     return "other"
+
+
+# ── per-asset technical overlay helpers ──────────────────────────────────────
+
+def _adx(
+    highs: list[float],
+    lows: list[float],
+    closes: list[float],
+    period: int = 14,
+) -> list[float | None]:
+    """Average Directional Index (Wilder, 1978). Returns one value per bar."""
+    n = len(closes)
+    result: list[float | None] = [None] * n
+    if n < period * 3 + 1:
+        return result
+
+    def _wilder(vals: list[float]) -> list[float | None]:
+        s: list[float | None] = [None] * len(vals)
+        if len(vals) < period:
+            return s
+        s[period - 1] = sum(vals[:period])
+        for i in range(period, len(vals)):
+            prev = s[i - 1]
+            if prev is not None:
+                s[i] = prev - prev / period + vals[i]
+        return s
+
+    tr_v, pdm_v, mdm_v = [], [], []
+    for i in range(1, n):
+        h, l, pc = highs[i], lows[i], closes[i - 1]
+        tr_v.append(max(h - l, abs(h - pc), abs(l - pc)))
+        up   = highs[i] - highs[i - 1]
+        down = lows[i - 1] - lows[i]
+        pdm_v.append(up   if up > down and up > 0   else 0.0)
+        mdm_v.append(down if down > up and down > 0 else 0.0)
+
+    str_s  = _wilder(tr_v)
+    spdm_s = _wilder(pdm_v)
+    smdm_s = _wilder(mdm_v)
+
+    dx_v: list[float | None] = []
+    for i in range(len(tr_v)):
+        if str_s[i] is None or str_s[i] < 1e-9:  # type: ignore[operator]
+            dx_v.append(None)
+            continue
+        pdi = 100.0 * (spdm_s[i] or 0.0) / str_s[i]  # type: ignore[operator]
+        mdi = 100.0 * (smdm_s[i] or 0.0) / str_s[i]  # type: ignore[operator]
+        denom = pdi + mdi
+        dx_v.append(100.0 * abs(pdi - mdi) / denom if denom > 1e-9 else 0.0)
+
+    valid_dx = [v for v in dx_v if v is not None]
+    adx_raw  = _wilder(valid_dx)
+    vi = 0
+    for i, dx in enumerate(dx_v):
+        if dx is not None:
+            result[i + 1] = adx_raw[vi]
+            vi += 1
+    return result
+
+
+def build_per_asset_technical_state(
+    universe: list[tuple[str, str, str]],
+    lookback_years: float = 5.0,
+    warmup_days: int = 300,
+    ema_period: int = 200,
+    adx_period: int = 14,
+) -> dict:
+    """Pre-compute per-asset daily EMA and 4H ADX for the universe.
+
+    Returns:
+        {
+          "daily_ema": {ticker: {date_str: {"close": float, "ema": float|None}}},
+          "4h_adx":    {ticker: [(bar_ts_isoformat, adx_value), ...]},
+          "ema_period": int,
+          "adx_period": int,
+        }
+    """
+    seen: set[tuple[str, str]] = set()
+    daily_ema_out: dict[str, dict[str, dict]] = {}
+    adx_4h_out:   dict[str, list[tuple[str, float]]] = {}
+
+    for ticker, source, _session in universe:
+        key = (ticker, source)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        try:
+            if source == "binance":
+                bars, _, _ = load_local_binance_klines(
+                    ticker=ticker, interval="15m",
+                    lookback_years=lookback_years, warmup_days=warmup_days,
+                )
+            else:
+                bars, _, _ = load_local_tiingo_klines(
+                    ticker=ticker, interval="5m",
+                    lookback_years=lookback_years, warmup_days=warmup_days,
+                )
+        except Exception:
+            continue
+
+        if not bars:
+            continue
+
+        # ── aggregate to daily ────────────────────────────────────────────
+        daily: dict[str, dict] = {}
+        for b in bars:
+            ts = b.get("timestamp") or b.get("ts")
+            if ts is None:
+                continue
+            d = ts.date().isoformat() if hasattr(ts, "date") else str(ts)[:10]
+            if d not in daily:
+                daily[d] = {"open": float(b["open"]), "high": float(b["high"]),
+                             "low": float(b["low"]), "close": float(b["close"])}
+            else:
+                daily[d]["high"]  = max(daily[d]["high"],  float(b["high"]))
+                daily[d]["low"]   = min(daily[d]["low"],   float(b["low"]))
+                daily[d]["close"] = float(b["close"])
+
+        sorted_dates  = sorted(daily)
+        daily_closes  = [daily[d]["close"] for d in sorted_dates]
+        ema_vals      = _ema(daily_closes, ema_period)
+        daily_ema_out[ticker] = {
+            d: {"close": daily_closes[i], "ema": ema_vals[i]}
+            for i, d in enumerate(sorted_dates)
+        }
+
+        # ── aggregate to 4H ───────────────────────────────────────────────
+        buckets: dict[datetime, dict] = {}
+        for b in bars:
+            ts = b.get("timestamp") or b.get("ts")
+            if ts is None:
+                continue
+            t4h = ts.replace(
+                hour=(ts.hour // 4) * 4, minute=0, second=0, microsecond=0
+            )
+            if t4h not in buckets:
+                buckets[t4h] = {"open": float(b["open"]), "high": float(b["high"]),
+                                 "low": float(b["low"]),  "close": float(b["close"])}
+            else:
+                buckets[t4h]["high"]  = max(buckets[t4h]["high"],  float(b["high"]))
+                buckets[t4h]["low"]   = min(buckets[t4h]["low"],   float(b["low"]))
+                buckets[t4h]["close"] = float(b["close"])
+
+        sorted_4h = sorted(buckets)
+        h4_h = [buckets[t]["high"]  for t in sorted_4h]
+        h4_l = [buckets[t]["low"]   for t in sorted_4h]
+        h4_c = [buckets[t]["close"] for t in sorted_4h]
+        adx_vals = _adx(h4_h, h4_l, h4_c, adx_period)
+        adx_4h_out[ticker] = [
+            (t.isoformat(), adx_vals[i])
+            for i, t in enumerate(sorted_4h)
+            if adx_vals[i] is not None
+        ]
+
+    return {
+        "daily_ema": daily_ema_out,
+        "4h_adx":    adx_4h_out,
+        "ema_period": ema_period,
+        "adx_period": adx_period,
+    }
+
+
+def _lookup_per_asset_technical_signal(
+    *,
+    entry_ts: datetime,
+    ticker: str,
+    direction: str,
+    technical_state: dict,
+    ema_lag_days: int = 1,
+    ema_above_long_mult: float = 1.0,
+    ema_above_short_mult: float = 0.5,
+    ema_below_long_mult: float = 0.5,
+    ema_below_short_mult: float = 1.0,
+    use_adx_gate: bool = False,
+    adx_strong_threshold: float = 25.0,
+    adx_weak_threshold: float = 20.0,
+    adx_weak_mult: float = 0.5,
+) -> tuple[str | None, float, float | None, float]:
+    """Lookup daily EMA regime and 4H ADX gate for a candidate entry.
+
+    Returns (ema_regime, ema_mult, adx_value, adx_mult).
+    """
+    daily_ema = technical_state.get("daily_ema", {})
+    adx_4h    = technical_state.get("4h_adx",    {})
+
+    # ── daily EMA ─────────────────────────────────────────────────────────
+    ema_regime: str | None = None
+    ema_mult = 1.0
+    asset_daily = daily_ema.get(ticker, {})
+    if asset_daily:
+        lookup_d = (entry_ts.date() - timedelta(days=max(ema_lag_days, 0)))
+        for lag in range(6):
+            d_str = (lookup_d - timedelta(days=lag)).isoformat()
+            if d_str in asset_daily:
+                row = asset_daily[d_str]
+                ema_val = row.get("ema")
+                if ema_val is not None:
+                    above = row["close"] >= ema_val
+                    ema_regime = "above_ema" if above else "below_ema"
+                    if direction == "long":
+                        ema_mult = ema_above_long_mult if above else ema_below_long_mult
+                    else:
+                        ema_mult = ema_above_short_mult if above else ema_below_short_mult
+                break
+
+    # ── 4H ADX gate ───────────────────────────────────────────────────────
+    adx_value: float | None = None
+    adx_mult = 1.0
+    if use_adx_gate:
+        asset_adx = adx_4h.get(ticker, [])
+        if asset_adx:
+            # find last completed 4H bar strictly before entry_ts
+            cutoff = entry_ts.isoformat()
+            lo, hi = 0, len(asset_adx)
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if asset_adx[mid][0] < cutoff:
+                    lo = mid + 1
+                else:
+                    hi = mid
+            idx = lo - 1
+            if idx >= 0:
+                adx_value = asset_adx[idx][1]
+                if adx_value is not None and adx_value < adx_weak_threshold:
+                    adx_mult = adx_weak_mult
+
+    return ema_regime, ema_mult, adx_value, adx_mult
 
 
 def _realized_drawdown_pct(capital: float, peak_capital: float) -> float:
@@ -982,6 +1215,17 @@ def generate_session_turtle_shared_account_report(
     volatility_persistence_short_persistent_stress_mult: float = 1.0,
     volatility_persistence_short_neutral_mult: float = 1.0,
     volatility_persistence_short_fading_stress_mult: float = 0.5,
+    use_per_asset_technical_overlay: bool = False,
+    per_asset_technical_state: dict | None = None,
+    per_asset_ema_lag_days: int = 1,
+    per_asset_ema_above_long_mult: float = 1.0,
+    per_asset_ema_above_short_mult: float = 0.5,
+    per_asset_ema_below_long_mult: float = 0.5,
+    per_asset_ema_below_short_mult: float = 1.0,
+    per_asset_use_adx_gate: bool = False,
+    per_asset_adx_strong_threshold: float = 25.0,
+    per_asset_adx_weak_threshold: float = 20.0,
+    per_asset_adx_weak_mult: float = 0.5,
     precomputed_candidates: list[dict] | None = None,
 ) -> dict:
     if exposure_mult <= 0:
@@ -1246,6 +1490,13 @@ def generate_session_turtle_shared_account_report(
                         else None
                     ),
                     "performance_peer_count": position.performance_peer_count,
+                    "technical_ema_regime": position.technical_ema_regime,
+                    "technical_ema_mult": round(position.technical_ema_mult, 4),
+                    "technical_adx_value": (
+                        round(position.technical_adx_value, 2)
+                        if position.technical_adx_value is not None else None
+                    ),
+                    "technical_adx_mult": round(position.technical_adx_mult, 4),
                     "net_pnl": round(position.scaled_pnl, 4),
                     "equity_after_exit": round(capital, 4),
                 }
@@ -1455,6 +1706,30 @@ def generate_session_turtle_shared_account_report(
                     short_fading_stress_mult=volatility_persistence_short_fading_stress_mult,
                 )
 
+            # ── per-asset technical overlay (daily EMA + 4H ADX) ─────────
+            technical_ema_regime: str | None = None
+            technical_ema_mult = 1.0
+            technical_adx_value: float | None = None
+            technical_adx_mult = 1.0
+            if use_per_asset_technical_overlay and per_asset_technical_state:
+                technical_ema_regime, technical_ema_mult, technical_adx_value, technical_adx_mult = (
+                    _lookup_per_asset_technical_signal(
+                        entry_ts=datetime.fromisoformat(str(candidate["entry_ts"])),
+                        ticker=str(candidate["ticker"]),
+                        direction=str(candidate["direction"]),
+                        technical_state=per_asset_technical_state,
+                        ema_lag_days=per_asset_ema_lag_days,
+                        ema_above_long_mult=per_asset_ema_above_long_mult,
+                        ema_above_short_mult=per_asset_ema_above_short_mult,
+                        ema_below_long_mult=per_asset_ema_below_long_mult,
+                        ema_below_short_mult=per_asset_ema_below_short_mult,
+                        use_adx_gate=per_asset_use_adx_gate,
+                        adx_strong_threshold=per_asset_adx_strong_threshold,
+                        adx_weak_threshold=per_asset_adx_weak_threshold,
+                        adx_weak_mult=per_asset_adx_weak_mult,
+                    )
+                )
+
             base_position_size = _candidate_requested_position_size(
                 candidate=candidate,
                 capital=capital,
@@ -1467,6 +1742,8 @@ def generate_session_turtle_shared_account_report(
                 * intraday_vol_proxy_mult
                 * ext_hours_proxy_mult
                 * volatility_persistence_mult
+                * technical_ema_mult
+                * technical_adx_mult
             )
             if target_position_size <= 1e-9:
                 skipped_no_capacity += 1
@@ -1497,6 +1774,10 @@ def generate_session_turtle_shared_account_report(
                     "volatility_persistence_vix_rel": volatility_persistence_vix_rel,
                     "volatility_persistence_vixy_rel": volatility_persistence_vixy_rel,
                     "volatility_persistence_signal_age_min": volatility_persistence_signal_age_min,
+                    "technical_ema_regime": technical_ema_regime,
+                    "technical_ema_mult": technical_ema_mult,
+                    "technical_adx_value": technical_adx_value,
+                    "technical_adx_mult": technical_adx_mult,
                     "entry_exposure_mult": active_exposure_mult,
                     "entry_sentiment_score": sentiment_score,
                     "stable_key": (
@@ -1608,6 +1889,10 @@ def generate_session_turtle_shared_account_report(
                     performance_score=record["performance_score"],
                     performance_rank_pct=record["performance_rank_pct"],
                     performance_peer_count=int(record["performance_peer_count"]),
+                    technical_ema_regime=record["technical_ema_regime"],
+                    technical_ema_mult=float(record["technical_ema_mult"]),
+                    technical_adx_value=record["technical_adx_value"],
+                    technical_adx_mult=float(record["technical_adx_mult"]),
                 )
             )
 
@@ -1702,6 +1987,11 @@ def generate_session_turtle_shared_account_report(
         label += " With Extended Hours VIX/FG Proxy"
     if use_volatility_persistence_overlay:
         label += f" With {volatility_persistence_label}"
+    if use_per_asset_technical_overlay:
+        parts = ["daily EMA"]
+        if per_asset_use_adx_gate:
+            parts.append("4H ADX gate")
+        label += f" With Per-Asset Technical ({', '.join(parts)})"
     if any(cap is not None for cap in asset_class_caps.values()):
         label += " With Asset Class Caps"
 
@@ -1864,6 +2154,16 @@ def generate_session_turtle_shared_account_report(
         "gold_pnl": round(bucket_pnl["gold"], 4),
         "equity_pnl": round(bucket_pnl["equity"], 4),
         "metals_pnl": round(bucket_pnl["metals"], 4),
+        "use_per_asset_technical_overlay": use_per_asset_technical_overlay,
+        "per_asset_ema_period": per_asset_technical_state.get("ema_period") if per_asset_technical_state else None,
+        "per_asset_adx_period": per_asset_technical_state.get("adx_period") if per_asset_technical_state else None,
+        "per_asset_use_adx_gate": per_asset_use_adx_gate,
+        "entries_above_ema": sum(1 for t in executed_trades if t.get("technical_ema_regime") == "above_ema"),
+        "entries_below_ema": sum(1 for t in executed_trades if t.get("technical_ema_regime") == "below_ema"),
+        "entries_adx_scaled_down": sum(1 for t in executed_trades if (t.get("technical_adx_mult") or 1.0) < 0.999),
+        "avg_technical_ema_mult": round(
+            sum(float(t.get("technical_ema_mult") or 1.0) for t in executed_trades) / len(executed_trades), 4
+        ) if executed_trades else 1.0,
     }
 
     return {
