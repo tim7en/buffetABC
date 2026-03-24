@@ -6,6 +6,8 @@
 
 > **Note**: VIXY intraday (5m SMA) is a backtest research layer only and is **not used in live execution**. It requires a live 5-minute data feed and real-time regime classification that is not operationally practical. The two daily-refresh layers below are sufficient for live use.
 
+> **Short sizing change (Mar 2026)**: `short_risk_on_mult` changed from `1e-9` (fully suppressed) to `0.5` (half size). Rationale: the original design blocked all shorts during calm/bull environments, causing the strategy to miss clean declining trends on assets like MSTR, COIN, SOL that trend down as strongly as they trend up. Half sizing in risk-on preserves caution while capturing these moves.
+
 ---
 
 ## 1. Architecture Overview
@@ -43,7 +45,7 @@ Every entry decision passes through two sequential filters:
 
 | Prior-day VIX close | Regime      | Long mult | Short mult |
 |---------------------|-------------|-----------|------------|
-| ≤ 15                | `risk_on`   | **1.0×**  | **1e-9×** (suppressed) |
+| ≤ 15                | `risk_on`   | **1.0×**  | **0.5×** (half size) |
 | 15 < VIX < 25       | `neutral`   | 1.0×      | 1.0×       |
 | ≥ 25                | `risk_off`  | **0.5×**  | 1.0×       |
 
@@ -51,7 +53,7 @@ Every entry decision passes through two sequential filters:
 
 | Prior-day F&G score | Regime           | Long mult | Short mult |
 |---------------------|------------------|-----------|------------|
-| ≥ 60                | `greed/risk_on`  | **1.0×**  | **1e-9×** (suppressed) |
+| ≥ 60                | `greed/risk_on`  | **1.0×**  | **0.5×** (half size) |
 | 30 < F&G < 60       | `neutral`        | 1.0×      | 1.0×       |
 | ≤ 30                | `fear/risk_off`  | **0.5×**  | 1.0×       |
 
@@ -174,7 +176,7 @@ result = generate_session_turtle_shared_account_report(
     extended_hours_long_risk_on_mult=1.0,
     extended_hours_long_neutral_mult=1.0,
     extended_hours_long_risk_off_mult=0.5,
-    extended_hours_short_risk_on_mult=1e-9,
+    extended_hours_short_risk_on_mult=0.5,   # half size in risk-on (was 1e-9 — suppressed)
     extended_hours_short_neutral_mult=1.0,
     extended_hours_short_risk_off_mult=1.0,
 )
@@ -234,10 +236,11 @@ Both should report **100% coverage** up to yesterday's date. Any gap means the f
 | `channel_period` | 20 | Donchian breakout lookback |
 | `trend_fast_period` | 55 | Trend filter fast EMA |
 | `trend_slow_period` | 200 | Trend filter slow EMA |
-| VIX risk_on threshold | **≤ 15** | Suppress shorts for non-crypto |
+| VIX risk_on threshold | **≤ 15** | Half-size shorts for non-crypto |
 | VIX risk_off threshold | **≥ 25** | Halve longs for non-crypto |
-| F&G greed threshold | **≥ 60** | Suppress shorts for crypto |
+| F&G greed threshold | **≥ 60** | Half-size shorts for crypto |
 | F&G fear threshold | **≤ 30** | Halve longs for crypto |
+| `short_risk_on_mult` | **0.5** | Shorts at half size in calm environments (changed from 1e-9) |
 
 ---
 

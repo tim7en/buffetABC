@@ -159,11 +159,11 @@ def main() -> None:
         "intraday_volatility_proxy_short_ma_bars": 78,
         "intraday_volatility_proxy_long_ma_bars": 390,
         "intraday_volatility_proxy_buckets": frozenset({"equity"}),
-        # asymmetric: halve longs in risk_off, suppress shorts in risk_on
+        # halve longs in risk_off; half-size shorts in risk_on (not suppressed)
         "intraday_volatility_long_risk_on_mult":   1.0,
         "intraday_volatility_long_neutral_mult":   1.0,
         "intraday_volatility_long_risk_off_mult":  0.5,
-        "intraday_volatility_short_risk_on_mult":  1e-9,
+        "intraday_volatility_short_risk_on_mult":  0.5,
         "intraday_volatility_short_neutral_mult":  1.0,
         "intraday_volatility_short_risk_off_mult": 1.0,
     }
@@ -179,11 +179,11 @@ def main() -> None:
         # F&G thresholds for crypto
         "extended_hours_fg_greed_threshold": 60.0,
         "extended_hours_fg_fear_threshold":  30.0,
-        # asymmetric: halve longs in risk_off, suppress shorts in risk_on
+        # halve longs in risk_off; half-size shorts in risk_on (not suppressed)
         "extended_hours_long_risk_on_mult":   1.0,
         "extended_hours_long_neutral_mult":   1.0,
         "extended_hours_long_risk_off_mult":  0.5,
-        "extended_hours_short_risk_on_mult":  1e-9,
+        "extended_hours_short_risk_on_mult":  0.5,
         "extended_hours_short_neutral_mult":  1.0,
         "extended_hours_short_risk_off_mult": 1.0,
     }

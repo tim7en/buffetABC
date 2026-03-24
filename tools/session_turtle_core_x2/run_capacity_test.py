@@ -159,7 +159,7 @@ def main() -> None:
         "intraday_volatility_long_risk_on_mult":   1.0,
         "intraday_volatility_long_neutral_mult":   1.0,
         "intraday_volatility_long_risk_off_mult":  0.5,
-        "intraday_volatility_short_risk_on_mult":  1e-9,
+        "intraday_volatility_short_risk_on_mult":  0.5,
         "intraday_volatility_short_neutral_mult":  1.0,
         "intraday_volatility_short_risk_off_mult": 1.0,
         # VIX macro + F&G — all sessions
@@ -173,7 +173,7 @@ def main() -> None:
         "extended_hours_long_risk_on_mult":   1.0,
         "extended_hours_long_neutral_mult":   1.0,
         "extended_hours_long_risk_off_mult":  0.5,
-        "extended_hours_short_risk_on_mult":  1e-9,
+        "extended_hours_short_risk_on_mult":  0.5,
         "extended_hours_short_neutral_mult":  1.0,
         "extended_hours_short_risk_off_mult": 1.0,
     }
