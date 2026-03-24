@@ -504,7 +504,6 @@ def _lookup_extended_hours_signal(
     """
     if (
         not extended_hours_state
-        or session_open == "new_york_equity_open"
         or direction not in {"long", "short"}
     ):
         return None, 1.0, None, None
@@ -570,10 +569,12 @@ def _lookup_intraday_volatility_signal(
     *,
     entry_ts: datetime,
     session_open: str,
+    asset_bucket: str,
     direction: str,
     proxy_state: dict[str, list | int] | None,
     max_age_minutes: int,
     lag_bars: int,
+    allowed_buckets: frozenset[str] | None,
     long_risk_on_mult: float,
     long_neutral_mult: float,
     long_risk_off_mult: float,
@@ -585,6 +586,7 @@ def _lookup_intraday_volatility_signal(
         not proxy_state
         or session_open != "new_york_equity_open"
         or direction not in {"long", "short"}
+        or (allowed_buckets is not None and asset_bucket not in allowed_buckets)
     ):
         return None, 1.0, None, None
 
@@ -948,6 +950,7 @@ def generate_session_turtle_shared_account_report(
     intraday_volatility_short_risk_on_mult: float = 0.5,
     intraday_volatility_short_neutral_mult: float = 1.0,
     intraday_volatility_short_risk_off_mult: float = 1.0,
+    intraday_volatility_proxy_buckets: frozenset[str] | None = None,
     use_extended_hours_proxy: bool = False,
     extended_hours_proxy_state: dict | None = None,
     extended_hours_proxy_lag_days: int = 1,
@@ -1385,10 +1388,12 @@ def generate_session_turtle_shared_account_report(
                 ) = _lookup_intraday_volatility_signal(
                     entry_ts=batch_entry_ts,
                     session_open=str(candidate["session_open"]),
+                    asset_bucket=asset_bucket,
                     direction=str(candidate["direction"]),
                     proxy_state=intraday_volatility_proxy_state,
                     max_age_minutes=intraday_volatility_proxy_max_age_minutes,
                     lag_bars=intraday_volatility_proxy_lag_bars,
+                    allowed_buckets=intraday_volatility_proxy_buckets,
                     long_risk_on_mult=intraday_volatility_long_risk_on_mult,
                     long_neutral_mult=intraday_volatility_long_neutral_mult,
                     long_risk_off_mult=intraday_volatility_long_risk_off_mult,
