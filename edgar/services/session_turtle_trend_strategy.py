@@ -63,8 +63,12 @@ class _Trade:
     stop_source: str = "daily_atr_stop"
     strategy_leg: str = "session_turtle_trend"
     entry_rel_volume: float = 1.0
+    rel_volume_ratio: float = 1.0
     volume_risk_scale: float = 1.0
     directional_volume_confirmed: bool = False
+    conviction_mult: float = 1.0
+    breakout_penetration: float = 0.0
+    directional_close_score: float = 0.0
     risk_model: str = "base"
     initial_shares: float = 0.0
     initial_position_size: float = 0.0
@@ -174,6 +178,50 @@ def _load_local_bars(
         return bars, symbol, "local_tiingo_cache", path
 
 
+def _breakout_conviction_multiplier(
+    *,
+    direction: str,
+    rel_volume: float,
+    rel_volume_ratio: float,
+    close_location: float,
+    close_price: float,
+    breakout_level: float,
+    channel_high: float | None,
+    channel_low: float | None,
+    max_mult: float = 1.35,
+    rel_volume_weight: float = 0.10,
+    rel_volume_ratio_weight: float = 0.15,
+    breakout_weight: float = 0.10,
+    close_location_weight: float = 0.05,
+) -> tuple[float, float, float]:
+    channel_width = 0.0
+    if channel_high is not None and channel_low is not None:
+        channel_width = max(float(channel_high) - float(channel_low), 0.0)
+    channel_width = max(channel_width, 1e-8)
+
+    if direction == "long":
+        raw_penetration = max(float(close_price) - float(breakout_level), 0.0) / channel_width
+        directional_close_score = (float(close_location) - 0.5) / 0.5
+    else:
+        raw_penetration = max(float(breakout_level) - float(close_price), 0.0) / channel_width
+        directional_close_score = (0.5 - float(close_location)) / 0.5
+
+    rel_volume_excess = min(max(float(rel_volume) - 1.0, 0.0), 2.0)
+    rel_volume_ratio_excess = min(max(float(rel_volume_ratio) - 1.0, 0.0), 1.5)
+    breakout_penetration = min(max(raw_penetration, 0.0), 1.0)
+    directional_close_score = min(max(directional_close_score, 0.0), 1.0)
+
+    conviction_mult = (
+        1.0
+        + (rel_volume_weight * rel_volume_excess)
+        + (rel_volume_ratio_weight * rel_volume_ratio_excess)
+        + (breakout_weight * breakout_penetration)
+        + (close_location_weight * directional_close_score)
+    )
+    conviction_mult = min(max(conviction_mult, 1.0), max_mult)
+    return conviction_mult, breakout_penetration, directional_close_score
+
+
 def run_session_turtle_trend_backtest(
     ticker: str,
     initial_capital: float = 10_000.0,
@@ -200,6 +248,13 @@ def run_session_turtle_trend_backtest(
     directional_volume_min_rel_volume: float = 1.25,
     directional_volume_close_location_threshold: float = 0.65,
     directional_volume_risk_pct: float = 0.07,
+    use_breakout_conviction_boost: bool = False,
+    conviction_rel_volume_ratio_period: int = 5,
+    conviction_max_mult: float = 1.35,
+    conviction_rel_volume_weight: float = 0.10,
+    conviction_rel_volume_ratio_weight: float = 0.15,
+    conviction_breakout_weight: float = 0.10,
+    conviction_close_location_weight: float = 0.05,
     enable_pyramiding: bool = False,
     pyramid_add_atr: float = 0.5,
     max_units: int = 4,
@@ -254,6 +309,18 @@ def run_session_turtle_trend_backtest(
         raise ValueError("directional_volume_close_location_threshold must be between 0.5 and 1.0")
     if directional_volume_risk_pct < base_risk_pct:
         raise ValueError("directional_volume_risk_pct must be >= base_risk_pct")
+    if conviction_rel_volume_ratio_period < 2:
+        raise ValueError("conviction_rel_volume_ratio_period must be >= 2")
+    if conviction_max_mult < 1.0:
+        raise ValueError("conviction_max_mult must be >= 1.0")
+    for label, value in (
+        ("conviction_rel_volume_weight", conviction_rel_volume_weight),
+        ("conviction_rel_volume_ratio_weight", conviction_rel_volume_ratio_weight),
+        ("conviction_breakout_weight", conviction_breakout_weight),
+        ("conviction_close_location_weight", conviction_close_location_weight),
+    ):
+        if value < 0:
+            raise ValueError(f"{label} must be non-negative")
     if max_units < 1:
         raise ValueError("max_units must be >= 1")
     if trend_fast_period < 2 or trend_slow_period < 2:
@@ -315,6 +382,11 @@ def run_session_turtle_trend_backtest(
     exit_highs = _rolling_highest(session_highs, exit_channel)
     exit_lows = _rolling_lowest(session_lows, exit_channel)
     vol_sma = _sma(volumes, volume_period)
+    rel_volume_series: list[float] = [1.0] * len(bars)
+    for idx, (volume, avg_volume) in enumerate(zip(volumes, vol_sma)):
+        if avg_volume is not None and float(avg_volume) > 0:
+            rel_volume_series[idx] = float(volume) / float(avg_volume)
+    rel_volume_ema = _ema(rel_volume_series, conviction_rel_volume_ratio_period)
     trend_bars, bar_to_trend_idx = _aggregate_bars_with_index_mapping(bars, interval_minutes=240)
     trend_closes = [float(bar["close"]) for bar in trend_bars]
     trend_ema_fast = _ema(trend_closes, trend_fast_period) if use_4h_trend_filter else []
@@ -726,7 +798,10 @@ def run_session_turtle_trend_backtest(
 
         rel_volume = 1.0
         if vol_sma[i] is not None and float(vol_sma[i]) > 0:
-            rel_volume = float(volumes[i]) / float(vol_sma[i])
+            rel_volume = rel_volume_series[i]
+        rel_volume_ratio = 1.0
+        if rel_volume_ema[i] is not None and float(rel_volume_ema[i]) > 0:
+            rel_volume_ratio = rel_volume / float(rel_volume_ema[i])
         volume_risk_scale = 1.0
         if use_volume_risk_scaling:
             volume_risk_scale = min(max(rel_volume, volume_risk_floor), volume_risk_cap)
@@ -744,6 +819,33 @@ def run_session_turtle_trend_backtest(
         if use_directional_volume_risk_boost and directional_volume_confirmed:
             target_risk_pct = max(target_risk_pct, directional_volume_risk_pct)
             risk_model = "directional_volume_boost"
+        conviction_mult = 1.0
+        breakout_penetration = 0.0
+        directional_close_score = 0.0
+        if use_breakout_conviction_boost:
+            conviction_mult, breakout_penetration, directional_close_score = _breakout_conviction_multiplier(
+                direction=direction,
+                rel_volume=rel_volume,
+                rel_volume_ratio=rel_volume_ratio,
+                close_location=close_location,
+                close_price=close_i,
+                breakout_level=breakout_level,
+                channel_high=long_breakout,
+                channel_low=short_breakout,
+                max_mult=conviction_max_mult,
+                rel_volume_weight=conviction_rel_volume_weight,
+                rel_volume_ratio_weight=conviction_rel_volume_ratio_weight,
+                breakout_weight=conviction_breakout_weight,
+                close_location_weight=conviction_close_location_weight,
+            )
+            if conviction_mult > 1.0:
+                target_risk_pct *= conviction_mult
+                if risk_model == "directional_volume_boost":
+                    risk_model = "directional_volume_conviction_boost"
+                elif risk_model == "rvol_scaled":
+                    risk_model = "rvol_conviction_boost"
+                else:
+                    risk_model = "conviction_boost"
 
         next_open = opens[i + 1] if opens[i + 1] > 0 else closes[i + 1]
         fixed_stop_rate = float(fixed_stop_pct) if fixed_stop_pct is not None else None
@@ -815,8 +917,12 @@ def run_session_turtle_trend_backtest(
             signal_quality="A" if channel_period == 55 else "B",
             stop_source=stop_source,
             entry_rel_volume=round(rel_volume, 4),
+            rel_volume_ratio=round(rel_volume_ratio, 4),
             volume_risk_scale=round(volume_risk_scale, 4),
             directional_volume_confirmed=directional_volume_confirmed,
+            conviction_mult=round(conviction_mult, 4),
+            breakout_penetration=round(breakout_penetration, 4),
+            directional_close_score=round(directional_close_score, 4),
             risk_model=risk_model,
             initial_shares=round(shares, 6),
             initial_position_size=round(position_size, 4),
@@ -881,6 +987,13 @@ def run_session_turtle_trend_backtest(
         "directional_volume_min_rel_volume": directional_volume_min_rel_volume,
         "directional_volume_close_location_threshold": directional_volume_close_location_threshold,
         "directional_volume_risk_pct": directional_volume_risk_pct,
+        "use_breakout_conviction_boost": use_breakout_conviction_boost,
+        "conviction_rel_volume_ratio_period": conviction_rel_volume_ratio_period,
+        "conviction_max_mult": conviction_max_mult,
+        "conviction_rel_volume_weight": conviction_rel_volume_weight,
+        "conviction_rel_volume_ratio_weight": conviction_rel_volume_ratio_weight,
+        "conviction_breakout_weight": conviction_breakout_weight,
+        "conviction_close_location_weight": conviction_close_location_weight,
         "enable_pyramiding": enable_pyramiding,
         "pyramid_add_atr": pyramid_add_atr,
         "max_units": max_units,
@@ -943,8 +1056,12 @@ def run_session_turtle_trend_backtest(
                 "hold_days": t.hold_bars,
                 "stop_source": t.stop_source,
                 "entry_rel_volume": t.entry_rel_volume,
+                "rel_volume_ratio": t.rel_volume_ratio,
                 "volume_risk_scale": t.volume_risk_scale,
                 "directional_volume_confirmed": t.directional_volume_confirmed,
+                "conviction_mult": t.conviction_mult,
+                "breakout_penetration": t.breakout_penetration,
+                "directional_close_score": t.directional_close_score,
                 "risk_model": t.risk_model,
                 "session_label": t.session_label,
                 "breakout_level": t.breakout_level,

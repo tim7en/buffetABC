@@ -127,6 +127,10 @@ class _OpenTrade:
     pnl: float
     risk_model: str
     entry_rel_volume: float
+    rel_volume_ratio: float
+    conviction_mult: float
+    breakout_penetration: float
+    directional_close_score: float
     asset_bucket: str
     entry_exposure_mult: float
     entry_sentiment_score: float | None
@@ -1045,6 +1049,13 @@ def build_session_turtle_shared_account_candidates(
     base_risk_pct: float = 0.05,
     fixed_stop_pct: float = 0.10,
     directional_volume_risk_pct: float = 0.07,
+    use_breakout_conviction_boost: bool = False,
+    conviction_rel_volume_ratio_period: int = 5,
+    conviction_max_mult: float = 1.35,
+    conviction_rel_volume_weight: float = 0.10,
+    conviction_rel_volume_ratio_weight: float = 0.15,
+    conviction_breakout_weight: float = 0.10,
+    conviction_close_location_weight: float = 0.05,
     trend_fast_period: int = 55,
     trend_slow_period: int = 200,
     use_extended_hours_protective_exits: bool = False,
@@ -1082,6 +1093,13 @@ def build_session_turtle_shared_account_candidates(
             directional_volume_min_rel_volume=1.25,
             directional_volume_close_location_threshold=0.65,
             directional_volume_risk_pct=directional_volume_risk_pct,
+            use_breakout_conviction_boost=use_breakout_conviction_boost,
+            conviction_rel_volume_ratio_period=conviction_rel_volume_ratio_period,
+            conviction_max_mult=conviction_max_mult,
+            conviction_rel_volume_weight=conviction_rel_volume_weight,
+            conviction_rel_volume_ratio_weight=conviction_rel_volume_ratio_weight,
+            conviction_breakout_weight=conviction_breakout_weight,
+            conviction_close_location_weight=conviction_close_location_weight,
             enable_pyramiding=False,
             use_break_even_stop=False,
             use_chandelier_exit=False,
@@ -1113,6 +1131,10 @@ def build_session_turtle_shared_account_candidates(
                     "pnl": float(trade["pnl"]),
                     "risk_model": str(trade["risk_model"]),
                     "entry_rel_volume": float(trade["entry_rel_volume"]),
+                    "rel_volume_ratio": float(trade.get("rel_volume_ratio", 1.0) or 1.0),
+                    "conviction_mult": float(trade.get("conviction_mult", 1.0) or 1.0),
+                    "breakout_penetration": float(trade.get("breakout_penetration", 0.0) or 0.0),
+                    "directional_close_score": float(trade.get("directional_close_score", 0.0) or 0.0),
                     "asset_bucket": _asset_bucket(ticker),
                 }
             )
@@ -1139,6 +1161,13 @@ def generate_session_turtle_shared_account_report(
     base_risk_pct: float = 0.05,
     fixed_stop_pct: float = 0.10,
     directional_volume_risk_pct: float = 0.07,
+    use_breakout_conviction_boost: bool = False,
+    conviction_rel_volume_ratio_period: int = 5,
+    conviction_max_mult: float = 1.35,
+    conviction_rel_volume_weight: float = 0.10,
+    conviction_rel_volume_ratio_weight: float = 0.15,
+    conviction_breakout_weight: float = 0.10,
+    conviction_close_location_weight: float = 0.05,
     trend_fast_period: int = 55,
     trend_slow_period: int = 200,
     base_portfolio_cap_pct: float = 0.90,
@@ -1352,6 +1381,13 @@ def generate_session_turtle_shared_account_report(
             base_risk_pct=base_risk_pct,
             fixed_stop_pct=fixed_stop_pct,
             directional_volume_risk_pct=directional_volume_risk_pct,
+            use_breakout_conviction_boost=use_breakout_conviction_boost,
+            conviction_rel_volume_ratio_period=conviction_rel_volume_ratio_period,
+            conviction_max_mult=conviction_max_mult,
+            conviction_rel_volume_weight=conviction_rel_volume_weight,
+            conviction_rel_volume_ratio_weight=conviction_rel_volume_ratio_weight,
+            conviction_breakout_weight=conviction_breakout_weight,
+            conviction_close_location_weight=conviction_close_location_weight,
             trend_fast_period=trend_fast_period,
             trend_slow_period=trend_slow_period,
             use_extended_hours_protective_exits=use_extended_hours_protective_exits,
@@ -1477,6 +1513,10 @@ def generate_session_turtle_shared_account_report(
                     ),
                     "scale": round(position.scale, 6),
                     "entry_rel_volume": round(position.entry_rel_volume, 4),
+                    "rel_volume_ratio": round(position.rel_volume_ratio, 4),
+                    "conviction_mult": round(position.conviction_mult, 4),
+                    "breakout_penetration": round(position.breakout_penetration, 4),
+                    "directional_close_score": round(position.directional_close_score, 4),
                     "risk_model": position.risk_model,
                     "performance_risk_mult": round(position.performance_risk_mult, 4),
                     "performance_score": (
@@ -1862,6 +1902,10 @@ def generate_session_turtle_shared_account_report(
                     pnl=float(candidate["pnl"]),
                     risk_model=str(candidate["risk_model"]),
                     entry_rel_volume=float(candidate["entry_rel_volume"]),
+                    rel_volume_ratio=float(candidate.get("rel_volume_ratio", 1.0)),
+                    conviction_mult=float(candidate.get("conviction_mult", 1.0)),
+                    breakout_penetration=float(candidate.get("breakout_penetration", 0.0)),
+                    directional_close_score=float(candidate.get("directional_close_score", 0.0)),
                     asset_bucket=str(record["asset_bucket"]),
                     entry_exposure_mult=float(record["entry_exposure_mult"]),
                     entry_sentiment_score=record["entry_sentiment_score"],
@@ -1936,6 +1980,10 @@ def generate_session_turtle_shared_account_report(
         float(trade.get("direct_sentiment_size_mult"))
         if trade.get("direct_sentiment_size_mult") is not None
         else 1.0
+        for trade in executed_trades
+    ]
+    conviction_mults = [
+        float(trade.get("conviction_mult")) if trade.get("conviction_mult") is not None else 1.0
         for trade in executed_trades
     ]
     intraday_vol_proxy_mults = [
@@ -2131,6 +2179,17 @@ def generate_session_turtle_shared_account_report(
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,
         "directional_volume_risk_pct": directional_volume_risk_pct,
+        "use_breakout_conviction_boost": use_breakout_conviction_boost,
+        "conviction_rel_volume_ratio_period": conviction_rel_volume_ratio_period,
+        "conviction_max_mult": conviction_max_mult,
+        "conviction_rel_volume_weight": conviction_rel_volume_weight,
+        "conviction_rel_volume_ratio_weight": conviction_rel_volume_ratio_weight,
+        "conviction_breakout_weight": conviction_breakout_weight,
+        "conviction_close_location_weight": conviction_close_location_weight,
+        "avg_conviction_mult": (
+            round(sum(conviction_mults) / len(conviction_mults), 4) if conviction_mults else 1.0
+        ),
+        "entries_conviction_upscaled": sum(1 for mult in conviction_mults if mult > 1.000001),
         "use_extended_hours_protective_exits": use_extended_hours_protective_exits,
         "extended_hours_core_session_minutes": extended_hours_core_session_minutes,
         "use_performance_leadership_overlay": use_performance_leadership_overlay,

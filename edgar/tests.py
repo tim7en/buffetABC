@@ -15,6 +15,7 @@ from edgar import sp500
 from edgar.models import EdgarCompany, EdgarDocument, EdgarFundamental, EdgarMetricMapping
 from edgar.services.edgar_client import EdgarClient, RateLimiter
 from edgar.services.session_turtle_portfolio import generate_session_turtle_shared_account_report
+from edgar.services.session_turtle_trend_strategy import _breakout_conviction_multiplier
 from edgar.services.strategy import (
     BacktestResult,
     Trade,
@@ -3399,6 +3400,22 @@ class StrategySerializationTests(TestCase):
 
 
 class StrategyIndicatorTests(TestCase):
+    def test_breakout_conviction_multiplier_rewards_stronger_breakouts(self):
+        conviction_mult, breakout_penetration, directional_close_score = _breakout_conviction_multiplier(
+            direction="long",
+            rel_volume=2.4,
+            rel_volume_ratio=1.8,
+            close_location=0.96,
+            close_price=104.0,
+            breakout_level=100.0,
+            channel_high=101.0,
+            channel_low=95.0,
+            max_mult=1.35,
+        )
+        self.assertEqual(conviction_mult, 1.35)
+        self.assertAlmostEqual(breakout_penetration, 2.0 / 3.0, places=4)
+        self.assertAlmostEqual(directional_close_score, 0.92, places=4)
+
     def test_williams_fractal_detection(self):
         highs = [10.0, 11.0, 15.0, 12.0, 11.0, 13.0, 12.0]
         lows = [9.0, 8.0, 7.0, 8.0, 9.0, 8.5, 9.5]
