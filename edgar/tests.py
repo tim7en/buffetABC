@@ -1095,6 +1095,53 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertEqual(candidates[0]["ticker"], "AAA")
         self.assertEqual(mock_backtest.call_count, 1)
 
+    @patch("edgar.services.session_turtle_portfolio.load_local_tiingo_klines")
+    @patch("edgar.services.session_turtle_portfolio.load_local_binance_klines")
+    def test_build_per_asset_technical_state_includes_binance_assets(
+        self,
+        mock_load_binance,
+        mock_load_tiingo,
+    ):
+        from edgar.services.session_turtle_portfolio import build_per_asset_technical_state
+
+        start = datetime(2024, 1, 1, 0, 0, 0)
+
+        def _bars(base_price: float) -> list[dict]:
+            rows: list[dict] = []
+            for idx in range(160):
+                price = base_price + idx * 0.25
+                rows.append(
+                    {
+                        "timestamp": start + timedelta(minutes=15 * idx),
+                        "open": price,
+                        "high": price + 0.5,
+                        "low": price - 0.5,
+                        "close": price + 0.2,
+                        "volume": 1000.0 + idx,
+                    }
+                )
+            return rows
+
+        mock_load_binance.return_value = (_bars(10.0), "ATOMUSDT")
+        mock_load_tiingo.return_value = (_bars(100.0), "AMZN", "cache/cache/tiingo/AMZN_5m.parquet")
+
+        state = build_per_asset_technical_state(
+            universe=[
+                ("ATOM-USD", "binance", "hong_kong_open"),
+                ("AMZN", "tiingo", "new_york_equity_open"),
+            ],
+            lookback_years=0.2,
+            warmup_days=5,
+            ema_period=3,
+            adx_period=2,
+        )
+
+        self.assertIn("ATOM-USD", state["daily_ema"])
+        self.assertIn("ATOM-USD", state["4h_adx"])
+        self.assertTrue(state["4h_adx"]["ATOM-USD"])
+        self.assertIn("AMZN", state["daily_ema"])
+        self.assertIn("AMZN", state["4h_adx"])
+
 
 class ApiTests(TestCase):
     def setUp(self):

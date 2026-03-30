@@ -259,7 +259,7 @@ def build_per_asset_technical_state(
 
         try:
             if source == "binance":
-                bars, _, _ = load_local_binance_klines(
+                bars, _ = load_local_binance_klines(
                     ticker=ticker, interval="15m",
                     lookback_years=lookback_years, warmup_days=warmup_days,
                 )
