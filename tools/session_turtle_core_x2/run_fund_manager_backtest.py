@@ -1,9 +1,10 @@
 """
 Fund Manager Backtest — Session Turtle Core x3
 ===============================================
-Production-grade rolling moderator implementing the EXACT rules from
-strategy-moderator.jsx.  This is the reference implementation for live
-fund management decisions.
+Production-grade rolling moderator implementing the operational fund-manager
+logic used for this repo's strategy moderator research. It is the current
+reference runner for moderation decisions, but some scoring inputs remain
+proxies for the higher-level playbook described in strategy-moderator.jsx.
 
 Architecture
 ------------
@@ -26,8 +27,8 @@ handing it to the engine:
   5. Pre-filter candidates incorporating all decisions + circuit breaker state.
   6. Run MODERATED backtest with filtered candidates.
 
-Scoring — 4 pillars × 25 pts = 100
------------------------------------
+Scoring — 4 operational proxy pillars × 25 pts = 100
+-----------------------------------------------------
   Pillar 1  Risk-Adjusted Return  : Sharpe approx (annualized from trade P&L)
   Pillar 2  Stability             : Win-rate × Profit-factor composite
   Pillar 3  Trade Quality         : Sortino approx + MAR/Calmar approx
@@ -75,7 +76,7 @@ from edgar.services.session_turtle_portfolio import (
     generate_session_turtle_shared_account_report,
 )
 
-# ── Phase-gate config (exact from strategy-moderator.jsx Decision Gate) ────────
+# ── Phase-gate config (aligned to strategy-moderator.jsx Decision Gate) ─────────
 OBSERVE_ONLY_DAYS = 28    # W1-W4  : no changes whatsoever
 REDUCE_ONLY_DAYS  = 56    # W5-W8  : reduce weights, never remove
 FULL_ROTATION_DAYS = 56   # W9+    : same as REDUCE_ONLY end boundary
@@ -85,7 +86,7 @@ SCORE_LOOKBACK_DAYS = 91  # 13 rolling weeks
 REVIEW_FREQ_DAYS    = 30  # monthly scoring pass
 MIN_TRADES_TO_SCORE = 3   # fewer → INSUFFICIENT → keep at full weight
 
-# ── Tier thresholds (matches strategy-moderator.jsx) ───────────────────────────
+# ── Tier thresholds (aligned to strategy-moderator.jsx) ─────────────────────────
 TIER_A = 75   # Full weight
 TIER_B = 55   # Standard weight
 TIER_C = 40   # Reduce 50% — enters probation
@@ -96,7 +97,13 @@ TIER_D = 25   # Reduce 25% — diversification hold
 PROBATION_DAYS = 28   # 4 weeks — C-tier must remain C before 50% kicks in
 MIN_TENURE_DAYS = 56  # 8 weeks live before removal is permitted
 
-# ── Circuit-breaker thresholds (strategy-moderator.jsx HALT/CIRCUIT BREAKER) ───
+# ── Diversification hold rules ──────────────────────────────────────────────────
+# D/F-tier assets are only kept at 25% when they still offer diversification value
+# versus the currently retained portfolio.
+DIVERSIFICATION_CORR_THRESHOLD = 0.30
+MIN_DIVERSIFICATION_OBS = 20
+
+# ── Circuit-breaker thresholds (aligned to strategy-moderator.jsx HALT/CIRCUIT BREAKER) ───
 # Reference max DD = 30.36% from production backtest
 REF_MAX_DD_PCT   = 30.36
 CB_REDUCE_DD_PCT = REF_MAX_DD_PCT * 0.60   # 18.22% → reduce all entries 50%
@@ -159,6 +166,91 @@ def _add_days(dt: datetime, days: int) -> datetime:
     return dt + timedelta(days=days)
 
 
+def _pearson_corr(xs: list[float], ys: list[float]) -> float | None:
+    """Simple Pearson correlation with minimal dependencies."""
+    n = len(xs)
+    if n != len(ys) or n < 2:
+        return None
+    mean_x = sum(xs) / n
+    mean_y = sum(ys) / n
+    cov = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+    var_x = sum((x - mean_x) ** 2 for x in xs)
+    var_y = sum((y - mean_y) ** 2 for y in ys)
+    if var_x <= 1e-12 or var_y <= 1e-12:
+        return None
+    return cov / math.sqrt(var_x * var_y)
+
+
+def _build_daily_return_state(technical_state: dict) -> dict[str, dict[datetime.date, float]]:
+    """
+    Build daily close-to-close returns from the already-computed daily EMA state.
+
+    Returns:
+        {ticker: {date: daily_return}}
+    """
+    out: dict[str, dict[datetime.date, float]] = {}
+    daily_ema = technical_state.get("daily_ema", {}) if technical_state else {}
+    for ticker, rows in daily_ema.items():
+        ordered = sorted(
+            (
+                datetime.fromisoformat(day).date(),
+                float(payload.get("close", 0.0) or 0.0),
+            )
+            for day, payload in rows.items()
+        )
+        ticker_returns: dict[datetime.date, float] = {}
+        prev_close: float | None = None
+        for day, close in ordered:
+            if prev_close is not None and prev_close > 0:
+                ticker_returns[day] = (close / prev_close) - 1.0
+            prev_close = close
+        out[str(ticker)] = ticker_returns
+    return out
+
+
+def _avg_abs_corr_to_portfolio(
+    *,
+    ticker: str,
+    peer_tickers: list[str],
+    review_dt: datetime,
+    daily_return_state: dict[str, dict[datetime.date, float]],
+    lookback_days: int = SCORE_LOOKBACK_DAYS,
+    min_obs: int = MIN_DIVERSIFICATION_OBS,
+) -> float | None:
+    """
+    Average absolute correlation of one asset to the current retained peer set.
+
+    Uses prior daily returns only, over the same 13-week lookback window as the
+    scoring pass. Returns None when correlation cannot be estimated reliably.
+    """
+    own = daily_return_state.get(ticker, {})
+    if not own or not peer_tickers:
+        return None
+
+    end_day = review_dt.date()
+    start_day = (review_dt - timedelta(days=lookback_days)).date()
+    corrs: list[float] = []
+    for peer in peer_tickers:
+        peer_series = daily_return_state.get(peer, {})
+        if not peer_series:
+            continue
+        common_days = sorted(
+            d for d in own.keys() & peer_series.keys()
+            if start_day <= d < end_day
+        )
+        if len(common_days) < min_obs:
+            continue
+        xs = [own[d] for d in common_days]
+        ys = [peer_series[d] for d in common_days]
+        corr = _pearson_corr(xs, ys)
+        if corr is not None:
+            corrs.append(abs(corr))
+
+    if not corrs:
+        return None
+    return sum(corrs) / len(corrs)
+
+
 # ── Equity-curve builder ───────────────────────────────────────────────────────
 
 def _build_equity_curve(trades: list[dict]) -> list[tuple[datetime, float]]:
@@ -195,8 +287,9 @@ def _score_asset(
     window_days: int = SCORE_LOOKBACK_DAYS,
 ) -> tuple[int, str, dict]:
     """
-    Compute composite 0-100 score across 4 pillars (25 pts each).
-    Pillars align with strategy-moderator.jsx Asset Scoring tab.
+    Compute a composite 0-100 score across 4 proxy pillars (25 pts each).
+    This is an operational scoring proxy, not a literal implementation of every
+    narrative metric listed in strategy-moderator.jsx.
 
     Returns (score, tier, metrics_dict).
     Returns (-1, 'INSUFFICIENT', {}) when too few trades.
@@ -323,10 +416,12 @@ class AssetState:
     def update(self, review_dt: datetime, new_tier: str) -> None:
         """
         Record new tier and manage probation clock.
-        C-tier starts a 4-week probation.  Any other tier clears it.
+
+        Any sub-55 tier (C/D/F) starts a 4-week probation clock. Returning to A/B
+        or insufficient-data status clears it.
         """
         self.tier_history.append((review_dt, new_tier))
-        if new_tier == "C":
+        if new_tier in {"C", "D", "F"}:
             if self.probation_since is None:
                 self.probation_since = review_dt
         else:
@@ -343,21 +438,23 @@ class AssetState:
         review_dt: datetime,
         tier: str,
         phase: str,  # "observe" | "reduce_only" | "full"
+        diversifies: bool | None = None,
     ) -> float:
         """
         Derive keep-ratio from tier, phase, and state.
 
         strategy-moderator.jsx rules:
-          KEEP Full  (A)    → 1.0
-          KEEP Std   (B)    → 1.0
-          REDUCE 50% (C)    → 0.5  (but only after 4-wk probation; before → 1.0)
-          REDUCE 25% (D)    → 0.25 (diversification hold — keep 25%)
-          REMOVE     (F)    → 0.0  (only if tenure >= 8 wk; else keep)
-          INSUFFICIENT      → 1.0  (benefit of the doubt)
+          KEEP Full  (A)         → 1.0
+          KEEP Std   (B)         → 1.0
+          REDUCE 50% (C)         → 0.5 immediately, with 4-week probation
+          SCORE < 55 after probation:
+            - diversifies        → 0.25 (diversification hold)
+            - no diversification → 0.0 once min tenure is met
+          INSUFFICIENT           → 1.0  (benefit of the doubt)
 
           Phase gates:
             observe_only  → always 1.0 (no action)
-            reduce_only   → max ratio 0.5 (can reduce, never remove → 0.0 becomes 0.25)
+            reduce_only   → max reduction is 50%; never 25% hold or full removal
             full          → all actions allowed
         """
         if tier == "INSUFFICIENT" or phase == "observe":
@@ -366,22 +463,23 @@ class AssetState:
         if tier in ("A", "B"):
             return 1.0
 
+        # Any persistent sub-55 state starts with an immediate 50% reduction.
+        if not self.probation_completed(review_dt):
+            return 0.5 if phase in ("reduce_only", "full") else 1.0
+
         if tier == "C":
-            # Probation guard: hold at full weight until probation completes
-            if not self.probation_completed(review_dt):
-                return 1.0
-            return 0.5 if phase == "full" else 1.0  # reduce_only: can reduce
+            return 0.5
 
-        if tier == "D":
-            # D-tier: always reduce to 25% (diversification hold) if phase allows
-            return 0.25 if phase in ("reduce_only", "full") else 1.0
+        # D/F after probation: keep only if diversification value remains or the
+        # asset is too new to remove.
+        keep_for_diversification = diversifies is not False
+        if keep_for_diversification or not self.is_min_tenure_met(review_dt):
+            return 0.25 if phase == "full" else 0.5
 
-        if tier == "F":
-            # F-tier: remove only if min tenure met AND in full phase
-            if phase != "full":
-                return 0.25  # in reduce_only: reduce heavily but don't remove
-            if not self.is_min_tenure_met(review_dt):
-                return 0.25  # not yet eligible for removal
+        if phase != "full":
+            return 0.5
+
+        if tier in {"D", "F"}:
             return 0.0
 
         return 1.0  # safety fallback
@@ -395,6 +493,7 @@ def _build_rolling_decisions(
     all_tickers:      set[str],
     strategy_start:   datetime,
     last_entry:       datetime,
+    daily_return_state: dict[str, dict[datetime.date, float]],
 ) -> dict[datetime, dict[str, tuple[int, str, float, dict]]]:
     """
     For each monthly review date, compute:
@@ -427,16 +526,43 @@ def _build_rolling_decisions(
         else:
             phase = "full"
 
-        tick_decisions: dict[str, tuple[int, str, float, dict]] = {}
+        raw_scores: dict[str, tuple[int, str, dict]] = {}
         for ticker in all_tickers:
             window_trades = [
                 td for (exit_dt, td) in by_ticker.get(ticker, [])
                 if window_start <= exit_dt < review_dt   # strict: no look-ahead
             ]
-            score, tier, metrics = _score_asset(window_trades)
+            raw_scores[ticker] = _score_asset(window_trades)
+
+        tick_decisions: dict[str, tuple[int, str, float, dict]] = {}
+        retained_peer_candidates = {
+            ticker for ticker, (_score, tier, _metrics) in raw_scores.items()
+            if tier in {"A", "B", "C", "INSUFFICIENT"}
+        }
+        for ticker in all_tickers:
+            score, tier, metrics = raw_scores[ticker]
             state   = asset_states[ticker]
             state.update(review_dt, tier)
-            ratio   = state.effective_keep_ratio(review_dt, tier, phase)
+            peer_tickers = sorted(retained_peer_candidates - {ticker})
+            avg_abs_corr = _avg_abs_corr_to_portfolio(
+                ticker=ticker,
+                peer_tickers=peer_tickers,
+                review_dt=review_dt,
+                daily_return_state=daily_return_state,
+            )
+            diversifies = None if avg_abs_corr is None else avg_abs_corr < DIVERSIFICATION_CORR_THRESHOLD
+            ratio = state.effective_keep_ratio(
+                review_dt,
+                tier,
+                phase,
+                diversifies=diversifies,
+            )
+            metrics = dict(metrics)
+            metrics["phase"] = phase
+            metrics["avg_abs_corr"] = round(avg_abs_corr, 3) if avg_abs_corr is not None else None
+            metrics["diversifies"] = diversifies
+            metrics["probation_complete"] = state.probation_completed(review_dt)
+            metrics["tenure_days"] = round(state.tenure_days(review_dt), 1)
             tick_decisions[ticker] = (score, tier, ratio, metrics)
 
         decisions[review_dt] = tick_decisions
@@ -640,6 +766,7 @@ def main() -> None:
         universe=universe, lookback_years=5.0, warmup_days=300,
         ema_period=_EMA_PERIOD, adx_period=14,
     )
+    daily_return_state = _build_daily_return_state(tech_state)
 
     # ── Candidates ───────────────────────────────────────────────────────────
     print("\nBuilding candidate trades...")
@@ -699,7 +826,11 @@ def main() -> None:
 
     # ── Step 3: Build per-asset state machines ────────────────────────────────
     print("\nStep 3 — Building per-asset state machines (phase/probation/tenure)...")
-    asset_states = {tk: AssetState(tk, strategy_start) for tk in all_tickers}
+    asset_start_ts = {
+        tk: min(c["entry_ts"] for c in all_candidates if c["ticker"] == tk)
+        for tk in all_tickers
+    }
+    asset_states = {tk: AssetState(tk, asset_start_ts[tk]) for tk in all_tickers}
 
     # ── Step 4: Build rolling decision map ───────────────────────────────────
     print("\nStep 4 — Building rolling fund-manager decisions (13-week lookback)...")
@@ -709,6 +840,7 @@ def main() -> None:
         all_tickers=set(all_tickers),
         strategy_start=strategy_start,
         last_entry=last_entry,
+        daily_return_state=daily_return_state,
     )
     sorted_reviews = sorted(decisions.keys())
     print(f"  {len(sorted_reviews)} monthly review checkpoints")
@@ -726,32 +858,32 @@ def main() -> None:
           f"{removed / len(all_candidates) * 100:.1f}%)")
 
     # ── Step 6: Moderated backtest — fund-manager filtered ────────────────────
-    print("\nStep 6 — FUND MANAGER (filter + DD governor, exact CB thresholds)...")
+    print("\nStep 6 — FUND MANAGER (phase gates, probation, diversification, CB prefilter)...")
     fm_result = _run(
-        label="Fund Manager (13wk scoring, phase gates, probation, CB)",
+        label="Fund Manager (phase gates, probation, diversification, CB)",
         candidates=fm_candidates,
         macro_state=macro_state,
         tech_state=tech_state,
-        use_dd_governor=True,
+        use_dd_governor=False,
     )
     print(f"  Return {fm_result['total_return_pct']:.1f}%  CAGR {fm_result['cagr_pct']:.1f}%  "
           f"MaxDD {fm_result['max_realized_drawdown_pct']:.1f}%  "
           f"PF {fm_result['profit_factor']:.2f}  WR {fm_result['win_rate_pct']:.1f}%  "
           f"Trades {fm_result['executed_trades']}")
 
-    # Step 6b: filter only, no DD governor (isolate effects)
-    print("\nStep 6b — FUND MANAGER filter only (no DD governor)...")
-    fm_no_cb = _run(
-        label="Fund Manager filter only (no CB governor)",
+    # Step 6b: legacy diagnostic to quantify the old double-circuit-breaker path.
+    print("\nStep 6b — LEGACY diagnostic (prefilter CB + engine DD governor)...")
+    fm_legacy_double_cb = _run(
+        label="Legacy diagnostic (double CB)",
         candidates=fm_candidates,
         macro_state=macro_state,
         tech_state=tech_state,
-        use_dd_governor=False,
+        use_dd_governor=True,
     )
-    print(f"  Return {fm_no_cb['total_return_pct']:.1f}%  CAGR {fm_no_cb['cagr_pct']:.1f}%  "
-          f"MaxDD {fm_no_cb['max_realized_drawdown_pct']:.1f}%  "
-          f"PF {fm_no_cb['profit_factor']:.2f}  WR {fm_no_cb['win_rate_pct']:.1f}%  "
-          f"Trades {fm_no_cb['executed_trades']}")
+    print(f"  Return {fm_legacy_double_cb['total_return_pct']:.1f}%  CAGR {fm_legacy_double_cb['cagr_pct']:.1f}%  "
+          f"MaxDD {fm_legacy_double_cb['max_realized_drawdown_pct']:.1f}%  "
+          f"PF {fm_legacy_double_cb['profit_factor']:.2f}  WR {fm_legacy_double_cb['win_rate_pct']:.1f}%  "
+          f"Trades {fm_legacy_double_cb['executed_trades']}")
 
     # ── Print decision timeline ───────────────────────────────────────────────
     _print_timeline(decisions, sorted_reviews, all_tickers, strategy_start)
@@ -792,7 +924,7 @@ def main() -> None:
             prev_s = s
 
     # ── Comparison table ──────────────────────────────────────────────────────
-    rows = [baseline, fm_no_cb, fm_result]
+    rows = [baseline, fm_result, fm_legacy_double_cb]
     cols = [
         ("Variant",     "variant_label",                "<54"),
         ("Return %",    "total_return_pct",             ">9"),
@@ -817,7 +949,7 @@ def main() -> None:
 
     b = baseline
     print("\n  Delta vs baseline:")
-    for row in [fm_no_cb, fm_result]:
+    for row in [fm_result, fm_legacy_double_cb]:
         print(f"  {row['variant_label']}")
         print(f"    Return {float(row['total_return_pct']) - float(b['total_return_pct']):+.1f}%  "
               f"CAGR {float(row['cagr_pct']) - float(b['cagr_pct']):+.1f}%  "
@@ -879,6 +1011,7 @@ def main() -> None:
     print(f"    Score lookback : {SCORE_LOOKBACK_DAYS}d  (13 weeks)")
     print(f"    Probation      : {PROBATION_DAYS}d  (4 weeks C-tier)")
     print(f"    Min tenure     : {MIN_TENURE_DAYS}d  (8 weeks before removal)")
+    print(f"    Diversify hold : avg |corr| < {DIVERSIFICATION_CORR_THRESHOLD:.2f}")
     print(f"    Phase W1-W4    : observe only ({OBSERVE_ONLY_DAYS}d)")
     print(f"    Phase W5-W8    : reduce only ({REDUCE_ONLY_DAYS}d)")
     print(f"    Phase W9+      : full rotation")

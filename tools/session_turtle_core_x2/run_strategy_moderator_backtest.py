@@ -1,5 +1,5 @@
 """
-Strategy Moderator Backtest.
+Strategy Moderator Backtest (simplified research variant).
 
 Simulates launching the strategy moderator after the first 3 months of live running.
 
@@ -23,6 +23,11 @@ Two variants are compared:
   moderated  — moderation kicks in after 3-month warm-up
 
 Both use identical overlay config (ema_hard_fg_half).
+
+Important: this is a simplified one-shot moderator backtest. It does NOT
+implement the full phase gates / diversification hold / probation state machine
+from strategy-moderator.jsx. Use run_fund_manager_backtest.py for the current
+reference implementation.
 
 Forward-looking bias: scoring uses ONLY warm-up trades (entry_ts < cutoff).
                       Candidates after the cutoff are never seen during scoring.
@@ -56,7 +61,8 @@ from edgar.services.session_turtle_portfolio import (
 WARM_UP_MONTHS   = 3        # observation-only period before moderation begins
 MIN_TRADES_TO_SCORE = 3     # assets with fewer warm-up trades get benefit of doubt
 
-# Tier score thresholds (matches strategy-moderator.jsx)
+# Tier score thresholds match strategy-moderator.jsx, but the scoring model
+# below is intentionally simplified for research use.
 TIER_A = 75
 TIER_B = 55
 TIER_C = 40

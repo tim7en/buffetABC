@@ -1,5 +1,5 @@
 """
-Rolling Strategy Moderator Backtest.
+Rolling Strategy Moderator Backtest (simplified research variant).
 
 Architecture
 ------------
@@ -29,6 +29,11 @@ Using the moderated trades would create a circular dependency (can't know modera
 execution before the moderation decisions are made).  This is a standard
 walk-forward approximation.  The capital curve diverges between baseline and
 moderated, but the TIER SIGNALS are clean and lag-safe.
+
+Important: this is still a simplified rolling research harness. It does NOT
+implement the full diversification hold / probation / asset-tenure logic from
+strategy-moderator.jsx. Use run_fund_manager_backtest.py for the reference
+implementation.
 
 Forward-look bias guards
 ------------------------
@@ -67,7 +72,8 @@ REVIEW_FREQ_MONTHS    = 1     # how often moderator re-scores (monthly)
 SCORE_LOOKBACK_MONTHS = 3     # trailing window of trades used to score each asset
 MIN_TRADES_TO_SCORE   = 3     # fewer → INSUFFICIENT → benefit of the doubt (keep)
 
-# Tier score thresholds (matches strategy-moderator.jsx)
+# Tier score thresholds match strategy-moderator.jsx, but the scoring model
+# below is intentionally simplified for research use.
 TIER_A, TIER_B, TIER_C, TIER_D = 75, 55, 40, 25
 # below TIER_D → Tier F (remove)
 
