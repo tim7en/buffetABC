@@ -1,0 +1,5686 @@
+{
+  "2022-03-09": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-04-08": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-05-08": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -5.966,
+        "sortino": -7.575,
+        "mar": -1.023,
+        "max_dd_pct": 275.12,
+        "expectancy": -17.54,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -70.14,
+        "n_trades": 4,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-06-07": {
+    "BTC-USD": {
+      "score": 92,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 0.739,
+        "sortino": 1.092,
+        "mar": 1.685,
+        "max_dd_pct": 90.6,
+        "expectancy": 12.69,
+        "win_rate": 0.667,
+        "profit_factor": 2.104,
+        "total_return": 38.06,
+        "n_trades": 3,
+        "p1": 17,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -9.043,
+        "sortino": -13.197,
+        "mar": -0.423,
+        "max_dd_pct": 446.64,
+        "expectancy": -15.71,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -47.12,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -6.205,
+        "sortino": -7.542,
+        "mar": -0.194,
+        "max_dd_pct": 1277.2,
+        "expectancy": -15.48,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -61.93,
+        "n_trades": 4,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-07-07": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -9.043,
+        "sortino": -13.197,
+        "mar": -0.423,
+        "max_dd_pct": 446.64,
+        "expectancy": -15.71,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -47.12,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -10.353,
+        "sortino": -9.219,
+        "mar": -0.594,
+        "max_dd_pct": 385.14,
+        "expectancy": -19.03,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -57.08,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-08-06": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -0.799,
+        "sortino": -1.369,
+        "mar": -0.314,
+        "max_dd_pct": 228.24,
+        "expectancy": -5.95,
+        "win_rate": 0.333,
+        "profit_factor": 0.512,
+        "total_return": -17.86,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-09-05": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-10-05": {
+    "BTC-USD": {
+      "score": 84,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 0.488,
+        "sortino": 0.742,
+        "mar": 2.13,
+        "max_dd_pct": 59.58,
+        "expectancy": 10.55,
+        "win_rate": 0.667,
+        "profit_factor": 1.679,
+        "total_return": 31.64,
+        "n_trades": 3,
+        "p1": 17,
+        "p2": 25,
+        "p3": 17,
+        "p4": 25
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 100,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 1.636,
+        "sortino": 2.698,
+        "mar": 5.789,
+        "max_dd_pct": 13.05,
+        "expectancy": 6.28,
+        "win_rate": 0.667,
+        "profit_factor": 8.665,
+        "total_return": 18.83,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-11-04": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.561,
+        "sortino": -1.422,
+        "mar": -0.098,
+        "max_dd_pct": 542.11,
+        "expectancy": -4.4,
+        "win_rate": 0.333,
+        "profit_factor": 0.163,
+        "total_return": -13.2,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2022-12-04": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": 100,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 1.869,
+        "sortino": 3.077,
+        "mar": 118.256,
+        "max_dd_pct": 7.41,
+        "expectancy": 72.86,
+        "win_rate": 0.667,
+        "profit_factor": 14.488,
+        "total_return": 218.58,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.561,
+        "sortino": -1.422,
+        "mar": -0.098,
+        "max_dd_pct": 542.11,
+        "expectancy": -4.4,
+        "win_rate": 0.333,
+        "profit_factor": 0.163,
+        "total_return": -13.2,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-01-03": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": 100,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 1.901,
+        "sortino": 3.112,
+        "mar": 121.305,
+        "max_dd_pct": 7.32,
+        "expectancy": 73.79,
+        "win_rate": 0.667,
+        "profit_factor": 14.661,
+        "total_return": 221.38,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-02-02": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-03-04": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-04-03": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-05-03": {
+    "BTC-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.143,
+        "sortino": -3.07,
+        "mar": -2.469,
+        "max_dd_pct": 144.45,
+        "expectancy": -29.64,
+        "win_rate": 0.333,
+        "profit_factor": 0.108,
+        "total_return": -88.92,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -6.649,
+        "sortino": -9.692,
+        "mar": -1.115,
+        "max_dd_pct": 211.3,
+        "expectancy": -19.57,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -58.72,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-06-02": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.171,
+        "sortino": -1.95,
+        "mar": -0.558,
+        "max_dd_pct": 252.1,
+        "expectancy": -11.69,
+        "win_rate": 0.333,
+        "profit_factor": 0.373,
+        "total_return": -35.06,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-07-02": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.171,
+        "sortino": -1.95,
+        "mar": -0.558,
+        "max_dd_pct": 252.1,
+        "expectancy": -11.69,
+        "win_rate": 0.333,
+        "profit_factor": 0.373,
+        "total_return": -35.06,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-08-01": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.169,
+        "sortino": -1.46,
+        "mar": -0.056,
+        "max_dd_pct": 2009.69,
+        "expectancy": -7.05,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -28.2,
+        "n_trades": 4,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-08-31": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.072,
+        "sortino": -1.815,
+        "mar": -0.148,
+        "max_dd_pct": 728.73,
+        "expectancy": -8.93,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -26.8,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-09-30": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": 8,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -0.01,
+        "sortino": -0.017,
+        "mar": -0.033,
+        "max_dd_pct": 100.89,
+        "expectancy": -0.28,
+        "win_rate": 0.333,
+        "profit_factor": 0.991,
+        "total_return": -0.84,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 8,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.163,
+        "sortino": -1.482,
+        "mar": -0.0,
+        "max_dd_pct": 12266210000000.0,
+        "expectancy": -30.67,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -122.66,
+        "n_trades": 4,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -3.123,
+        "sortino": -4.861,
+        "mar": -0.0,
+        "max_dd_pct": 4294390000000.0,
+        "expectancy": -14.31,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -42.94,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-10-30": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -3.22,
+        "sortino": -3.023,
+        "mar": -4.263,
+        "max_dd_pct": 153.58,
+        "expectancy": -54.42,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -163.25,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-11-29": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.808,
+        "sortino": -1.568,
+        "mar": -3.993,
+        "max_dd_pct": 105.69,
+        "expectancy": -35.07,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -105.2,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2023-12-29": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": 8,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -0.372,
+        "sortino": -0.644,
+        "mar": -0.108,
+        "max_dd_pct": 137.77,
+        "expectancy": -1.23,
+        "win_rate": 0.333,
+        "profit_factor": 0.726,
+        "total_return": -3.69,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 8,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 100,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 2.178,
+        "sortino": 3.746,
+        "mar": 46699142857.143,
+        "max_dd_pct": 0.0,
+        "expectancy": 3.88,
+        "win_rate": 1.0,
+        "profit_factor": 11642800000.0,
+        "total_return": 11.64,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-01-28": {
+    "BTC-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.537,
+        "sortino": -1.341,
+        "mar": -0.809,
+        "max_dd_pct": 1114.36,
+        "expectancy": -74.96,
+        "win_rate": 0.333,
+        "profit_factor": 0.09,
+        "total_return": -224.87,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "HOOD": {
+      "score": 67,
+      "tier": "B",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 0.48,
+        "sortino": 0.737,
+        "mar": 0.453,
+        "max_dd_pct": 100.0,
+        "expectancy": 3.76,
+        "win_rate": 0.333,
+        "profit_factor": 1.675,
+        "total_return": 11.29,
+        "n_trades": 3,
+        "p1": 17,
+        "p2": 8,
+        "p3": 17,
+        "p4": 25
+      }
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-02-27": {
+    "BTC-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.537,
+        "sortino": -1.341,
+        "mar": -0.809,
+        "max_dd_pct": 1114.36,
+        "expectancy": -74.96,
+        "win_rate": 0.333,
+        "profit_factor": 0.09,
+        "total_return": -224.87,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-03-28": {
+    "BTC-USD": {
+      "score": 100,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 1.234,
+        "sortino": 2.351,
+        "mar": 138.13,
+        "max_dd_pct": 26.78,
+        "expectancy": 230.59,
+        "win_rate": 0.5,
+        "profit_factor": 4.734,
+        "total_return": 922.35,
+        "n_trades": 4,
+        "p1": 25,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.664,
+        "sortino": -1.441,
+        "mar": -0.312,
+        "max_dd_pct": 100.0,
+        "expectancy": -2.59,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -7.77,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-04-27": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": 83,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 0.932,
+        "sortino": 1.602,
+        "mar": 11.082,
+        "max_dd_pct": 34.17,
+        "expectancy": 31.47,
+        "win_rate": 0.333,
+        "profit_factor": 2.926,
+        "total_return": 94.41,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 8,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.664,
+        "sortino": -1.441,
+        "mar": -0.0,
+        "max_dd_pct": 43600560000000.0,
+        "expectancy": -145.34,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -436.01,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-05-27": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -3.142,
+        "sortino": -2.768,
+        "mar": -1.33,
+        "max_dd_pct": 462.58,
+        "expectancy": -51.12,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -153.35,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-06-26": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-07-26": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-08-25": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.063,
+        "sortino": -2.006,
+        "mar": -3.357,
+        "max_dd_pct": 326.73,
+        "expectancy": -91.15,
+        "win_rate": 0.333,
+        "profit_factor": 0.106,
+        "total_return": -273.46,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "MSTR": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -0.737,
+        "sortino": -1.101,
+        "mar": -2.806,
+        "max_dd_pct": 196.35,
+        "expectancy": -45.79,
+        "win_rate": 0.333,
+        "profit_factor": 0.509,
+        "total_return": -137.36,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.48,
+        "sortino": -2.234,
+        "mar": -2.279,
+        "max_dd_pct": 444.38,
+        "expectancy": -84.18,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -252.53,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-09-24": {
+    "BTC-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.393,
+        "sortino": -2.093,
+        "mar": -0.671,
+        "max_dd_pct": 2095.63,
+        "expectancy": -116.78,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -350.34,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.944,
+        "sortino": -1.834,
+        "mar": -1.153,
+        "max_dd_pct": 901.2,
+        "expectancy": -86.37,
+        "win_rate": 0.333,
+        "profit_factor": 0.111,
+        "total_return": -259.1,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "MSTR": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.453,
+        "sortino": -2.227,
+        "mar": -8.587,
+        "max_dd_pct": 130.76,
+        "expectancy": -93.31,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -279.93,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-10-24": {
+    "BTC-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.935,
+        "sortino": -1.988,
+        "mar": -0.671,
+        "max_dd_pct": 2484.32,
+        "expectancy": -103.83,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -415.32,
+        "n_trades": 4,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -1.944,
+        "sortino": -1.834,
+        "mar": -1.153,
+        "max_dd_pct": 901.2,
+        "expectancy": -86.37,
+        "win_rate": 0.333,
+        "profit_factor": 0.111,
+        "total_return": -259.1,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "MSTR": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.453,
+        "sortino": -2.227,
+        "mar": -8.587,
+        "max_dd_pct": 130.76,
+        "expectancy": -93.31,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -279.93,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-11-23": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2024-12-23": {
+    "BTC-USD": {
+      "score": 83,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 1.045,
+        "sortino": 1.778,
+        "mar": 159.173,
+        "max_dd_pct": 24.05,
+        "expectancy": 318.17,
+        "win_rate": 0.333,
+        "profit_factor": 3.599,
+        "total_return": 954.51,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 8,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": 84,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 0.542,
+        "sortino": 0.538,
+        "mar": 5.843,
+        "max_dd_pct": 59.21,
+        "expectancy": 28.75,
+        "win_rate": 0.667,
+        "profit_factor": 1.689,
+        "total_return": 86.25,
+        "n_trades": 3,
+        "p1": 17,
+        "p2": 25,
+        "p3": 17,
+        "p4": 25
+      }
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.634,
+        "sortino": -2.466,
+        "mar": -0.0,
+        "max_dd_pct": 27104800000000.0,
+        "expectancy": -90.35,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -271.05,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-01-22": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-02-21": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-03-23": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-04-22": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -0.484,
+        "sortino": -0.808,
+        "mar": -14.368,
+        "max_dd_pct": 100.0,
+        "expectancy": -119.41,
+        "win_rate": 0.333,
+        "profit_factor": 0.657,
+        "total_return": -358.23,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-05-22": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": 100,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 3.866,
+        "sortino": 3.591,
+        "mar": 836519032967.033,
+        "max_dd_pct": 0.0,
+        "expectancy": 69.52,
+        "win_rate": 1.0,
+        "profit_factor": 208556800000.0,
+        "total_return": 208.56,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-06-21": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -0.505,
+        "sortino": -0.841,
+        "mar": -9.782,
+        "max_dd_pct": 155.1,
+        "expectancy": -126.09,
+        "win_rate": 0.333,
+        "profit_factor": 0.645,
+        "total_return": -378.27,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": 92,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 0.804,
+        "sortino": 0.795,
+        "mar": 51.288,
+        "max_dd_pct": 46.66,
+        "expectancy": 198.89,
+        "win_rate": 0.667,
+        "profit_factor": 2.143,
+        "total_return": 596.68,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 25,
+        "p3": 17,
+        "p4": 25
+      }
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-07-21": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-08-20": {
+    "BTC-USD": {
+      "score": 100,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 1.627,
+        "sortino": 1.583,
+        "mar": 129.748,
+        "max_dd_pct": 21.49,
+        "expectancy": 231.74,
+        "win_rate": 0.667,
+        "profit_factor": 4.653,
+        "total_return": 695.23,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-09-19": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-10-19": {
+    "BTC-USD": {
+      "score": 8,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -0.352,
+        "sortino": -0.607,
+        "mar": -2.694,
+        "max_dd_pct": 135.56,
+        "expectancy": -30.35,
+        "win_rate": 0.333,
+        "profit_factor": 0.738,
+        "total_return": -91.06,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 8,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.164,
+        "sortino": -3.74,
+        "mar": -15.729,
+        "max_dd_pct": 658.82,
+        "expectancy": -861.19,
+        "win_rate": 0.333,
+        "profit_factor": 0.152,
+        "total_return": -2583.56,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-11-18": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -2.164,
+        "sortino": -3.74,
+        "mar": -15.729,
+        "max_dd_pct": 658.82,
+        "expectancy": -861.19,
+        "win_rate": 0.333,
+        "profit_factor": 0.152,
+        "total_return": -2583.56,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2025-12-18": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2026-01-17": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2026-02-16": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  },
+  "2026-03-18": {
+    "BTC-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "AMZN": {
+      "score": 0,
+      "tier": "F",
+      "keep_ratio": 0.0,
+      "metrics": {
+        "sharpe": -3.967,
+        "sortino": -3.718,
+        "mar": -25.71,
+        "max_dd_pct": 337.14,
+        "expectancy": -720.33,
+        "win_rate": 0.0,
+        "profit_factor": 0.0,
+        "total_return": -2161.0,
+        "n_trades": 3,
+        "p1": 0,
+        "p2": 0,
+        "p3": 0,
+        "p4": 0
+      }
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "ETH-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PAXG-USD": {
+      "score": 100,
+      "tier": "A",
+      "keep_ratio": 1.0,
+      "metrics": {
+        "sharpe": 7.957,
+        "sortino": 7.671,
+        "mar": 5370240587912.088,
+        "max_dd_pct": 0.0,
+        "expectancy": 446.29,
+        "win_rate": 1.0,
+        "profit_factor": 1338881900000.0,
+        "total_return": 1338.88,
+        "n_trades": 3,
+        "p1": 25,
+        "p2": 25,
+        "p3": 25,
+        "p4": 25
+      }
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "COPPER": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT",
+      "keep_ratio": 1.0,
+      "metrics": {}
+    }
+  }
+}

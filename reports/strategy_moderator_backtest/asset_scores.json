@@ -1,0 +1,71 @@
+{
+  "cutoff_date": "2022-05-09",
+  "warm_up_months": 3,
+  "min_trades_to_score": 3,
+  "asset_scores": {
+    "AMZN": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "BTC-USD": {
+      "score": 90,
+      "tier": "A"
+    },
+    "COIN": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "COPPER": {
+      "score": 10,
+      "tier": "F"
+    },
+    "CRCL": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "ETH-USD": {
+      "score": 100,
+      "tier": "A"
+    },
+    "GLD": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "HOOD": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "INTC": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "MSTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "PAXG-USD": {
+      "score": 20,
+      "tier": "F"
+    },
+    "PLTR": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "PPLT": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "SLV": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "SOL-USD": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    },
+    "TSLA": {
+      "score": -1,
+      "tier": "INSUFFICIENT"
+    }
+  }
+}
