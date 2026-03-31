@@ -1,0 +1,24 @@
+{
+  "Baseline production": {
+    "total_return_pct": 3672.82,
+    "cagr_pct": 144.69,
+    "max_realized_drawdown_pct": 30.36,
+    "profit_factor": 2.21,
+    "win_rate_pct": 40.6,
+    "executed_trades": 266,
+    "overall_health": "green",
+    "top1_abs_pnl_share": 0.1259,
+    "avg_crypto_performance_mult": 1.0
+  },
+  "Crypto laggard diversified": {
+    "total_return_pct": 3412.56,
+    "cagr_pct": 140.42,
+    "max_realized_drawdown_pct": 31.08,
+    "profit_factor": 2.23,
+    "win_rate_pct": 40.3,
+    "executed_trades": 268,
+    "overall_health": "green",
+    "top1_abs_pnl_share": 0.1247,
+    "avg_crypto_performance_mult": 0.9818
+  }
+}

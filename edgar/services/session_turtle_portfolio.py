@@ -465,12 +465,15 @@ def _performance_leadership_scale(
     floor_mult: float,
     cap_mult: float,
     min_history: int,
+    eligible_tickers: set[str] | None = None,
 ) -> tuple[float, float | None, float | None, int]:
     if lookback_trades <= 0 or min_history <= 0:
         return 1.0, None, None, 0
 
     scores: dict[str, float] = {}
     for asset_ticker, returns in closed_trade_returns_by_ticker.items():
+        if eligible_tickers is not None and asset_ticker not in eligible_tickers:
+            continue
         if len(returns) < min_history:
             continue
         scores[str(asset_ticker)] = _decayed_trade_return_score(
@@ -1177,6 +1180,7 @@ def generate_session_turtle_shared_account_report(
     performance_floor_mult: float = 0.75,
     performance_cap_mult: float = 1.25,
     performance_min_history: int = 3,
+    performance_bucket_scopes: frozenset[str] | None = None,
     use_extended_hours_protective_exits: bool = False,
     extended_hours_core_session_minutes: int = 390,
     use_sentiment_governor: bool = False,
@@ -1289,6 +1293,21 @@ def generate_session_turtle_shared_account_report(
         raise ValueError("performance overlay must bracket neutral sizing at 1.0")
     if performance_min_history <= 0:
         raise ValueError("performance_min_history must be positive")
+    performance_bucket_scopes_normalized: frozenset[str] | None = None
+    if performance_bucket_scopes:
+        performance_bucket_scopes_normalized = frozenset(
+            str(bucket).strip().lower()
+            for bucket in performance_bucket_scopes
+            if str(bucket).strip()
+        )
+        invalid_buckets = performance_bucket_scopes_normalized.difference(
+            {"crypto", "gold", "metals", "equity"}
+        )
+        if invalid_buckets:
+            raise ValueError(
+                "performance_bucket_scopes contains invalid buckets: "
+                + ", ".join(sorted(invalid_buckets))
+            )
     if extended_hours_core_session_minutes <= 0:
         raise ValueError("extended_hours_core_session_minutes must be positive")
     if sentiment_lag_days < 0:
@@ -1397,6 +1416,9 @@ def generate_session_turtle_shared_account_report(
         candidates = list(precomputed_candidates)
 
     candidates.sort(key=lambda row: (row["entry_ts"], row["combo_idx"], row["trade_idx"]))
+    tickers_by_bucket: dict[str, set[str]] = defaultdict(set)
+    for candidate in candidates:
+        tickers_by_bucket[str(candidate["asset_bucket"])].add(str(candidate["ticker"]))
     closed_candidate_results = sorted(candidates, key=lambda row: (row["exit_ts"], row["combo_idx"], row["trade_idx"]))
     capital = float(initial_capital)
     peak_capital = capital
@@ -1632,20 +1654,28 @@ def generate_session_turtle_shared_account_report(
             volatility_persistence_signal_age_min: float | None = None
 
             if use_performance_leadership_overlay:
-                (
-                    performance_risk_mult,
-                    performance_score,
-                    performance_rank_pct,
-                    performance_peer_count,
-                ) = _performance_leadership_scale(
-                    ticker=str(candidate["ticker"]),
-                    closed_trade_returns_by_ticker=closed_trade_returns_by_ticker,
-                    lookback_trades=performance_lookback_trades,
-                    decay=performance_decay,
-                    floor_mult=performance_floor_mult,
-                    cap_mult=performance_cap_mult,
-                    min_history=performance_min_history,
-                )
+                eligible_tickers: set[str] | None = None
+                if performance_bucket_scopes_normalized is not None:
+                    if asset_bucket not in performance_bucket_scopes_normalized:
+                        eligible_tickers = set()
+                    else:
+                        eligible_tickers = tickers_by_bucket.get(asset_bucket, set())
+                if eligible_tickers != set():
+                    (
+                        performance_risk_mult,
+                        performance_score,
+                        performance_rank_pct,
+                        performance_peer_count,
+                    ) = _performance_leadership_scale(
+                        ticker=str(candidate["ticker"]),
+                        closed_trade_returns_by_ticker=closed_trade_returns_by_ticker,
+                        lookback_trades=performance_lookback_trades,
+                        decay=performance_decay,
+                        floor_mult=performance_floor_mult,
+                        cap_mult=performance_cap_mult,
+                        min_history=performance_min_history,
+                        eligible_tickers=eligible_tickers,
+                    )
 
             bucket_scores = None
             if use_direct_bucket_sentiment_sizing and bucket_sentiment_scores:
@@ -2025,6 +2055,8 @@ def generate_session_turtle_shared_account_report(
         label += " With Extended Hours Protective Exits"
     if use_performance_leadership_overlay:
         label += " With Leadership Overlay"
+        if performance_bucket_scopes_normalized:
+            label += f" ({', '.join(sorted(performance_bucket_scopes_normalized))} scoped)"
     if use_sentiment_governor:
         label += " With Sentiment Governor"
     if use_direct_bucket_sentiment_sizing:
@@ -2198,6 +2230,11 @@ def generate_session_turtle_shared_account_report(
         "performance_floor_mult": performance_floor_mult,
         "performance_cap_mult": performance_cap_mult,
         "performance_min_history": performance_min_history,
+        "performance_bucket_scopes": (
+            sorted(performance_bucket_scopes_normalized)
+            if performance_bucket_scopes_normalized
+            else None
+        ),
         "avg_performance_risk_mult": (
             round(sum(performance_mults) / len(performance_mults), 4) if performance_mults else 1.0
         ),

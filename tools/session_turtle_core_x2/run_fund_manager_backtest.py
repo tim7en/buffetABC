@@ -306,10 +306,10 @@ def _score_asset(
     avg_pnl      = total_return / n
     wr           = len(wins) / n
     gross_win    = sum(wins)           if wins   else 0.0
-    gross_loss   = abs(sum(losses))    if losses else 1e-9
-    pf           = gross_win / gross_loss
+    gross_loss   = abs(sum(losses))    if losses else 0.0
+    pf           = (gross_win / gross_loss) if gross_loss > 1e-9 else (999.0 if gross_win > 0 else 0.0)
     avg_win      = gross_win / len(wins)  if wins   else 0.0
-    avg_loss     = gross_loss / len(losses) if losses else 0.0
+    avg_loss     = gross_loss / len(losses) if losses and gross_loss > 1e-9 else 0.0
     expectancy   = wr * avg_win - (1 - wr) * avg_loss
 
     # ── Sharpe approx ──────────────────────────────────────────────────────────

@@ -529,6 +529,93 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertTrue(summary["use_performance_leadership_overlay"])
         self.assertEqual(summary["entries_performance_upscaled"], 1)
         self.assertEqual(summary["entries_performance_downscaled"], 1)
+        self.assertIsNone(summary["performance_bucket_scopes"])
+
+    @patch("edgar.services.session_turtle_portfolio._resolve_universe")
+    @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")
+    def test_session_turtle_portfolio_supports_bucket_scoped_performance_leadership_overlay(
+        self,
+        mock_backtest,
+        mock_resolve_universe,
+    ):
+        mock_resolve_universe.return_value = (
+            ("BTC-USD", "binance", "new_york_equity_open"),
+            ("ETH-USD", "binance", "new_york_equity_open"),
+            ("AMZN", "tiingo", "new_york_equity_open"),
+        )
+
+        def _trade(entry_date: str, exit_date: str, pnl: float) -> dict:
+            return {
+                "direction": "long",
+                "entry_date": entry_date,
+                "exit_date": exit_date,
+                "entry_price": 100.0,
+                "exit_price": 100.0 + pnl,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": pnl,
+                "risk_model": "directional_volume_boost",
+                "entry_rel_volume": 1.5,
+            }
+
+        payloads = {
+            "BTC-USD": {
+                "trades": [
+                    _trade("2024-01-01T10:00:00", "2024-01-02T10:00:00", 20.0),
+                    _trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 20.0),
+                    _trade("2024-01-05T10:00:00", "2024-01-06T10:00:00", 10.0),
+                ]
+            },
+            "ETH-USD": {
+                "trades": [
+                    _trade("2024-01-01T10:00:00", "2024-01-02T10:00:00", -20.0),
+                    _trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", -20.0),
+                    _trade("2024-01-05T10:00:00", "2024-01-06T10:00:00", 10.0),
+                ]
+            },
+            "AMZN": {
+                "trades": [
+                    _trade("2024-01-01T10:00:00", "2024-01-02T10:00:00", 15.0),
+                    _trade("2024-01-03T10:00:00", "2024-01-04T10:00:00", 15.0),
+                    _trade("2024-01-05T10:00:00", "2024-01-06T10:00:00", 15.0),
+                ]
+            },
+        }
+        mock_backtest.side_effect = lambda ticker, **kwargs: payloads[ticker]
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=2.0,
+            base_portfolio_cap_pct=0.9,
+            use_performance_leadership_overlay=True,
+            performance_lookback_trades=2,
+            performance_decay=1.0,
+            performance_floor_mult=0.5,
+            performance_cap_mult=1.5,
+            performance_min_history=2,
+            performance_bucket_scopes=frozenset({"crypto"}),
+        )
+
+        trades = report["trades"]
+        btc_last = next(
+            trade for trade in trades if trade["ticker"] == "BTC-USD" and trade["entry_ts"] == "2024-01-05T10:00:00"
+        )
+        eth_last = next(
+            trade for trade in trades if trade["ticker"] == "ETH-USD" and trade["entry_ts"] == "2024-01-05T10:00:00"
+        )
+        amzn_last = next(
+            trade for trade in trades if trade["ticker"] == "AMZN" and trade["entry_ts"] == "2024-01-05T10:00:00"
+        )
+
+        self.assertEqual(btc_last["performance_risk_mult"], 1.5)
+        self.assertEqual(eth_last["performance_risk_mult"], 0.5)
+        self.assertEqual(amzn_last["performance_risk_mult"], 1.0)
+        self.assertEqual(amzn_last["performance_rank_pct"], None)
+        self.assertEqual(amzn_last["performance_peer_count"], 0)
+
+        summary = report["summary"]
+        self.assertEqual(summary["performance_bucket_scopes"], ["crypto"])
 
     @patch("edgar.services.session_turtle_portfolio._resolve_universe")
     @patch("edgar.services.session_turtle_portfolio.run_session_turtle_trend_backtest")

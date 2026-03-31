@@ -1,0 +1,38 @@
+{
+  "Base alt expanded": {
+    "candidate_trades": 891,
+    "executed_trades": 334,
+    "total_return_pct": 2014.11,
+    "cagr_pct": 110.54,
+    "max_realized_drawdown_pct": 35.52,
+    "profit_factor": 1.75,
+    "win_rate_pct": 35.03,
+    "final_equity": 21141.0511,
+    "crypto_trades": 146,
+    "crypto_pnl": -2684.6839
+  },
+  "All asset rotation": {
+    "candidate_trades": 891,
+    "executed_trades": 324,
+    "total_return_pct": 2423.42,
+    "cagr_pct": 119.84,
+    "max_realized_drawdown_pct": 34.99,
+    "profit_factor": 2.03,
+    "win_rate_pct": 35.49,
+    "final_equity": 25234.1965,
+    "crypto_trades": 141,
+    "crypto_pnl": -199.3124
+  },
+  "Rotation focused (leadership + moderator)": {
+    "candidate_trades": 695,
+    "executed_trades": 281,
+    "total_return_pct": 301.5,
+    "cagr_pct": 40.38,
+    "max_realized_drawdown_pct": 50.67,
+    "profit_factor": 1.41,
+    "win_rate_pct": 32.38,
+    "final_equity": 4014.9566,
+    "crypto_trades": 135,
+    "crypto_pnl": -231.8595
+  }
+}
