@@ -1,17 +1,23 @@
 {
   "Base alt expanded": {
-    "candidate_trades": 891,
-    "executed_trades": 334,
-    "total_return_pct": 2014.11,
-    "cagr_pct": 110.54,
-    "max_realized_drawdown_pct": 35.52,
-    "profit_factor": 1.75,
-    "win_rate_pct": 35.03,
-    "final_equity": 21141.0511,
-    "crypto_trades": 146,
-    "crypto_pnl": -2684.6839,
-    "long_trades": 189,
-    "short_trades": 145,
+    "directional_breakdown": {
+      "long": {
+        "trades": 189,
+        "pnl": 18263.9801,
+        "avg_pnl": 96.6348,
+        "win_rate_pct": 42.33,
+        "profit_factor": 2.109,
+        "share_of_total_pnl_pct": 90.68
+      },
+      "short": {
+        "trades": 145,
+        "pnl": 1877.0704,
+        "avg_pnl": 12.9453,
+        "win_rate_pct": 25.52,
+        "profit_factor": 1.179,
+        "share_of_total_pnl_pct": 9.32
+      }
+    },
     "yearly_returns": [
       {
         "year": 2022,
@@ -69,6 +75,19 @@
         "win_rate_pct": 59.09
       }
     ],
+    "yearly_health": {
+      "negative_year_count": 0,
+      "worst_year": {
+        "year": 2026,
+        "return_pct": 27.98,
+        "pnl": 4621.9587
+      },
+      "best_year": {
+        "year": 2024,
+        "return_pct": 155.75,
+        "pnl": 4442.392
+      }
+    },
     "underwater": {
       "time_underwater_pct": 84.64,
       "avg_underwater_days": 63.4,
@@ -79,18 +98,24 @@
     }
   },
   "All asset rotation": {
-    "candidate_trades": 891,
-    "executed_trades": 324,
-    "total_return_pct": 2423.42,
-    "cagr_pct": 119.84,
-    "max_realized_drawdown_pct": 34.99,
-    "profit_factor": 2.03,
-    "win_rate_pct": 35.49,
-    "final_equity": 25234.1965,
-    "crypto_trades": 141,
-    "crypto_pnl": -199.3124,
-    "long_trades": 185,
-    "short_trades": 139,
+    "directional_breakdown": {
+      "long": {
+        "trades": 185,
+        "pnl": 17041.7784,
+        "avg_pnl": 92.1177,
+        "win_rate_pct": 41.08,
+        "profit_factor": 2.065,
+        "share_of_total_pnl_pct": 70.32
+      },
+      "short": {
+        "trades": 139,
+        "pnl": 7192.4174,
+        "avg_pnl": 51.744,
+        "win_rate_pct": 28.06,
+        "profit_factor": 1.958,
+        "share_of_total_pnl_pct": 29.68
+      }
+    },
     "yearly_returns": [
       {
         "year": 2022,
@@ -148,6 +173,19 @@
         "win_rate_pct": 57.14
       }
     ],
+    "yearly_health": {
+      "negative_year_count": 0,
+      "worst_year": {
+        "year": 2026,
+        "return_pct": 33.95,
+        "pnl": 6395.6818
+      },
+      "best_year": {
+        "year": 2025,
+        "return_pct": 234.5,
+        "pnl": 13206.7546
+      }
+    },
     "underwater": {
       "time_underwater_pct": 82.5,
       "avg_underwater_days": 58.8,
@@ -158,18 +196,24 @@
     }
   },
   "Light bucket-aware moderator": {
-    "candidate_trades": 639,
-    "executed_trades": 284,
-    "total_return_pct": 1321.02,
-    "cagr_pct": 91.09,
-    "max_realized_drawdown_pct": 46.75,
-    "profit_factor": 2.28,
-    "win_rate_pct": 36.27,
-    "final_equity": 14210.2435,
-    "crypto_trades": 123,
-    "crypto_pnl": 1267.7272,
-    "long_trades": 162,
-    "short_trades": 122,
+    "directional_breakdown": {
+      "long": {
+        "trades": 162,
+        "pnl": 10336.2842,
+        "avg_pnl": 63.8042,
+        "win_rate_pct": 41.98,
+        "profit_factor": 2.603,
+        "share_of_total_pnl_pct": 78.24
+      },
+      "short": {
+        "trades": 122,
+        "pnl": 2873.9586,
+        "avg_pnl": 23.557,
+        "win_rate_pct": 28.69,
+        "profit_factor": 1.735,
+        "share_of_total_pnl_pct": 21.76
+      }
+    },
     "yearly_returns": [
       {
         "year": 2022,
@@ -227,6 +271,19 @@
         "win_rate_pct": 66.67
       }
     ],
+    "yearly_health": {
+      "negative_year_count": 0,
+      "worst_year": {
+        "year": 2024,
+        "return_pct": 18.55,
+        "pnl": 346.8085
+      },
+      "best_year": {
+        "year": 2025,
+        "return_pct": 339.21,
+        "pnl": 7517.4276
+      }
+    },
     "underwater": {
       "time_underwater_pct": 83.43,
       "avg_underwater_days": 78.1,
@@ -237,18 +294,24 @@
     }
   },
   "Rotation focused (leadership + moderator)": {
-    "candidate_trades": 695,
-    "executed_trades": 281,
-    "total_return_pct": 301.5,
-    "cagr_pct": 40.38,
-    "max_realized_drawdown_pct": 50.67,
-    "profit_factor": 1.41,
-    "win_rate_pct": 32.38,
-    "final_equity": 4014.9566,
-    "crypto_trades": 135,
-    "crypto_pnl": -231.8595,
-    "long_trades": 157,
-    "short_trades": 124,
+    "directional_breakdown": {
+      "long": {
+        "trades": 157,
+        "pnl": 2278.0958,
+        "avg_pnl": 14.5102,
+        "win_rate_pct": 36.94,
+        "profit_factor": 1.487,
+        "share_of_total_pnl_pct": 75.56
+      },
+      "short": {
+        "trades": 124,
+        "pnl": 736.8606,
+        "avg_pnl": 5.9424,
+        "win_rate_pct": 26.61,
+        "profit_factor": 1.276,
+        "share_of_total_pnl_pct": 24.44
+      }
+    },
     "yearly_returns": [
       {
         "year": 2022,
@@ -306,6 +369,19 @@
         "win_rate_pct": 57.14
       }
     ],
+    "yearly_health": {
+      "negative_year_count": 0,
+      "worst_year": {
+        "year": 2024,
+        "return_pct": 11.28,
+        "pnl": 189.6673
+      },
+      "best_year": {
+        "year": 2025,
+        "return_pct": 74.92,
+        "pnl": 1402.2978
+      }
+    },
     "underwater": {
       "time_underwater_pct": 91.25,
       "avg_underwater_days": 85.4,

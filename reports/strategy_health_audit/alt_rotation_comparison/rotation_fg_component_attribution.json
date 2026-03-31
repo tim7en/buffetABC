@@ -1,0 +1,66 @@
+[
+  {
+    "label": "current_fg_full",
+    "total_return_pct": 2423.42,
+    "cagr_pct": 119.84,
+    "max_realized_drawdown_pct": 34.99,
+    "profit_factor": 2.03,
+    "win_rate_pct": 35.49,
+    "executed_trades": 324,
+    "long_trades": 185,
+    "short_trades": 139,
+    "crypto_pnl": -199.3124,
+    "entries_ext_hours_proxy_scaled": 50,
+    "entries_ext_hours_risk_on_micro": 125,
+    "entries_ext_hours_neutral_micro": 152,
+    "entries_ext_hours_risk_off_micro": 47
+  },
+  {
+    "label": "no_fear_halfsize",
+    "total_return_pct": 2315.49,
+    "cagr_pct": 117.5,
+    "max_realized_drawdown_pct": 35.47,
+    "profit_factor": 2.02,
+    "win_rate_pct": 35.91,
+    "executed_trades": 323,
+    "long_trades": 185,
+    "short_trades": 138,
+    "crypto_pnl": -465.4128,
+    "entries_ext_hours_proxy_scaled": 39,
+    "entries_ext_hours_risk_on_micro": 125,
+    "entries_ext_hours_neutral_micro": 151,
+    "entries_ext_hours_risk_off_micro": 47,
+    "delta_vs_current": {
+      "return_pct_points": -107.93,
+      "cagr_pct_points": -2.34,
+      "maxdd_pct_points": 0.48,
+      "pf_points": -0.01,
+      "trades": -1,
+      "crypto_pnl": -266.1
+    }
+  },
+  {
+    "label": "no_greed_short_suppress",
+    "total_return_pct": 1541.02,
+    "cagr_pct": 97.92,
+    "max_realized_drawdown_pct": 35.08,
+    "profit_factor": 1.84,
+    "win_rate_pct": 41.37,
+    "executed_trades": 307,
+    "long_trades": 178,
+    "short_trades": 129,
+    "crypto_pnl": -95.8869,
+    "entries_ext_hours_proxy_scaled": 11,
+    "entries_ext_hours_risk_on_micro": 117,
+    "entries_ext_hours_neutral_micro": 143,
+    "entries_ext_hours_risk_off_micro": 47,
+    "delta_vs_current": {
+      "return_pct_points": -882.4,
+      "cagr_pct_points": -21.92,
+      "maxdd_pct_points": 0.09,
+      "pf_points": -0.19,
+      "trades": -17,
+      "crypto_pnl": 103.43
+    }
+  }
+]

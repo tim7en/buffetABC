@@ -1,0 +1,22 @@
+{
+  "base_crypto_only_ema": {
+    "total_return_pct": 1734.88,
+    "cagr_pct": 103.39,
+    "max_realized_drawdown_pct": 35.52,
+    "profit_factor": 1.66,
+    "win_rate_pct": 34.2,
+    "executed_trades": 348,
+    "entries_above_ema": 51,
+    "entries_below_ema": 83
+  },
+  "rotation_crypto_only_ema": {
+    "total_return_pct": 2393.63,
+    "cagr_pct": 119.2,
+    "max_realized_drawdown_pct": 34.63,
+    "profit_factor": 2.02,
+    "win_rate_pct": 34.63,
+    "executed_trades": 335,
+    "entries_above_ema": 49,
+    "entries_below_ema": 80
+  }
+}
