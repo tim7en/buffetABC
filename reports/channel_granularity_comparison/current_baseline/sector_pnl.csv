@@ -1,0 +1,25 @@
+variant,sector_group,net_pnl
+Session 20/10,Financials,18114.7597
+Session 20/10,Energy,17036.6046
+Session 20/10,Communication Services,10258.2905
+Session 20/10,Metals,9674.9811
+Session 20/10,Crypto,7789.7358
+Session 20/10,Consumer Discretionary,6199.4915
+Session 20/10,Information Technology,1875.3015
+Session 20/10,Gold,1703.2409
+Session 10/5,Financials,36026.3603
+Session 10/5,Metals,25234.5235
+Session 10/5,Information Technology,17718.6328
+Session 10/5,Communication Services,12639.4324
+Session 10/5,Gold,8838.6853
+Session 10/5,Crypto,4074.4685
+Session 10/5,Consumer Discretionary,3269.5652
+Session 10/5,Energy,2093.9023
+Raw 5m 20/10,Information Technology,1025.6964
+Raw 5m 20/10,Financials,1005.4366
+Raw 5m 20/10,Metals,896.2333
+Raw 5m 20/10,Energy,560.3751
+Raw 5m 20/10,Consumer Discretionary,-112.4799
+Raw 5m 20/10,Communication Services,-212.4197
+Raw 5m 20/10,Gold,-1044.8851
+Raw 5m 20/10,Crypto,-1100.2069
