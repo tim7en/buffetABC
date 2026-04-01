@@ -1,0 +1,5 @@
+scenario_name,label,description,shock_start,final_equity,total_return_pct,cagr_pct,max_realized_drawdown_pct,profit_factor,win_rate_pct,executed_trades,post_shock_trades,post_shock_pnl
+baseline,Current baseline replay,Unshocked replay using the current baseline configuration and the current local caches.,2025-10-01,73652.4054,7265.24,182.91,36.97,2.39,40.61,330,49,37742.9078
+slow,Hormuz normalization (slow),"Slow normalization: small initial gap, most of the move arrives as drift.",2025-10-01,67729.1001,6672.91,177.23,36.97,2.27,40.84,333,52,31819.6022
+base,Hormuz normalization (base),Base normalization: moderate repricing followed by persistent cross-asset rotation.,2025-10-01,65558.2435,6455.82,175.05,36.97,2.3,40.91,330,49,29648.7459
+fast,Hormuz normalization (fast),Fast normalization: front-loaded repricing with the bulk of the move hitting quickly.,2025-10-01,59887.1597,5888.72,169.1,36.97,2.03,41.69,331,50,23977.662

@@ -285,8 +285,8 @@ def run_session_turtle_trend_backtest(
         raise ValueError("session_turtle_trend requires interval='5m' or '15m'")
     if not allow_longs and not allow_shorts:
         raise ValueError("session_turtle_trend requires at least one of allow_longs or allow_shorts")
-    if channel_period not in {20, 55}:
-        raise ValueError("channel_period must be 20 or 55")
+    if channel_period not in {10, 20, 55}:
+        raise ValueError("channel_period must be 10, 20, or 55")
     if atr_period < 5:
         raise ValueError("atr_period must be >= 5")
     if entry_window_minutes <= 0:
@@ -334,7 +334,8 @@ def run_session_turtle_trend_backtest(
         if use_extended_hours_protective_exits_only
         else int(entry_window_minutes)
     )
-    exit_channel = exit_channel_period if exit_channel_period is not None else (10 if channel_period == 20 else 20)
+    default_exit_channels = {10: 5, 20: 10, 55: 20}
+    exit_channel = exit_channel_period if exit_channel_period is not None else default_exit_channels[channel_period]
     preload_warmup_days = max(channel_period + exit_channel + atr_period + 20, 75)
     if use_4h_trend_filter:
         preload_warmup_days = max(preload_warmup_days, trend_slow_period + 40)
@@ -914,7 +915,11 @@ def run_session_turtle_trend_backtest(
             active_stop_loss=round(stop_loss, 4),
             fees_paid=round(entry_fee, 4),
             sizing_tier=sizing_tier,
-            signal_quality="A" if channel_period == 55 else "B",
+            signal_quality=(
+                "A" if channel_period == 55 else
+                "B" if channel_period == 20 else
+                "C"
+            ),
             stop_source=stop_source,
             entry_rel_volume=round(rel_volume, 4),
             rel_volume_ratio=round(rel_volume_ratio, 4),
