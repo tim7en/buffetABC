@@ -1061,5 +1061,299 @@
         "positive_edge_vs_sector_rate_pct": 55.22
       }
     ]
+  },
+  "tail_risk": {
+    "by_sector": [
+      {
+        "sector_group": "Communication Services",
+        "trades": 41,
+        "net_pnl": 10258.2905,
+        "avg_trade_pnl": 250.2022,
+        "trade_cvar95_pnl": -859.4187,
+        "trade_cvar95_return_pct": -8.1824,
+        "worst_trade_pnl": -1681.7719,
+        "months_active": 33,
+        "avg_monthly_pnl": 310.8573,
+        "monthly_cvar95_pnl": -1136.7906,
+        "worst_month_pnl": -1681.7719,
+        "recent_6m_pnl": 5866.7264,
+        "recent_6m_share_of_sector_pnl_pct": 57.19,
+        "recent_6m_share_of_portfolio_pnl_pct": 15.54
+      },
+      {
+        "sector_group": "Consumer Discretionary",
+        "trades": 27,
+        "net_pnl": 6199.4915,
+        "avg_trade_pnl": 229.6108,
+        "trade_cvar95_pnl": -1338.9851,
+        "trade_cvar95_return_pct": -10.043,
+        "worst_trade_pnl": -1692.0612,
+        "months_active": 21,
+        "avg_monthly_pnl": 295.2139,
+        "monthly_cvar95_pnl": -1521.4925,
+        "worst_month_pnl": -1692.0612,
+        "recent_6m_pnl": 4190.4186,
+        "recent_6m_share_of_sector_pnl_pct": 67.59,
+        "recent_6m_share_of_portfolio_pnl_pct": 11.1
+      },
+      {
+        "sector_group": "Crypto",
+        "trades": 68,
+        "net_pnl": 7789.7358,
+        "avg_trade_pnl": 114.5549,
+        "trade_cvar95_pnl": -1884.9394,
+        "trade_cvar95_return_pct": -10.0431,
+        "worst_trade_pnl": -2773.4027,
+        "months_active": 36,
+        "avg_monthly_pnl": 216.3816,
+        "monthly_cvar95_pnl": -2783.6822,
+        "worst_month_pnl": -2914.2606,
+        "recent_6m_pnl": 1740.3699,
+        "recent_6m_share_of_sector_pnl_pct": 22.34,
+        "recent_6m_share_of_portfolio_pnl_pct": 4.61
+      },
+      {
+        "sector_group": "Energy",
+        "trades": 40,
+        "net_pnl": 17036.6046,
+        "avg_trade_pnl": 425.9151,
+        "trade_cvar95_pnl": -1016.5126,
+        "trade_cvar95_return_pct": -10.0433,
+        "worst_trade_pnl": -1829.9203,
+        "months_active": 28,
+        "avg_monthly_pnl": 608.4502,
+        "monthly_cvar95_pnl": -1547.1981,
+        "worst_month_pnl": -2428.375,
+        "recent_6m_pnl": 17485.5821,
+        "recent_6m_share_of_sector_pnl_pct": 102.64,
+        "recent_6m_share_of_portfolio_pnl_pct": 46.33
+      },
+      {
+        "sector_group": "Financials",
+        "trades": 25,
+        "net_pnl": 18114.7597,
+        "avg_trade_pnl": 724.5904,
+        "trade_cvar95_pnl": -2031.4778,
+        "trade_cvar95_return_pct": -10.037,
+        "worst_trade_pnl": -2200.056,
+        "months_active": 18,
+        "avg_monthly_pnl": 1006.3755,
+        "monthly_cvar95_pnl": -1071.8283,
+        "worst_month_pnl": -1071.8283,
+        "recent_6m_pnl": 6652.003,
+        "recent_6m_share_of_sector_pnl_pct": 36.72,
+        "recent_6m_share_of_portfolio_pnl_pct": 17.62
+      },
+      {
+        "sector_group": "Gold",
+        "trades": 35,
+        "net_pnl": 1703.2409,
+        "avg_trade_pnl": 48.664,
+        "trade_cvar95_pnl": -299.2948,
+        "trade_cvar95_return_pct": -4.3618,
+        "worst_trade_pnl": -318.6284,
+        "months_active": 25,
+        "avg_monthly_pnl": 68.1296,
+        "monthly_cvar95_pnl": -215.2278,
+        "worst_month_pnl": -318.6284,
+        "recent_6m_pnl": 1258.8592,
+        "recent_6m_share_of_sector_pnl_pct": 73.91,
+        "recent_6m_share_of_portfolio_pnl_pct": 3.34
+      },
+      {
+        "sector_group": "Information Technology",
+        "trades": 59,
+        "net_pnl": 1875.3015,
+        "avg_trade_pnl": 31.7848,
+        "trade_cvar95_pnl": -2366.31,
+        "trade_cvar95_return_pct": -10.0431,
+        "worst_trade_pnl": -2831.4115,
+        "months_active": 36,
+        "avg_monthly_pnl": 52.0917,
+        "monthly_cvar95_pnl": -2606.4074,
+        "worst_month_pnl": -2637.636,
+        "recent_6m_pnl": -4225.2264,
+        "recent_6m_share_of_sector_pnl_pct": -225.31,
+        "recent_6m_share_of_portfolio_pnl_pct": -11.19
+      },
+      {
+        "sector_group": "Metals",
+        "trades": 35,
+        "net_pnl": 9674.9811,
+        "avg_trade_pnl": 276.428,
+        "trade_cvar95_pnl": -654.8716,
+        "trade_cvar95_return_pct": -6.4702,
+        "worst_trade_pnl": -1009.1535,
+        "months_active": 26,
+        "avg_monthly_pnl": 372.1147,
+        "monthly_cvar95_pnl": -654.8716,
+        "worst_month_pnl": -1009.1535,
+        "recent_6m_pnl": 4774.175,
+        "recent_6m_share_of_sector_pnl_pct": 49.35,
+        "recent_6m_share_of_portfolio_pnl_pct": 12.65
+      }
+    ],
+    "by_sector_direction": [
+      {
+        "sector_group": "Communication Services",
+        "direction": "long",
+        "trades": 19,
+        "net_pnl": 6258.864,
+        "avg_trade_pnl": 329.4139,
+        "trade_cvar95_pnl": -1681.7719,
+        "trade_cvar95_return_pct": -6.307,
+        "worst_trade_pnl": -1681.7719
+      },
+      {
+        "sector_group": "Communication Services",
+        "direction": "short",
+        "trades": 22,
+        "net_pnl": 3999.4265,
+        "avg_trade_pnl": 181.7921,
+        "trade_cvar95_pnl": -448.2421,
+        "trade_cvar95_return_pct": -8.3462,
+        "worst_trade_pnl": -591.8093
+      },
+      {
+        "sector_group": "Consumer Discretionary",
+        "direction": "long",
+        "trades": 21,
+        "net_pnl": 8565.0117,
+        "avg_trade_pnl": 407.8577,
+        "trade_cvar95_pnl": -675.462,
+        "trade_cvar95_return_pct": -9.0593,
+        "worst_trade_pnl": -985.9091
+      },
+      {
+        "sector_group": "Consumer Discretionary",
+        "direction": "short",
+        "trades": 6,
+        "net_pnl": -2365.5202,
+        "avg_trade_pnl": -394.2534,
+        "trade_cvar95_pnl": -1692.0612,
+        "trade_cvar95_return_pct": -10.043,
+        "worst_trade_pnl": -1692.0612
+      },
+      {
+        "sector_group": "Crypto",
+        "direction": "long",
+        "trades": 37,
+        "net_pnl": 3313.2653,
+        "avg_trade_pnl": 89.5477,
+        "trade_cvar95_pnl": -2585.4758,
+        "trade_cvar95_return_pct": -10.037,
+        "worst_trade_pnl": -2773.4027
+      },
+      {
+        "sector_group": "Crypto",
+        "direction": "short",
+        "trades": 31,
+        "net_pnl": 4476.4705,
+        "avg_trade_pnl": 144.4023,
+        "trade_cvar95_pnl": -1184.403,
+        "trade_cvar95_return_pct": -10.0432,
+        "worst_trade_pnl": -1496.1418
+      },
+      {
+        "sector_group": "Energy",
+        "direction": "long",
+        "trades": 16,
+        "net_pnl": 21324.0695,
+        "avg_trade_pnl": 1332.7543,
+        "trade_cvar95_pnl": -396.5308,
+        "trade_cvar95_return_pct": -10.0368,
+        "worst_trade_pnl": -396.5308
+      },
+      {
+        "sector_group": "Energy",
+        "direction": "short",
+        "trades": 24,
+        "net_pnl": -4287.4649,
+        "avg_trade_pnl": -178.6444,
+        "trade_cvar95_pnl": -1247.9707,
+        "trade_cvar95_return_pct": -10.0433,
+        "worst_trade_pnl": -1829.9203
+      },
+      {
+        "sector_group": "Financials",
+        "direction": "long",
+        "trades": 16,
+        "net_pnl": 7938.9211,
+        "avg_trade_pnl": 496.1826,
+        "trade_cvar95_pnl": -2200.056,
+        "trade_cvar95_return_pct": -10.037,
+        "worst_trade_pnl": -2200.056
+      },
+      {
+        "sector_group": "Financials",
+        "direction": "short",
+        "trades": 9,
+        "net_pnl": 10175.8386,
+        "avg_trade_pnl": 1130.6487,
+        "trade_cvar95_pnl": -623.0235,
+        "trade_cvar95_return_pct": -6.1511,
+        "worst_trade_pnl": -623.0235
+      },
+      {
+        "sector_group": "Gold",
+        "direction": "long",
+        "trades": 26,
+        "net_pnl": 1702.4002,
+        "avg_trade_pnl": 65.4769,
+        "trade_cvar95_pnl": -299.2948,
+        "trade_cvar95_return_pct": -4.1438,
+        "worst_trade_pnl": -318.6284
+      },
+      {
+        "sector_group": "Gold",
+        "direction": "short",
+        "trades": 9,
+        "net_pnl": 0.8407,
+        "avg_trade_pnl": 0.0934,
+        "trade_cvar95_pnl": -16.0207,
+        "trade_cvar95_return_pct": -3.7428,
+        "worst_trade_pnl": -16.0207
+      },
+      {
+        "sector_group": "Information Technology",
+        "direction": "long",
+        "trades": 36,
+        "net_pnl": 1500.7416,
+        "avg_trade_pnl": 41.6873,
+        "trade_cvar95_pnl": -2405.5252,
+        "trade_cvar95_return_pct": -10.0371,
+        "worst_trade_pnl": -2831.4115
+      },
+      {
+        "sector_group": "Information Technology",
+        "direction": "short",
+        "trades": 23,
+        "net_pnl": 374.5599,
+        "avg_trade_pnl": 16.2852,
+        "trade_cvar95_pnl": -1533.7485,
+        "trade_cvar95_return_pct": -10.0434,
+        "worst_trade_pnl": -2287.8795
+      },
+      {
+        "sector_group": "Metals",
+        "direction": "long",
+        "trades": 22,
+        "net_pnl": 9949.4724,
+        "avg_trade_pnl": 452.2487,
+        "trade_cvar95_pnl": -654.8716,
+        "trade_cvar95_return_pct": -6.4702,
+        "worst_trade_pnl": -1009.1535
+      },
+      {
+        "sector_group": "Metals",
+        "direction": "short",
+        "trades": 13,
+        "net_pnl": -274.4913,
+        "avg_trade_pnl": -21.1147,
+        "trade_cvar95_pnl": -224.8149,
+        "trade_cvar95_return_pct": -4.0604,
+        "worst_trade_pnl": -224.8149
+      }
+    ]
   }
 }

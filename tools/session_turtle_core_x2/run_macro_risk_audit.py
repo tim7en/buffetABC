@@ -476,6 +476,94 @@ def _build_monthly_pnl_rows(trades: list[dict]) -> list[dict]:
     return rows
 
 
+def _cvar(values: list[float], *, confidence: float = 0.95) -> float | None:
+    ordered = sorted(float(value) for value in values)
+    if not ordered:
+        return None
+    tail_count = max(1, math.ceil(len(ordered) * (1.0 - confidence)))
+    tail = ordered[:tail_count]
+    return sum(tail) / len(tail)
+
+
+def _trade_return_pct(trade: dict) -> float | None:
+    notional = float(trade.get("notional", 0.0) or 0.0)
+    if notional <= 1e-12:
+        return None
+    return float(trade.get("net_pnl", 0.0) or 0.0) / notional * 100.0
+
+
+def _build_sector_tail_risk_rows(trades: list[dict]) -> tuple[list[dict], list[dict]]:
+    ordered = sorted(trades, key=lambda trade: _dt(trade["exit_ts"]))
+    all_months = sorted({_dt(trade["exit_ts"]).strftime("%Y-%m") for trade in ordered})
+    recent_months = set(all_months[-6:])
+
+    sector_monthly: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    by_sector: dict[str, list[dict]] = defaultdict(list)
+    by_sector_direction: dict[tuple[str, str], list[dict]] = defaultdict(list)
+
+    portfolio_recent_total = 0.0
+    for trade in ordered:
+        sector = _sector_group(str(trade["ticker"]))[0]
+        month = _dt(trade["exit_ts"]).strftime("%Y-%m")
+        net_pnl = float(trade.get("net_pnl", 0.0) or 0.0)
+        enriched = dict(trade)
+        enriched["sector_group"] = sector
+        enriched["exit_month"] = month
+        by_sector[sector].append(enriched)
+        by_sector_direction[(sector, str(trade["direction"]))].append(enriched)
+        sector_monthly[sector][month] += net_pnl
+        if month in recent_months:
+            portfolio_recent_total += net_pnl
+
+    sector_rows: list[dict] = []
+    for sector, rows in sorted(by_sector.items()):
+        trade_pnls = [float(row.get("net_pnl", 0.0) or 0.0) for row in rows]
+        trade_returns = [value for value in (_trade_return_pct(row) for row in rows) if value is not None]
+        monthly_pnls = list(sector_monthly[sector].values())
+        recent_pnl = sum(
+            pnl for month, pnl in sector_monthly[sector].items()
+            if month in recent_months
+        )
+        total_pnl = sum(trade_pnls)
+        sector_rows.append(
+            {
+                "sector_group": sector,
+                "trades": len(rows),
+                "net_pnl": round(total_pnl, 4),
+                "avg_trade_pnl": round(total_pnl / len(rows), 4),
+                "trade_cvar95_pnl": round(_cvar(trade_pnls) or 0.0, 4),
+                "trade_cvar95_return_pct": round(_cvar(trade_returns) or 0.0, 4),
+                "worst_trade_pnl": round(min(trade_pnls), 4),
+                "months_active": len(monthly_pnls),
+                "avg_monthly_pnl": round(sum(monthly_pnls) / len(monthly_pnls), 4),
+                "monthly_cvar95_pnl": round(_cvar(monthly_pnls) or 0.0, 4),
+                "worst_month_pnl": round(min(monthly_pnls), 4),
+                "recent_6m_pnl": round(recent_pnl, 4),
+                "recent_6m_share_of_sector_pnl_pct": round(recent_pnl / total_pnl * 100.0, 2) if abs(total_pnl) > 1e-12 else None,
+                "recent_6m_share_of_portfolio_pnl_pct": round(recent_pnl / portfolio_recent_total * 100.0, 2) if abs(portfolio_recent_total) > 1e-12 else None,
+            }
+        )
+
+    direction_rows: list[dict] = []
+    for (sector, direction), rows in sorted(by_sector_direction.items()):
+        trade_pnls = [float(row.get("net_pnl", 0.0) or 0.0) for row in rows]
+        trade_returns = [value for value in (_trade_return_pct(row) for row in rows) if value is not None]
+        direction_rows.append(
+            {
+                "sector_group": sector,
+                "direction": direction,
+                "trades": len(rows),
+                "net_pnl": round(sum(trade_pnls), 4),
+                "avg_trade_pnl": round(sum(trade_pnls) / len(rows), 4),
+                "trade_cvar95_pnl": round(_cvar(trade_pnls) or 0.0, 4),
+                "trade_cvar95_return_pct": round(_cvar(trade_returns) or 0.0, 4),
+                "worst_trade_pnl": round(min(trade_pnls), 4),
+            }
+        )
+
+    return sector_rows, direction_rows
+
+
 def _build_sector_cumulative_rows(trades: list[dict]) -> list[dict]:
     cumulative: dict[str, float] = defaultdict(float)
     rows = []
@@ -918,6 +1006,28 @@ def _plot_expansion_sensitivity(
     _savefig(fig, CHART_DIR / "06_expansion_sensitivity.png")
 
 
+def _plot_sector_tail_risk(sector_tail_rows: list[dict]) -> None:
+    if not sector_tail_rows:
+        return
+    ordered = sorted(sector_tail_rows, key=lambda row: float(row["net_pnl"]), reverse=True)
+    labels = [str(row["sector_group"]) for row in ordered]
+    y = list(range(len(labels)))
+    net_pnl = [float(row["net_pnl"]) for row in ordered]
+    monthly_cvar = [float(row["monthly_cvar95_pnl"]) for row in ordered]
+
+    fig, ax = plt.subplots(figsize=(12, max(5, len(labels) * 0.8)))
+    ax.barh([value + 0.18 for value in y], net_pnl, height=0.35, color=CYAN, label="Net PnL")
+    ax.barh([value - 0.18 for value in y], monthly_cvar, height=0.35, color=RED, label="Monthly CVaR95")
+    ax.axvline(0.0, color=BORDER, linewidth=1.0)
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels)
+    ax.set_title("Sector Net PnL vs Monthly Tail Loss")
+    ax.set_xlabel("PnL ($)")
+    ax.grid(True, axis="x", alpha=0.3)
+    ax.legend(loc="lower right")
+    _savefig(fig, CHART_DIR / "07_sector_tail_risk.png")
+
+
 def _latest_macro_snapshot(
     *,
     macro_series: dict[str, dict[date, float]],
@@ -1080,6 +1190,7 @@ def main() -> None:
 
     monthly_pnl_rows = _build_monthly_pnl_rows(trades)
     sector_cumulative_rows = _build_sector_cumulative_rows(trades)
+    sector_tail_rows, sector_direction_rows = _build_sector_tail_risk_rows(trades)
     expansion_daily_summary, expansion_trade_summary, expansion_meta = _build_expansion_sensitivity(
         analysis_days=analysis_days,
         market_return_state=market_return_state,
@@ -1132,6 +1243,10 @@ def main() -> None:
             "daily_buckets": expansion_daily_summary,
             "trade_entry_buckets": expansion_trade_summary,
         },
+        "tail_risk": {
+            "by_sector": sector_tail_rows,
+            "by_sector_direction": sector_direction_rows,
+        },
     }
 
     global CHART_DIR
@@ -1141,6 +1256,8 @@ def main() -> None:
     _write_csv(output_dir / "daily_risk_model.csv", risk_rows)
     _write_csv(output_dir / "monthly_pnl.csv", monthly_pnl_rows)
     _write_csv(output_dir / "sector_cumulative_pnl.csv", sector_cumulative_rows)
+    _write_csv(output_dir / "sector_tail_risk.csv", sector_tail_rows)
+    _write_csv(output_dir / "sector_direction_tail_risk.csv", sector_direction_rows)
     _write_csv(output_dir / "trade_edge.csv", trade_edge_rows)
     _write_csv(output_dir / "trade_edge_cumulative.csv", trade_edge_cumulative_rows)
     _write_csv(output_dir / "trade_edge_by_sector.csv", edge_by_sector)
@@ -1161,6 +1278,7 @@ def main() -> None:
         risk_rows=risk_rows,
     )
     _plot_expansion_sensitivity(expansion_daily_summary, expansion_trade_summary)
+    _plot_sector_tail_risk(sector_tail_rows)
 
     _print_console_summary(summary_payload, output_dir=output_dir)
 
