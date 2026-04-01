@@ -1,0 +1,37 @@
+left_ticker,right_ticker,left_sector,right_sector,left_bucket,right_bucket,same_sector,same_bucket,corr,abs_corr,obs
+Communication Services,Consumer Discretionary,Communication Services,Consumer Discretionary,Communication Services,Consumer Discretionary,False,False,0.5916,0.5916,817
+Communication Services,Crypto,Communication Services,Crypto,Communication Services,Crypto,False,False,0.2233,0.2233,1053
+Communication Services,Energy,Communication Services,Energy,Communication Services,Energy,False,False,0.0122,0.0122,1075
+Communication Services,Financials,Communication Services,Financials,Communication Services,Financials,False,False,0.4015,0.4015,818
+Communication Services,Gold,Communication Services,Gold,Communication Services,Gold,False,False,0.0417,0.0417,1055
+Communication Services,Information Technology,Communication Services,Information Technology,Communication Services,Information Technology,False,False,0.4549,0.4549,1075
+Communication Services,Market,Communication Services,Market,Communication Services,Market,False,False,0.5309,0.5309,1075
+Communication Services,Metals,Communication Services,Metals,Communication Services,Metals,False,False,0.1185,0.1185,1063
+Consumer Discretionary,Crypto,Consumer Discretionary,Crypto,Consumer Discretionary,Crypto,False,False,0.3299,0.3299,816
+Consumer Discretionary,Energy,Consumer Discretionary,Energy,Consumer Discretionary,Energy,False,False,0.0317,0.0317,817
+Consumer Discretionary,Financials,Consumer Discretionary,Financials,Consumer Discretionary,Financials,False,False,0.5163,0.5163,818
+Consumer Discretionary,Gold,Consumer Discretionary,Gold,Consumer Discretionary,Gold,False,False,0.0007,0.0007,818
+Consumer Discretionary,Information Technology,Consumer Discretionary,Information Technology,Consumer Discretionary,Information Technology,False,False,0.5549,0.5549,818
+Consumer Discretionary,Market,Consumer Discretionary,Market,Consumer Discretionary,Market,False,False,0.6363,0.6363,818
+Consumer Discretionary,Metals,Consumer Discretionary,Metals,Consumer Discretionary,Metals,False,False,0.1501,0.1501,818
+Crypto,Energy,Crypto,Energy,Crypto,Energy,False,False,0.0325,0.0325,1053
+Crypto,Financials,Crypto,Financials,Crypto,Financials,False,False,0.5421,0.5421,817
+Crypto,Gold,Crypto,Gold,Crypto,Gold,False,False,0.0915,0.0915,1477
+Crypto,Information Technology,Crypto,Information Technology,Crypto,Information Technology,False,False,0.5076,0.5076,1054
+Crypto,Market,Crypto,Market,Crypto,Market,False,False,0.7945,0.7945,1477
+Crypto,Metals,Crypto,Metals,Crypto,Metals,False,False,0.1878,0.1878,1055
+Energy,Financials,Energy,Financials,Energy,Financials,False,False,0.0015,0.0015,818
+Energy,Gold,Energy,Gold,Energy,Gold,False,False,0.0365,0.0365,1055
+Energy,Information Technology,Energy,Information Technology,Energy,Information Technology,False,False,0.0235,0.0235,1075
+Energy,Market,Energy,Market,Energy,Market,False,False,0.3425,0.3425,1076
+Energy,Metals,Energy,Metals,Energy,Metals,False,False,0.0688,0.0688,1063
+Financials,Gold,Financials,Gold,Financials,Gold,False,False,0.0767,0.0767,819
+Financials,Information Technology,Financials,Information Technology,Financials,Information Technology,False,False,0.6305,0.6305,819
+Financials,Market,Financials,Market,Financials,Market,False,False,0.7734,0.7734,819
+Financials,Metals,Financials,Metals,Financials,Metals,False,False,0.2079,0.2079,819
+Gold,Information Technology,Gold,Information Technology,Gold,Information Technology,False,False,0.0925,0.0925,1056
+Gold,Market,Gold,Market,Gold,Market,False,False,0.2111,0.2111,1479
+Gold,Metals,Gold,Metals,Gold,Metals,False,False,0.662,0.662,1057
+Information Technology,Market,Information Technology,Market,Information Technology,Market,False,False,0.7752,0.7752,1076
+Information Technology,Metals,Information Technology,Metals,Information Technology,Metals,False,False,0.2443,0.2443,1064
+Market,Metals,Market,Metals,Market,Metals,False,False,0.3994,0.3994,1065

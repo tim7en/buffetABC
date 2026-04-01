@@ -1,0 +1,6 @@
+expansion_bucket,trades,avg_strategy_return_pct,avg_edge_vs_sector_pct,avg_edge_vs_market_pct,net_pnl,positive_edge_vs_sector_rate_pct
+Q1,49,1.1358,1.8724,0.3218,401.2461,57.14
+Q2,70,2.925,0.2359,1.3199,18823.2933,47.14
+Q3,71,8.9682,2.5343,5.8302,35100.2453,52.11
+Q4,73,4.0303,-0.3586,1.7651,12018.4373,39.73
+Q5,67,0.6797,-0.1645,-1.0368,6309.1836,55.22
