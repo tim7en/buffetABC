@@ -1,0 +1,138 @@
+{
+  "Base + energy sleeve + GOOGL/META/NVDA": {
+    "candidate_universe_size": 25,
+    "candidate_trades": 689,
+    "executed_trades": 336,
+    "total_return_pct": 2713.22,
+    "cagr_pct": 124.15,
+    "max_realized_drawdown_pct": 37.76,
+    "profit_factor": 2.41,
+    "win_rate_pct": 40.18,
+    "final_equity": 28132.1644,
+    "crypto_trades": 77,
+    "gold_trades": 44,
+    "metals_trades": 51,
+    "energy_trades": 49,
+    "equity_trades": 115,
+    "crypto_pnl": 7011.4146,
+    "gold_pnl": 2048.7478,
+    "metals_pnl": 3338.835,
+    "energy_pnl": 4840.8343,
+    "equity_pnl": 9892.3331,
+    "avg_theme_alloc_mult": 1.0,
+    "entries_theme_upscaled": 0,
+    "entries_theme_downscaled": 0,
+    "bucket_avg_mults": {
+      "crypto": 1.0,
+      "gold": 1.0,
+      "metals": 1.0,
+      "energy": 1.0,
+      "equity": 1.0
+    },
+    "trades_by_ticker": {
+      "SOL-USD": 28,
+      "PAXG-USD": 27,
+      "BTC-USD": 26,
+      "BRENT": 25,
+      "NATGAS": 24,
+      "ETH-USD": 23,
+      "COPPER": 22,
+      "GOOGL": 19,
+      "NVDA": 19,
+      "GLD": 17,
+      "PPLT": 16,
+      "META": 13,
+      "SLV": 13,
+      "PLTR": 11,
+      "AMZN": 10,
+      "COIN": 10,
+      "HOOD": 10,
+      "MSTR": 9,
+      "TSLA": 9,
+      "INTC": 5
+    },
+    "added_equities": [
+      "GOOGL",
+      "META",
+      "NVDA"
+    ],
+    "added_energy": [
+      "BRENT",
+      "NATGAS"
+    ],
+    "removed_tickers": [
+      "LTC-USD",
+      "ENJ-USD",
+      "BCH-USD",
+      "ATOM-USD"
+    ]
+  },
+  "Quarterly theme allocator + energy sleeve + GOOGL/META/NVDA": {
+    "candidate_universe_size": 25,
+    "candidate_trades": 689,
+    "executed_trades": 343,
+    "total_return_pct": 2536.04,
+    "cagr_pct": 120.65,
+    "max_realized_drawdown_pct": 34.58,
+    "profit_factor": 2.35,
+    "win_rate_pct": 40.23,
+    "final_equity": 26360.4259,
+    "crypto_trades": 79,
+    "gold_trades": 42,
+    "metals_trades": 53,
+    "energy_trades": 52,
+    "equity_trades": 117,
+    "crypto_pnl": 7100.2356,
+    "gold_pnl": 1665.6486,
+    "metals_pnl": 2891.0737,
+    "energy_pnl": 5267.9068,
+    "equity_pnl": 8435.561,
+    "avg_theme_alloc_mult": 0.9968,
+    "entries_theme_upscaled": 288,
+    "entries_theme_downscaled": 282,
+    "bucket_avg_mults": {
+      "crypto": 0.8916,
+      "energy": 0.9695,
+      "equity": 1.0901,
+      "gold": 1.079,
+      "metals": 0.9703
+    },
+    "trades_by_ticker": {
+      "PAXG-USD": 29,
+      "SOL-USD": 28,
+      "BRENT": 26,
+      "BTC-USD": 26,
+      "NATGAS": 26,
+      "ETH-USD": 25,
+      "COPPER": 22,
+      "GOOGL": 19,
+      "NVDA": 19,
+      "PPLT": 17,
+      "META": 16,
+      "SLV": 14,
+      "GLD": 13,
+      "PLTR": 11,
+      "HOOD": 10,
+      "MSTR": 10,
+      "COIN": 9,
+      "TSLA": 9,
+      "AMZN": 8,
+      "INTC": 6
+    },
+    "added_equities": [
+      "GOOGL",
+      "META",
+      "NVDA"
+    ],
+    "added_energy": [
+      "BRENT",
+      "NATGAS"
+    ],
+    "removed_tickers": [
+      "LTC-USD",
+      "ENJ-USD",
+      "BCH-USD",
+      "ATOM-USD"
+    ]
+  }
+}

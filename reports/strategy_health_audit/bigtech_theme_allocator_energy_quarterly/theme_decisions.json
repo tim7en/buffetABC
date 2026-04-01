@@ -1,0 +1,546 @@
+{
+  "2022-05-11": {
+    "crypto": {
+      "score": -0.042352,
+      "trade_count": 11,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "gold": {
+      "score": -0.0268,
+      "trade_count": 4,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "metals": {
+      "score": -0.030503,
+      "trade_count": 4,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    },
+    "energy": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "equity": {
+      "score": -0.06725,
+      "trade_count": 4,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    }
+  },
+  "2022-08-09": {
+    "crypto": {
+      "score": 0.223139,
+      "trade_count": 9,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "gold": {
+      "score": 0.014811,
+      "trade_count": 4,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    },
+    "metals": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "energy": {
+      "score": 0.006641,
+      "trade_count": 3,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "equity": {
+      "score": -0.014108,
+      "trade_count": 6,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    }
+  },
+  "2022-11-07": {
+    "crypto": {
+      "score": -0.062495,
+      "trade_count": 15,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": -0.012832,
+      "trade_count": 6,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    },
+    "metals": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "energy": {
+      "score": -0.022978,
+      "trade_count": 4,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "equity": {
+      "score": 0.023104,
+      "trade_count": 7,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    }
+  },
+  "2023-02-05": {
+    "crypto": {
+      "score": -0.004562,
+      "trade_count": 13,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "gold": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "metals": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "energy": {
+      "score": -0.055558,
+      "trade_count": 3,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "equity": {
+      "score": -0.036662,
+      "trade_count": 5,
+      "rank_pct": 0.5,
+      "mult": 1.0
+    }
+  },
+  "2023-05-06": {
+    "crypto": {
+      "score": -0.057227,
+      "trade_count": 20,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": -0.009345,
+      "trade_count": 4,
+      "rank_pct": 0.5,
+      "mult": 1.0
+    },
+    "metals": {
+      "score": -0.03559,
+      "trade_count": 3,
+      "rank_pct": 0.25,
+      "mult": 0.875
+    },
+    "energy": {
+      "score": 0.084042,
+      "trade_count": 4,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "equity": {
+      "score": 0.031685,
+      "trade_count": 7,
+      "rank_pct": 0.75,
+      "mult": 1.125
+    }
+  },
+  "2023-08-04": {
+    "crypto": {
+      "score": 0.058834,
+      "trade_count": 14,
+      "rank_pct": 0.75,
+      "mult": 1.125
+    },
+    "gold": {
+      "score": -0.000318,
+      "trade_count": 3,
+      "rank_pct": 0.5,
+      "mult": 1.0
+    },
+    "metals": {
+      "score": -0.015666,
+      "trade_count": 6,
+      "rank_pct": 0.25,
+      "mult": 0.875
+    },
+    "energy": {
+      "score": -0.075755,
+      "trade_count": 5,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "equity": {
+      "score": 0.267441,
+      "trade_count": 14,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    }
+  },
+  "2023-11-02": {
+    "crypto": {
+      "score": -0.05861,
+      "trade_count": 14,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": -0.001101,
+      "trade_count": 6,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "metals": {
+      "score": -0.018306,
+      "trade_count": 8,
+      "rank_pct": 0.75,
+      "mult": 1.125
+    },
+    "energy": {
+      "score": -0.035215,
+      "trade_count": 5,
+      "rank_pct": 0.5,
+      "mult": 1.0
+    },
+    "equity": {
+      "score": -0.055305,
+      "trade_count": 17,
+      "rank_pct": 0.25,
+      "mult": 0.875
+    }
+  },
+  "2024-01-31": {
+    "crypto": {
+      "score": 0.213603,
+      "trade_count": 11,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "gold": {
+      "score": -0.015133,
+      "trade_count": 9,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "metals": {
+      "score": -0.021136,
+      "trade_count": 7,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "energy": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "equity": {
+      "score": 0.096643,
+      "trade_count": 17,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    }
+  },
+  "2024-04-30": {
+    "crypto": {
+      "score": 0.009502,
+      "trade_count": 13,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": 0.12341,
+      "trade_count": 3,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "metals": {
+      "score": 0.021482,
+      "trade_count": 5,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "energy": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "equity": {
+      "score": 0.117827,
+      "trade_count": 17,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    }
+  },
+  "2024-07-29": {
+    "crypto": {
+      "score": -0.025636,
+      "trade_count": 13,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": -0.011043,
+      "trade_count": 7,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "metals": {
+      "score": -0.004808,
+      "trade_count": 5,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    },
+    "energy": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "equity": {
+      "score": 0.017433,
+      "trade_count": 16,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    }
+  },
+  "2024-10-27": {
+    "crypto": {
+      "score": -0.077862,
+      "trade_count": 18,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": 0.017973,
+      "trade_count": 5,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    },
+    "metals": {
+      "score": -0.028198,
+      "trade_count": 5,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "energy": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "equity": {
+      "score": 0.018761,
+      "trade_count": 17,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    }
+  },
+  "2025-01-25": {
+    "crypto": {
+      "score": -0.100412,
+      "trade_count": 19,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": -0.019013,
+      "trade_count": 6,
+      "rank_pct": 0.5,
+      "mult": 1.0
+    },
+    "metals": {
+      "score": -0.024127,
+      "trade_count": 7,
+      "rank_pct": 0.25,
+      "mult": 0.875
+    },
+    "energy": {
+      "score": -0.005757,
+      "trade_count": 3,
+      "rank_pct": 0.75,
+      "mult": 1.125
+    },
+    "equity": {
+      "score": 0.116173,
+      "trade_count": 18,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    }
+  },
+  "2025-04-25": {
+    "crypto": {
+      "score": -0.051162,
+      "trade_count": 18,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": 0.03754,
+      "trade_count": 5,
+      "rank_pct": 0.75,
+      "mult": 1.125
+    },
+    "metals": {
+      "score": 0.0034,
+      "trade_count": 7,
+      "rank_pct": 0.5,
+      "mult": 1.0
+    },
+    "energy": {
+      "score": 0.037993,
+      "trade_count": 3,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "equity": {
+      "score": -0.045921,
+      "trade_count": 18,
+      "rank_pct": 0.25,
+      "mult": 0.875
+    }
+  },
+  "2025-07-24": {
+    "crypto": {
+      "score": -0.063794,
+      "trade_count": 12,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": -0.005246,
+      "trade_count": 6,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    },
+    "metals": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "energy": {
+      "score": -0.054225,
+      "trade_count": 4,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "equity": {
+      "score": 0.009126,
+      "trade_count": 12,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    }
+  },
+  "2025-10-22": {
+    "crypto": {
+      "score": -0.079251,
+      "trade_count": 26,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "gold": {
+      "score": 0.06033,
+      "trade_count": 5,
+      "rank_pct": 0.75,
+      "mult": 1.125
+    },
+    "metals": {
+      "score": 0.082633,
+      "trade_count": 5,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "energy": {
+      "score": -0.043428,
+      "trade_count": 5,
+      "rank_pct": 0.25,
+      "mult": 0.875
+    },
+    "equity": {
+      "score": 0.024179,
+      "trade_count": 21,
+      "rank_pct": 0.5,
+      "mult": 1.0
+    }
+  },
+  "2026-01-20": {
+    "crypto": {
+      "score": -0.050193,
+      "trade_count": 11,
+      "rank_pct": 0.3333,
+      "mult": 0.9167
+    },
+    "gold": {
+      "score": 0.038569,
+      "trade_count": 6,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "metals": {
+      "score": null,
+      "trade_count": 0,
+      "rank_pct": null,
+      "mult": 1.0
+    },
+    "energy": {
+      "score": -0.057185,
+      "trade_count": 6,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "equity": {
+      "score": -0.044465,
+      "trade_count": 22,
+      "rank_pct": 0.6667,
+      "mult": 1.0833
+    }
+  },
+  "2026-04-20": {
+    "crypto": {
+      "score": 0.28259,
+      "trade_count": 8,
+      "rank_pct": 0.75,
+      "mult": 1.125
+    },
+    "gold": {
+      "score": 0.056788,
+      "trade_count": 5,
+      "rank_pct": 0.0,
+      "mult": 0.75
+    },
+    "metals": {
+      "score": 0.196614,
+      "trade_count": 4,
+      "rank_pct": 0.5,
+      "mult": 1.0
+    },
+    "energy": {
+      "score": 0.290521,
+      "trade_count": 3,
+      "rank_pct": 1.0,
+      "mult": 1.25
+    },
+    "equity": {
+      "score": 0.060057,
+      "trade_count": 17,
+      "rank_pct": 0.25,
+      "mult": 0.875
+    }
+  }
+}
