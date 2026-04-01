@@ -1,0 +1,19 @@
+ticker,sector_group,expected_direction,shock_end_pct,first_correct_candidate_ts,candidate_lag_days,first_correct_trade_ts,trade_lag_days,correct_direction_trades,wrong_direction_trades,correct_direction_pnl,wrong_direction_pnl
+AMZN,Consumer Discretionary,short,-8.0,2025-10-17T14:55:00,16,2025-12-15T14:35:00,75,2,2,-1298.8716,-1658.6195
+BRENT,Energy,short,-18.0,2025-10-10T13:35:00,9,2025-10-10T13:35:00,9,5,3,26.9127,6713.042
+COIN,Financials,short,-12.0,2025-11-13T18:30:00,43,2025-11-13T18:30:00,43,2,1,7381.2539,-290.689
+COPPER,Metals,long,10.0,2025-10-07T13:35:00,6,2025-10-24T15:50:00,23,4,0,117.4191,0
+CRCL,Financials,short,-12.0,2025-10-30T19:20:00,29,2025-10-30T19:20:00,29,2,0,7980.3772,0
+GLD,Gold,long,12.0,2025-11-10T14:35:00,40,2025-11-10T14:35:00,40,3,0,2361.4872,0
+GOOGL,Communication Services,short,-10.0,2026-03-03T15:30:00,153,,,0,4,0,-781.8797
+HOOD,Financials,short,-12.0,2025-12-30T20:10:00,90,,,0,2,0,-723.8307
+INTC,Information Technology,short,-12.0,,,,,0,3,0,3448.2589
+META,Communication Services,short,-10.0,2025-10-31T18:20:00,30,2026-01-02T15:20:00,93,3,0,6137.1207,0
+MSTR,Information Technology,short,-12.0,2025-10-10T15:20:00,9,2025-10-10T15:20:00,9,3,0,1000.981,0
+NATGAS,Energy,short,-18.0,2025-10-09T14:35:00,8,2025-10-09T14:35:00,8,5,0,1213.5192,0
+NVDA,Information Technology,short,-12.0,2025-12-17T14:35:00,77,2026-01-14T14:40:00,105,5,1,-3035.3562,607.178
+PAXG-USD,Gold,long,12.0,2025-10-13T05:30:00,12,2025-10-13T05:30:00,12,5,0,4647.4999,0
+PLTR,Information Technology,short,-12.0,2026-01-20T14:35:00,111,,,0,2,0,-811.3613
+PPLT,Metals,long,10.0,2025-10-16T13:35:00,15,2025-11-12T15:20:00,42,3,0,2087.5622,0
+SLV,Metals,long,10.0,2025-11-10T14:35:00,40,2025-11-10T14:35:00,40,3,0,11035.0754,0
+TSLA,Consumer Discretionary,short,-8.0,2026-02-03T19:05:00,125,,,0,1,0,1674.4768
