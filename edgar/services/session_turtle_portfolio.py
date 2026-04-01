@@ -49,6 +49,7 @@ CRYPTO_TICKERS = {"BTC-USD", "ETH-USD", "SOL-USD"}
 GOLD_TICKERS = {"PAXG-USD", "GLD"}
 EQUITY_TICKERS = {"AMZN", "COIN", "CRCL", "HOOD", "INTC", "MSTR", "PLTR", "QQQ", "SPY", "TSLA"}
 METAL_TICKERS = {"COPPER", "PPLT", "SLV"}
+ENERGY_TICKERS = {"BRENT", "NATGAS"}
 
 
 def _resolve_universe(basket: str) -> tuple[tuple[str, str, str], ...]:
@@ -173,6 +174,8 @@ def _asset_bucket(ticker: str) -> str:
         return "equity"
     if ticker in METAL_TICKERS:
         return "metals"
+    if ticker in ENERGY_TICKERS:
+        return "energy"
     return "other"
 
 
@@ -1157,6 +1160,7 @@ def generate_session_turtle_shared_account_report(
     crypto_cap_mult: float | None = None,
     gold_cap_mult: float | None = None,
     metals_cap_mult: float | None = None,
+    energy_cap_mult: float | None = None,
     equity_cap_mult: float | None = None,
     initial_capital: float = 1_000.0,
     lookback_years: float = 4.1,
@@ -1277,6 +1281,7 @@ def generate_session_turtle_shared_account_report(
         ("crypto_cap_mult", crypto_cap_mult),
         ("gold_cap_mult", gold_cap_mult),
         ("metals_cap_mult", metals_cap_mult),
+        ("energy_cap_mult", energy_cap_mult),
         ("equity_cap_mult", equity_cap_mult),
     ):
         if cap_mult is not None and cap_mult <= 0:
@@ -1301,7 +1306,7 @@ def generate_session_turtle_shared_account_report(
             if str(bucket).strip()
         )
         invalid_buckets = performance_bucket_scopes_normalized.difference(
-            {"crypto", "gold", "metals", "equity"}
+            {"crypto", "gold", "metals", "energy", "equity"}
         )
         if invalid_buckets:
             raise ValueError(
@@ -1432,6 +1437,7 @@ def generate_session_turtle_shared_account_report(
         "crypto": crypto_cap_mult,
         "gold": gold_cap_mult,
         "metals": metals_cap_mult,
+        "energy": energy_cap_mult,
         "equity": equity_cap_mult,
     }
     closed_candidate_idx = 0
@@ -2107,6 +2113,7 @@ def generate_session_turtle_shared_account_report(
         "crypto_cap_mult": crypto_cap_mult,
         "gold_cap_mult": gold_cap_mult,
         "metals_cap_mult": metals_cap_mult,
+        "energy_cap_mult": energy_cap_mult,
         "equity_cap_mult": equity_cap_mult,
         "entries_at_base_exposure": exposure_counter[float(exposure_mult)],
         "entries_at_drawdown_exposure_1": exposure_counter[float(drawdown_exposure_mult_1)],
@@ -2246,10 +2253,12 @@ def generate_session_turtle_shared_account_report(
         "gold_trades": bucket_counter["gold"],
         "equity_trades": bucket_counter["equity"],
         "metals_trades": bucket_counter["metals"],
+        "energy_trades": bucket_counter["energy"],
         "crypto_pnl": round(bucket_pnl["crypto"], 4),
         "gold_pnl": round(bucket_pnl["gold"], 4),
         "equity_pnl": round(bucket_pnl["equity"], 4),
         "metals_pnl": round(bucket_pnl["metals"], 4),
+        "energy_pnl": round(bucket_pnl["energy"], 4),
         "use_per_asset_technical_overlay": use_per_asset_technical_overlay,
         "per_asset_ema_period": per_asset_technical_state.get("ema_period") if per_asset_technical_state else None,
         "per_asset_adx_period": per_asset_technical_state.get("adx_period") if per_asset_technical_state else None,

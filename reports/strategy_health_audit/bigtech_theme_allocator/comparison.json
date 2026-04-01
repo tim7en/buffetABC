@@ -1,0 +1,120 @@
+{
+  "Base + equity cap + GOOGL/META/NVDA": {
+    "candidate_universe_size": 23,
+    "candidate_trades": 633,
+    "executed_trades": 311,
+    "total_return_pct": 2962.61,
+    "cagr_pct": 129.18,
+    "max_realized_drawdown_pct": 30.63,
+    "profit_factor": 2.6,
+    "win_rate_pct": 41.48,
+    "final_equity": 30626.0524,
+    "crypto_trades": 87,
+    "gold_trades": 47,
+    "equity_trades": 118,
+    "metals_trades": 59,
+    "crypto_pnl": 7246.262,
+    "gold_pnl": 2693.0637,
+    "equity_pnl": 12718.1579,
+    "metals_pnl": 6968.5687,
+    "avg_theme_alloc_mult": 1.0,
+    "entries_theme_upscaled": 0,
+    "entries_theme_downscaled": 0,
+    "bucket_avg_mults": {
+      "crypto": 1.0,
+      "gold": 1.0,
+      "metals": 1.0,
+      "equity": 1.0
+    },
+    "trades_by_ticker": {
+      "SOL-USD": 31,
+      "PAXG-USD": 30,
+      "BTC-USD": 29,
+      "ETH-USD": 27,
+      "COPPER": 25,
+      "NVDA": 19,
+      "GOOGL": 18,
+      "GLD": 17,
+      "PPLT": 17,
+      "SLV": 17,
+      "META": 14,
+      "PLTR": 12,
+      "AMZN": 11,
+      "COIN": 10,
+      "HOOD": 10,
+      "MSTR": 9,
+      "TSLA": 9,
+      "INTC": 6
+    },
+    "added_equities": [
+      "GOOGL",
+      "META",
+      "NVDA"
+    ],
+    "removed_tickers": [
+      "LTC-USD",
+      "ENJ-USD",
+      "BCH-USD",
+      "ATOM-USD"
+    ]
+  },
+  "Theme allocator + GOOGL/META/NVDA": {
+    "candidate_universe_size": 23,
+    "candidate_trades": 633,
+    "executed_trades": 306,
+    "total_return_pct": 2588.97,
+    "cagr_pct": 122.07,
+    "max_realized_drawdown_pct": 34.58,
+    "profit_factor": 2.51,
+    "win_rate_pct": 41.83,
+    "final_equity": 26889.6708,
+    "crypto_trades": 83,
+    "gold_trades": 46,
+    "equity_trades": 119,
+    "metals_trades": 58,
+    "crypto_pnl": 9109.9728,
+    "gold_pnl": 2539.6953,
+    "equity_pnl": 9080.9309,
+    "metals_pnl": 5159.0708,
+    "avg_theme_alloc_mult": 1.002,
+    "entries_theme_upscaled": 291,
+    "entries_theme_downscaled": 272,
+    "bucket_avg_mults": {
+      "crypto": 0.9568,
+      "equity": 1.044,
+      "gold": 1.03,
+      "metals": 0.984
+    },
+    "trades_by_ticker": {
+      "PAXG-USD": 30,
+      "SOL-USD": 30,
+      "BTC-USD": 29,
+      "COPPER": 24,
+      "ETH-USD": 24,
+      "GOOGL": 19,
+      "NVDA": 19,
+      "PPLT": 18,
+      "GLD": 16,
+      "SLV": 16,
+      "META": 15,
+      "PLTR": 12,
+      "AMZN": 11,
+      "COIN": 10,
+      "HOOD": 10,
+      "MSTR": 9,
+      "TSLA": 9,
+      "INTC": 5
+    },
+    "added_equities": [
+      "GOOGL",
+      "META",
+      "NVDA"
+    ],
+    "removed_tickers": [
+      "LTC-USD",
+      "ENJ-USD",
+      "BCH-USD",
+      "ATOM-USD"
+    ]
+  }
+}
