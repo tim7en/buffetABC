@@ -111,7 +111,7 @@
   "entries_volatility_persistence_persistent_stress": 0,
   "entries_volatility_persistence_neutral": 0,
   "entries_volatility_persistence_fading_stress": 0,
-  "channel_period": 20,
+  "channel_period": 10,
   "lookback_years": 4.1,
   "base_risk_pct": 0.05,
   "directional_volume_risk_pct": 0.07,
@@ -158,6 +158,8 @@
   "avg_technical_ema_mult": 1.0,
   "variant_label": "50% move amplitude",
   "compression_scale": 0.5,
+  "exit_channel_period": 5,
+  "raw_5m_channels": false,
   "avg_hold_days": 11.87,
   "avg_trade_return_pct": 1.5384
 }
