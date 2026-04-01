@@ -1,0 +1,25 @@
+variant,bucket,window_pnl,window_trades
+Observed path,equity,39113.0243,
+Observed path,metals,15150.0965,
+Observed path,gold,5128.397,
+Observed path,crypto,1059.3685,
+Observed path,energy,963.0089,
+Observed path,overall,61413.8952,306
+50% move amplitude,equity,9333.7517,
+50% move amplitude,metals,3118.7023,
+50% move amplitude,gold,861.6631,
+50% move amplitude,crypto,-73.5041,
+50% move amplitude,energy,-96.1394,
+50% move amplitude,overall,13144.4736,281
+25% move amplitude,equity,3477.161,
+25% move amplitude,metals,1106.3882,
+25% move amplitude,energy,601.5207,
+25% move amplitude,gold,233.6094,
+25% move amplitude,crypto,-273.0446,
+25% move amplitude,overall,5145.6347,264
+10% move amplitude,equity,1050.2079,
+10% move amplitude,metals,176.7494,
+10% move amplitude,gold,44.2231,
+10% move amplitude,energy,-7.8678,
+10% move amplitude,crypto,-82.364,
+10% move amplitude,overall,1180.9486,282
