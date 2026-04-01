@@ -1,0 +1,1289 @@
+{
+  "analysis_window": {
+    "start_date": "2022-02-10",
+    "end_date": "2026-03-30"
+  },
+  "report_source": "/Users/timursabitov/Development/Python_Projects/buffetABC/reports/channel_granularity_comparison/current_baseline/session_10_5",
+  "latest_macro": {
+    "as_of": "2026-03-30",
+    "fed_funds_rate": 3.64,
+    "fed_funds_63d_change": 0.0,
+    "yield_2y": 3.82,
+    "yield_10y": 4.35,
+    "curve_10y_2y": 0.53,
+    "broad_dollar_index": 120.8851,
+    "broad_dollar_63d_change": 2.8326,
+    "vix": 30.61
+  },
+  "trade_edge": {
+    "overall": {
+      "group": "overall",
+      "trades": 588,
+      "avg_strategy_return_pct": 1.9736,
+      "avg_edge_vs_asset_pct": 0.1424,
+      "avg_edge_vs_sector_pct": 1.2102,
+      "avg_edge_vs_market_pct": 1.1759,
+      "positive_edge_vs_asset_rate_pct": 6.46,
+      "positive_edge_vs_sector_rate_pct": 51.53,
+      "net_pnl": 109895.5703,
+      "synthetic_asset_pnl": 110519.5453,
+      "synthetic_sector_pnl": 64213.0596,
+      "synthetic_market_pnl": 41184.6624,
+      "excess_vs_asset_pnl": -623.975,
+      "excess_vs_sector_pnl": 45682.5107,
+      "excess_vs_market_pnl": 68710.9079
+    },
+    "by_sector": [
+      {
+        "group": "Communication Services",
+        "trades": 71,
+        "avg_strategy_return_pct": 0.2991,
+        "avg_edge_vs_asset_pct": -0.1578,
+        "avg_edge_vs_sector_pct": 0.4261,
+        "avg_edge_vs_market_pct": -0.9651,
+        "positive_edge_vs_asset_rate_pct": 0.0,
+        "positive_edge_vs_sector_rate_pct": 43.66,
+        "net_pnl": 12639.4324,
+        "synthetic_asset_pnl": 12714.7207,
+        "synthetic_sector_pnl": 7613.1431,
+        "synthetic_market_pnl": 6986.9944,
+        "excess_vs_asset_pnl": -75.2883,
+        "excess_vs_sector_pnl": 5026.2893,
+        "excess_vs_market_pnl": 5652.438
+      },
+      {
+        "group": "Consumer Discretionary",
+        "trades": 40,
+        "avg_strategy_return_pct": 1.6606,
+        "avg_edge_vs_asset_pct": 0.2862,
+        "avg_edge_vs_sector_pct": 0.1143,
+        "avg_edge_vs_market_pct": 0.1292,
+        "positive_edge_vs_asset_rate_pct": 5.0,
+        "positive_edge_vs_sector_rate_pct": 55.0,
+        "net_pnl": 3269.5652,
+        "synthetic_asset_pnl": 3323.2566,
+        "synthetic_sector_pnl": 4542.1333,
+        "synthetic_market_pnl": 1568.0055,
+        "excess_vs_asset_pnl": -53.6914,
+        "excess_vs_sector_pnl": -1272.5681,
+        "excess_vs_market_pnl": 1701.5597
+      },
+      {
+        "group": "Crypto",
+        "trades": 109,
+        "avg_strategy_return_pct": 1.9012,
+        "avg_edge_vs_asset_pct": 0.0548,
+        "avg_edge_vs_sector_pct": 0.6944,
+        "avg_edge_vs_market_pct": 1.2431,
+        "positive_edge_vs_asset_rate_pct": 1.83,
+        "positive_edge_vs_sector_rate_pct": 48.62,
+        "net_pnl": 4074.4685,
+        "synthetic_asset_pnl": 4170.6334,
+        "synthetic_sector_pnl": 1776.095,
+        "synthetic_market_pnl": 2624.3317,
+        "excess_vs_asset_pnl": -96.1649,
+        "excess_vs_sector_pnl": 2298.3735,
+        "excess_vs_market_pnl": 1450.1368
+      },
+      {
+        "group": "Energy",
+        "trades": 85,
+        "avg_strategy_return_pct": 1.2007,
+        "avg_edge_vs_asset_pct": 0.6781,
+        "avg_edge_vs_sector_pct": 3.3207,
+        "avg_edge_vs_market_pct": 3.3265,
+        "positive_edge_vs_asset_rate_pct": 15.29,
+        "positive_edge_vs_sector_rate_pct": 57.65,
+        "net_pnl": 2093.9023,
+        "synthetic_asset_pnl": 2170.8789,
+        "synthetic_sector_pnl": -4936.4756,
+        "synthetic_market_pnl": -5303.4777,
+        "excess_vs_asset_pnl": -76.9766,
+        "excess_vs_sector_pnl": 7030.3779,
+        "excess_vs_market_pnl": 7397.38
+      },
+      {
+        "group": "Financials",
+        "trades": 39,
+        "avg_strategy_return_pct": 6.9464,
+        "avg_edge_vs_asset_pct": 0.1099,
+        "avg_edge_vs_sector_pct": 2.1675,
+        "avg_edge_vs_market_pct": 4.3326,
+        "positive_edge_vs_asset_rate_pct": 2.56,
+        "positive_edge_vs_sector_rate_pct": 56.41,
+        "net_pnl": 36026.3603,
+        "synthetic_asset_pnl": 36085.1963,
+        "synthetic_sector_pnl": 27138.3262,
+        "synthetic_market_pnl": 13782.3014,
+        "excess_vs_asset_pnl": -58.836,
+        "excess_vs_sector_pnl": 8888.0341,
+        "excess_vs_market_pnl": 22244.0589
+      },
+      {
+        "group": "Gold",
+        "trades": 66,
+        "avg_strategy_return_pct": 1.1113,
+        "avg_edge_vs_asset_pct": -0.0021,
+        "avg_edge_vs_sector_pct": -0.1045,
+        "avg_edge_vs_market_pct": -1.0269,
+        "positive_edge_vs_asset_rate_pct": 3.03,
+        "positive_edge_vs_sector_rate_pct": 48.48,
+        "net_pnl": 8838.6853,
+        "synthetic_asset_pnl": 8905.4906,
+        "synthetic_sector_pnl": 8263.1009,
+        "synthetic_market_pnl": 6837.5087,
+        "excess_vs_asset_pnl": -66.8053,
+        "excess_vs_sector_pnl": 575.5844,
+        "excess_vs_market_pnl": 2001.1766
+      },
+      {
+        "group": "Information Technology",
+        "trades": 90,
+        "avg_strategy_return_pct": 3.1955,
+        "avg_edge_vs_asset_pct": -0.0447,
+        "avg_edge_vs_sector_pct": 1.8389,
+        "avg_edge_vs_market_pct": 1.3706,
+        "positive_edge_vs_asset_rate_pct": 3.33,
+        "positive_edge_vs_sector_rate_pct": 45.56,
+        "net_pnl": 17718.6328,
+        "synthetic_asset_pnl": 17840.4951,
+        "synthetic_sector_pnl": 7129.7986,
+        "synthetic_market_pnl": 9851.2914,
+        "excess_vs_asset_pnl": -121.8623,
+        "excess_vs_sector_pnl": 10588.8342,
+        "excess_vs_market_pnl": 7867.3414
+      },
+      {
+        "group": "Metals",
+        "trades": 88,
+        "avg_strategy_return_pct": 1.4962,
+        "avg_edge_vs_asset_pct": 0.2241,
+        "avg_edge_vs_sector_pct": 0.8601,
+        "avg_edge_vs_market_pct": 1.2725,
+        "positive_edge_vs_asset_rate_pct": 17.05,
+        "positive_edge_vs_sector_rate_pct": 60.23,
+        "net_pnl": 25234.5235,
+        "synthetic_asset_pnl": 25308.8737,
+        "synthetic_sector_pnl": 12686.9381,
+        "synthetic_market_pnl": 4837.707,
+        "excess_vs_asset_pnl": -74.3502,
+        "excess_vs_sector_pnl": 12547.5854,
+        "excess_vs_market_pnl": 20396.8165
+      }
+    ],
+    "by_bucket": [
+      {
+        "group": "crypto",
+        "trades": 109,
+        "avg_strategy_return_pct": 1.9012,
+        "avg_edge_vs_asset_pct": 0.0548,
+        "avg_edge_vs_sector_pct": 0.6944,
+        "avg_edge_vs_market_pct": 1.2431,
+        "positive_edge_vs_asset_rate_pct": 1.83,
+        "positive_edge_vs_sector_rate_pct": 48.62,
+        "net_pnl": 4074.4685,
+        "synthetic_asset_pnl": 4170.6334,
+        "synthetic_sector_pnl": 1776.095,
+        "synthetic_market_pnl": 2624.3317,
+        "excess_vs_asset_pnl": -96.1649,
+        "excess_vs_sector_pnl": 2298.3735,
+        "excess_vs_market_pnl": 1450.1368
+      },
+      {
+        "group": "energy",
+        "trades": 85,
+        "avg_strategy_return_pct": 1.2007,
+        "avg_edge_vs_asset_pct": 0.6781,
+        "avg_edge_vs_sector_pct": 3.3207,
+        "avg_edge_vs_market_pct": 3.3265,
+        "positive_edge_vs_asset_rate_pct": 15.29,
+        "positive_edge_vs_sector_rate_pct": 57.65,
+        "net_pnl": 2093.9023,
+        "synthetic_asset_pnl": 2170.8789,
+        "synthetic_sector_pnl": -4936.4756,
+        "synthetic_market_pnl": -5303.4777,
+        "excess_vs_asset_pnl": -76.9766,
+        "excess_vs_sector_pnl": 7030.3779,
+        "excess_vs_market_pnl": 7397.38
+      },
+      {
+        "group": "equity",
+        "trades": 240,
+        "avg_strategy_return_pct": 2.6924,
+        "avg_edge_vs_asset_pct": 0.0021,
+        "avg_edge_vs_sector_pct": 1.1869,
+        "avg_edge_vs_market_pct": 0.954,
+        "positive_edge_vs_asset_rate_pct": 2.5,
+        "positive_edge_vs_sector_rate_pct": 48.33,
+        "net_pnl": 69653.9907,
+        "synthetic_asset_pnl": 69963.6687,
+        "synthetic_sector_pnl": 46423.4012,
+        "synthetic_market_pnl": 32188.5927,
+        "excess_vs_asset_pnl": -309.678,
+        "excess_vs_sector_pnl": 23230.5895,
+        "excess_vs_market_pnl": 37465.398
+      },
+      {
+        "group": "gold",
+        "trades": 66,
+        "avg_strategy_return_pct": 1.1113,
+        "avg_edge_vs_asset_pct": -0.0021,
+        "avg_edge_vs_sector_pct": -0.1045,
+        "avg_edge_vs_market_pct": -1.0269,
+        "positive_edge_vs_asset_rate_pct": 3.03,
+        "positive_edge_vs_sector_rate_pct": 48.48,
+        "net_pnl": 8838.6853,
+        "synthetic_asset_pnl": 8905.4906,
+        "synthetic_sector_pnl": 8263.1009,
+        "synthetic_market_pnl": 6837.5087,
+        "excess_vs_asset_pnl": -66.8053,
+        "excess_vs_sector_pnl": 575.5844,
+        "excess_vs_market_pnl": 2001.1766
+      },
+      {
+        "group": "metals",
+        "trades": 88,
+        "avg_strategy_return_pct": 1.4962,
+        "avg_edge_vs_asset_pct": 0.2241,
+        "avg_edge_vs_sector_pct": 0.8601,
+        "avg_edge_vs_market_pct": 1.2725,
+        "positive_edge_vs_asset_rate_pct": 17.05,
+        "positive_edge_vs_sector_rate_pct": 60.23,
+        "net_pnl": 25234.5235,
+        "synthetic_asset_pnl": 25308.8737,
+        "synthetic_sector_pnl": 12686.9381,
+        "synthetic_market_pnl": 4837.707,
+        "excess_vs_asset_pnl": -74.3502,
+        "excess_vs_sector_pnl": 12547.5854,
+        "excess_vs_market_pnl": 20396.8165
+      }
+    ]
+  },
+  "risk_model": {
+    "current": {
+      "date": "2026-03-30",
+      "drawdown_pct": 0.0,
+      "rolling_pf": 5.8641,
+      "avg_pairwise_corr_63d": 0.2259,
+      "market_expansion_pct": -7.306,
+      "market_63d_return_pct": -20.3391,
+      "dff": 3.64,
+      "dff_63d_change": 0.0,
+      "dgs2": 3.82,
+      "dgs10": 4.35,
+      "curve_10y_2y": 0.53,
+      "dtwexbgs": 120.8851,
+      "dtwexbgs_63d_change": 2.8326,
+      "vixcls": 30.61,
+      "score_drawdown": 0.0,
+      "score_pf": 0.0,
+      "score_corr": 0.5,
+      "score_rates": 0.5,
+      "score_dollar": 0.5,
+      "score_vix": 1.0,
+      "score_expansion": 0.0,
+      "risk_score": 32.5,
+      "risk_bucket": "low"
+    },
+    "duration": {
+      "current_run": {
+        "bucket": "low",
+        "start_date": "2025-12-09",
+        "end_date": "2026-03-30",
+        "calendar_days": 112,
+        "observation_days": 102
+      },
+      "historical_run_stats": {
+        "bucket": "low",
+        "run_count": 34,
+        "median_calendar_days": 8.0,
+        "p80_calendar_days": 28,
+        "max_calendar_days": 112
+      },
+      "all_runs": [
+        {
+          "bucket": "low",
+          "start_date": "2022-02-10",
+          "end_date": "2022-03-16",
+          "calendar_days": 35,
+          "observation_days": 35
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2022-03-17",
+          "end_date": "2022-03-17",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "low",
+          "start_date": "2022-03-18",
+          "end_date": "2022-03-24",
+          "calendar_days": 7,
+          "observation_days": 7
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2022-03-25",
+          "end_date": "2022-03-28",
+          "calendar_days": 4,
+          "observation_days": 4
+        },
+        {
+          "bucket": "low",
+          "start_date": "2022-03-29",
+          "end_date": "2022-04-04",
+          "calendar_days": 7,
+          "observation_days": 7
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2022-04-05",
+          "end_date": "2022-04-05",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "low",
+          "start_date": "2022-04-06",
+          "end_date": "2022-04-18",
+          "calendar_days": 13,
+          "observation_days": 13
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2022-04-19",
+          "end_date": "2022-04-20",
+          "calendar_days": 2,
+          "observation_days": 2
+        },
+        {
+          "bucket": "low",
+          "start_date": "2022-04-21",
+          "end_date": "2022-04-24",
+          "calendar_days": 4,
+          "observation_days": 4
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2022-04-25",
+          "end_date": "2022-09-20",
+          "calendar_days": 149,
+          "observation_days": 149
+        },
+        {
+          "bucket": "high",
+          "start_date": "2022-09-21",
+          "end_date": "2022-11-09",
+          "calendar_days": 50,
+          "observation_days": 50
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2022-11-10",
+          "end_date": "2023-04-06",
+          "calendar_days": 148,
+          "observation_days": 148
+        },
+        {
+          "bucket": "low",
+          "start_date": "2023-04-07",
+          "end_date": "2023-05-04",
+          "calendar_days": 28,
+          "observation_days": 28
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2023-05-05",
+          "end_date": "2023-06-20",
+          "calendar_days": 47,
+          "observation_days": 47
+        },
+        {
+          "bucket": "low",
+          "start_date": "2023-06-21",
+          "end_date": "2023-08-14",
+          "calendar_days": 55,
+          "observation_days": 55
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2023-08-15",
+          "end_date": "2023-08-15",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "low",
+          "start_date": "2023-08-16",
+          "end_date": "2023-08-22",
+          "calendar_days": 7,
+          "observation_days": 7
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2023-08-23",
+          "end_date": "2023-10-13",
+          "calendar_days": 52,
+          "observation_days": 52
+        },
+        {
+          "bucket": "high",
+          "start_date": "2023-10-14",
+          "end_date": "2023-10-15",
+          "calendar_days": 2,
+          "observation_days": 2
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2023-10-16",
+          "end_date": "2023-10-17",
+          "calendar_days": 2,
+          "observation_days": 2
+        },
+        {
+          "bucket": "high",
+          "start_date": "2023-10-18",
+          "end_date": "2023-10-23",
+          "calendar_days": 6,
+          "observation_days": 6
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2023-10-24",
+          "end_date": "2023-10-25",
+          "calendar_days": 2,
+          "observation_days": 2
+        },
+        {
+          "bucket": "high",
+          "start_date": "2023-10-26",
+          "end_date": "2023-10-31",
+          "calendar_days": 6,
+          "observation_days": 6
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2023-11-01",
+          "end_date": "2023-11-01",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "high",
+          "start_date": "2023-11-02",
+          "end_date": "2023-11-07",
+          "calendar_days": 6,
+          "observation_days": 6
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2023-11-08",
+          "end_date": "2023-11-12",
+          "calendar_days": 5,
+          "observation_days": 5
+        },
+        {
+          "bucket": "high",
+          "start_date": "2023-11-13",
+          "end_date": "2023-11-13",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2023-11-14",
+          "end_date": "2023-11-20",
+          "calendar_days": 7,
+          "observation_days": 7
+        },
+        {
+          "bucket": "low",
+          "start_date": "2023-11-21",
+          "end_date": "2024-01-28",
+          "calendar_days": 69,
+          "observation_days": 69
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-01-29",
+          "end_date": "2024-01-31",
+          "calendar_days": 3,
+          "observation_days": 3
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-02-01",
+          "end_date": "2024-02-01",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-02-02",
+          "end_date": "2024-02-19",
+          "calendar_days": 18,
+          "observation_days": 18
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-02-20",
+          "end_date": "2024-04-14",
+          "calendar_days": 55,
+          "observation_days": 55
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-04-15",
+          "end_date": "2024-04-21",
+          "calendar_days": 7,
+          "observation_days": 7
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-04-22",
+          "end_date": "2024-05-14",
+          "calendar_days": 23,
+          "observation_days": 23
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-05-15",
+          "end_date": "2024-05-20",
+          "calendar_days": 6,
+          "observation_days": 6
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-05-21",
+          "end_date": "2024-05-21",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-05-22",
+          "end_date": "2024-05-23",
+          "calendar_days": 2,
+          "observation_days": 2
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-05-24",
+          "end_date": "2024-05-26",
+          "calendar_days": 3,
+          "observation_days": 3
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-05-27",
+          "end_date": "2024-05-27",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-05-28",
+          "end_date": "2024-06-04",
+          "calendar_days": 8,
+          "observation_days": 8
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-06-05",
+          "end_date": "2024-06-09",
+          "calendar_days": 5,
+          "observation_days": 5
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-06-10",
+          "end_date": "2024-06-12",
+          "calendar_days": 3,
+          "observation_days": 3
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-06-13",
+          "end_date": "2024-06-13",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-06-14",
+          "end_date": "2024-06-26",
+          "calendar_days": 13,
+          "observation_days": 13
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-06-27",
+          "end_date": "2024-07-11",
+          "calendar_days": 15,
+          "observation_days": 15
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-07-12",
+          "end_date": "2024-07-14",
+          "calendar_days": 3,
+          "observation_days": 3
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-07-15",
+          "end_date": "2024-07-15",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-07-16",
+          "end_date": "2024-07-23",
+          "calendar_days": 8,
+          "observation_days": 8
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-07-24",
+          "end_date": "2024-08-27",
+          "calendar_days": 35,
+          "observation_days": 35
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-08-28",
+          "end_date": "2024-08-28",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-08-29",
+          "end_date": "2024-09-29",
+          "calendar_days": 32,
+          "observation_days": 32
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-09-30",
+          "end_date": "2024-10-14",
+          "calendar_days": 15,
+          "observation_days": 15
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-10-15",
+          "end_date": "2024-11-05",
+          "calendar_days": 22,
+          "observation_days": 22
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-11-06",
+          "end_date": "2024-11-24",
+          "calendar_days": 19,
+          "observation_days": 19
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-11-25",
+          "end_date": "2024-11-25",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-11-26",
+          "end_date": "2024-12-17",
+          "calendar_days": 22,
+          "observation_days": 22
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2024-12-18",
+          "end_date": "2024-12-22",
+          "calendar_days": 5,
+          "observation_days": 5
+        },
+        {
+          "bucket": "low",
+          "start_date": "2024-12-23",
+          "end_date": "2025-01-06",
+          "calendar_days": 15,
+          "observation_days": 15
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-01-07",
+          "end_date": "2025-01-12",
+          "calendar_days": 6,
+          "observation_days": 6
+        },
+        {
+          "bucket": "high",
+          "start_date": "2025-01-13",
+          "end_date": "2025-01-14",
+          "calendar_days": 2,
+          "observation_days": 2
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-01-15",
+          "end_date": "2025-02-18",
+          "calendar_days": 35,
+          "observation_days": 35
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-02-19",
+          "end_date": "2025-04-06",
+          "calendar_days": 47,
+          "observation_days": 47
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-04-07",
+          "end_date": "2025-06-10",
+          "calendar_days": 65,
+          "observation_days": 65
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-06-11",
+          "end_date": "2025-06-24",
+          "calendar_days": 14,
+          "observation_days": 14
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-06-25",
+          "end_date": "2025-07-22",
+          "calendar_days": 28,
+          "observation_days": 28
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-07-23",
+          "end_date": "2025-09-30",
+          "calendar_days": 70,
+          "observation_days": 70
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-10-01",
+          "end_date": "2025-10-20",
+          "calendar_days": 20,
+          "observation_days": 20
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-10-21",
+          "end_date": "2025-10-21",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-10-22",
+          "end_date": "2025-10-22",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-10-23",
+          "end_date": "2025-10-23",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-10-24",
+          "end_date": "2025-10-26",
+          "calendar_days": 3,
+          "observation_days": 3
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-10-27",
+          "end_date": "2025-11-03",
+          "calendar_days": 8,
+          "observation_days": 8
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-11-04",
+          "end_date": "2025-11-09",
+          "calendar_days": 6,
+          "observation_days": 6
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-11-10",
+          "end_date": "2025-11-12",
+          "calendar_days": 3,
+          "observation_days": 3
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-11-13",
+          "end_date": "2025-11-17",
+          "calendar_days": 5,
+          "observation_days": 5
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-11-18",
+          "end_date": "2025-11-19",
+          "calendar_days": 2,
+          "observation_days": 2
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-11-20",
+          "end_date": "2025-12-03",
+          "calendar_days": 14,
+          "observation_days": 14
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-12-04",
+          "end_date": "2025-12-04",
+          "calendar_days": 1,
+          "observation_days": 1
+        },
+        {
+          "bucket": "medium",
+          "start_date": "2025-12-05",
+          "end_date": "2025-12-08",
+          "calendar_days": 4,
+          "observation_days": 4
+        },
+        {
+          "bucket": "low",
+          "start_date": "2025-12-09",
+          "end_date": "2026-03-30",
+          "calendar_days": 112,
+          "observation_days": 102
+        }
+      ]
+    },
+    "method": {
+      "type": "heuristic weighted score",
+      "weights": {
+        "drawdown": 0.2,
+        "rolling_pf": 0.15,
+        "pairwise_corr": 0.15,
+        "rates": 0.15,
+        "dollar": 0.15,
+        "vix": 0.1,
+        "price_expansion": 0.1
+      },
+      "thresholds": {
+        "low": "< 35",
+        "medium": "35 to < 65",
+        "high": ">= 65"
+      }
+    }
+  },
+  "price_expansion": {
+    "current": {
+      "current_date": "2026-03-30",
+      "current_expansion_pct": -7.306,
+      "current_expansion_bucket": "Q1",
+      "current_bucket_forward_21d_market_stats": {
+        "expansion_bucket": "Q1",
+        "observations": 300,
+        "avg_expansion_pct": -17.1247,
+        "median_expansion_pct": -18.3558,
+        "avg_forward_21d_market_return_pct": 1.1664,
+        "median_forward_21d_market_return_pct": -0.4972
+      }
+    },
+    "daily_buckets": [
+      {
+        "expansion_bucket": "Q1",
+        "observations": 300,
+        "avg_expansion_pct": -17.1247,
+        "median_expansion_pct": -18.3558,
+        "avg_forward_21d_market_return_pct": 1.1664,
+        "median_forward_21d_market_return_pct": -0.4972
+      },
+      {
+        "expansion_bucket": "Q2",
+        "observations": 280,
+        "avg_expansion_pct": 0.8828,
+        "median_expansion_pct": 1.0704,
+        "avg_forward_21d_market_return_pct": 1.1048,
+        "median_forward_21d_market_return_pct": 2.4977
+      },
+      {
+        "expansion_bucket": "Q3",
+        "observations": 299,
+        "avg_expansion_pct": 11.2134,
+        "median_expansion_pct": 11.1149,
+        "avg_forward_21d_market_return_pct": 3.4584,
+        "median_forward_21d_market_return_pct": 3.8958
+      },
+      {
+        "expansion_bucket": "Q4",
+        "observations": 300,
+        "avg_expansion_pct": 19.3138,
+        "median_expansion_pct": 19.0696,
+        "avg_forward_21d_market_return_pct": 3.1718,
+        "median_forward_21d_market_return_pct": 4.4432
+      },
+      {
+        "expansion_bucket": "Q5",
+        "observations": 300,
+        "avg_expansion_pct": 31.6399,
+        "median_expansion_pct": 29.4646,
+        "avg_forward_21d_market_return_pct": 3.3961,
+        "median_forward_21d_market_return_pct": 3.5026
+      }
+    ],
+    "trade_entry_buckets": [
+      {
+        "expansion_bucket": "Q1",
+        "trades": 99,
+        "avg_strategy_return_pct": 0.1977,
+        "avg_edge_vs_sector_pct": 1.0441,
+        "avg_edge_vs_market_pct": 0.1944,
+        "net_pnl": -1973.0379,
+        "positive_edge_vs_sector_rate_pct": 49.49
+      },
+      {
+        "expansion_bucket": "Q2",
+        "trades": 117,
+        "avg_strategy_return_pct": 2.32,
+        "avg_edge_vs_sector_pct": 0.3335,
+        "avg_edge_vs_market_pct": 1.7589,
+        "net_pnl": 23934.0612,
+        "positive_edge_vs_sector_rate_pct": 52.99
+      },
+      {
+        "expansion_bucket": "Q3",
+        "trades": 134,
+        "avg_strategy_return_pct": 3.8135,
+        "avg_edge_vs_sector_pct": 1.6038,
+        "avg_edge_vs_market_pct": 2.8527,
+        "net_pnl": 54361.9666,
+        "positive_edge_vs_sector_rate_pct": 57.46
+      },
+      {
+        "expansion_bucket": "Q4",
+        "trades": 116,
+        "avg_strategy_return_pct": 1.5764,
+        "avg_edge_vs_sector_pct": 1.4423,
+        "avg_edge_vs_market_pct": -0.1211,
+        "net_pnl": 15636.8178,
+        "positive_edge_vs_sector_rate_pct": 38.79
+      },
+      {
+        "expansion_bucket": "Q5",
+        "trades": 121,
+        "avg_strategy_return_pct": 1.4591,
+        "avg_edge_vs_sector_pct": 1.5312,
+        "avg_edge_vs_market_pct": 0.7418,
+        "net_pnl": 17942.5125,
+        "positive_edge_vs_sector_rate_pct": 57.02
+      }
+    ]
+  },
+  "tail_risk": {
+    "by_sector": [
+      {
+        "sector_group": "Communication Services",
+        "trades": 71,
+        "net_pnl": 12639.4324,
+        "avg_trade_pnl": 178.0202,
+        "trade_cvar95_pnl": -621.1848,
+        "trade_cvar95_return_pct": -8.6704,
+        "worst_trade_pnl": -953.0495,
+        "months_active": 42,
+        "avg_monthly_pnl": 300.9389,
+        "monthly_cvar95_pnl": -539.1224,
+        "worst_month_pnl": -848.7837,
+        "recent_6m_pnl": 8923.7375,
+        "recent_6m_share_of_sector_pnl_pct": 70.6,
+        "recent_6m_share_of_portfolio_pnl_pct": 11.04
+      },
+      {
+        "sector_group": "Consumer Discretionary",
+        "trades": 40,
+        "net_pnl": 3269.5652,
+        "avg_trade_pnl": 81.7391,
+        "trade_cvar95_pnl": -924.9786,
+        "trade_cvar95_return_pct": -10.043,
+        "worst_trade_pnl": -1970.7681,
+        "months_active": 28,
+        "avg_monthly_pnl": 116.7702,
+        "monthly_cvar95_pnl": -1387.4678,
+        "worst_month_pnl": -2321.346,
+        "recent_6m_pnl": 1017.2301,
+        "recent_6m_share_of_sector_pnl_pct": 31.11,
+        "recent_6m_share_of_portfolio_pnl_pct": 1.26
+      },
+      {
+        "sector_group": "Crypto",
+        "trades": 109,
+        "net_pnl": 4074.4685,
+        "avg_trade_pnl": 37.3804,
+        "trade_cvar95_pnl": -1492.786,
+        "trade_cvar95_return_pct": -10.0431,
+        "worst_trade_pnl": -2106.3041,
+        "months_active": 43,
+        "avg_monthly_pnl": 94.7551,
+        "monthly_cvar95_pnl": -2091.5879,
+        "worst_month_pnl": -2659.0804,
+        "recent_6m_pnl": 5698.9755,
+        "recent_6m_share_of_sector_pnl_pct": 139.87,
+        "recent_6m_share_of_portfolio_pnl_pct": 7.05
+      },
+      {
+        "sector_group": "Energy",
+        "trades": 85,
+        "net_pnl": 2093.9023,
+        "avg_trade_pnl": 24.6341,
+        "trade_cvar95_pnl": -605.4226,
+        "trade_cvar95_return_pct": -9.3542,
+        "worst_trade_pnl": -800.1379,
+        "months_active": 48,
+        "avg_monthly_pnl": 43.623,
+        "monthly_cvar95_pnl": -753.8327,
+        "worst_month_pnl": -1032.9489,
+        "recent_6m_pnl": 1612.2966,
+        "recent_6m_share_of_sector_pnl_pct": 77.0,
+        "recent_6m_share_of_portfolio_pnl_pct": 1.99
+      },
+      {
+        "sector_group": "Financials",
+        "trades": 39,
+        "net_pnl": 36026.3603,
+        "avg_trade_pnl": 923.7528,
+        "trade_cvar95_pnl": -519.9783,
+        "trade_cvar95_return_pct": -10.04,
+        "worst_trade_pnl": -545.4916,
+        "months_active": 28,
+        "avg_monthly_pnl": 1286.6557,
+        "monthly_cvar95_pnl": -490.0829,
+        "worst_month_pnl": -545.4916,
+        "recent_6m_pnl": 18059.4151,
+        "recent_6m_share_of_sector_pnl_pct": 50.13,
+        "recent_6m_share_of_portfolio_pnl_pct": 22.33
+      },
+      {
+        "sector_group": "Gold",
+        "trades": 66,
+        "net_pnl": 8838.6853,
+        "avg_trade_pnl": 133.9195,
+        "trade_cvar95_pnl": -235.3374,
+        "trade_cvar95_return_pct": -3.5635,
+        "worst_trade_pnl": -406.8935,
+        "months_active": 38,
+        "avg_monthly_pnl": 232.597,
+        "monthly_cvar95_pnl": -367.1747,
+        "worst_month_pnl": -509.4558,
+        "recent_6m_pnl": 8187.1932,
+        "recent_6m_share_of_sector_pnl_pct": 92.63,
+        "recent_6m_share_of_portfolio_pnl_pct": 10.12
+      },
+      {
+        "sector_group": "Information Technology",
+        "trades": 90,
+        "net_pnl": 17718.6328,
+        "avg_trade_pnl": 196.8737,
+        "trade_cvar95_pnl": -1624.8729,
+        "trade_cvar95_return_pct": -10.0406,
+        "worst_trade_pnl": -2294.3888,
+        "months_active": 41,
+        "avg_monthly_pnl": 432.1618,
+        "monthly_cvar95_pnl": -1878.8153,
+        "worst_month_pnl": -2554.5243,
+        "recent_6m_pnl": 13821.7304,
+        "recent_6m_share_of_sector_pnl_pct": 78.01,
+        "recent_6m_share_of_portfolio_pnl_pct": 17.09
+      },
+      {
+        "sector_group": "Metals",
+        "trades": 88,
+        "net_pnl": 25234.5235,
+        "avg_trade_pnl": 286.7559,
+        "trade_cvar95_pnl": -281.7431,
+        "trade_cvar95_return_pct": -5.4652,
+        "worst_trade_pnl": -451.1703,
+        "months_active": 42,
+        "avg_monthly_pnl": 600.822,
+        "monthly_cvar95_pnl": -227.7146,
+        "worst_month_pnl": -382.63,
+        "recent_6m_pnl": 23542.3385,
+        "recent_6m_share_of_sector_pnl_pct": 93.29,
+        "recent_6m_share_of_portfolio_pnl_pct": 29.11
+      }
+    ],
+    "by_sector_direction": [
+      {
+        "sector_group": "Communication Services",
+        "direction": "long",
+        "trades": 36,
+        "net_pnl": 2333.7025,
+        "avg_trade_pnl": 64.8251,
+        "trade_cvar95_pnl": -846.9998,
+        "trade_cvar95_return_pct": -6.8231,
+        "worst_trade_pnl": -953.0495
+      },
+      {
+        "sector_group": "Communication Services",
+        "direction": "short",
+        "trades": 35,
+        "net_pnl": 10305.7299,
+        "avg_trade_pnl": 294.4494,
+        "trade_cvar95_pnl": -165.2837,
+        "trade_cvar95_return_pct": -9.2682,
+        "worst_trade_pnl": -187.3254
+      },
+      {
+        "sector_group": "Consumer Discretionary",
+        "direction": "long",
+        "trades": 33,
+        "net_pnl": 5582.9144,
+        "avg_trade_pnl": 169.1792,
+        "trade_cvar95_pnl": -402.0838,
+        "trade_cvar95_return_pct": -5.4324,
+        "worst_trade_pnl": -453.5897
+      },
+      {
+        "sector_group": "Consumer Discretionary",
+        "direction": "short",
+        "trades": 7,
+        "net_pnl": -2313.3492,
+        "avg_trade_pnl": -330.4785,
+        "trade_cvar95_pnl": -1970.7681,
+        "trade_cvar95_return_pct": -10.043,
+        "worst_trade_pnl": -1970.7681
+      },
+      {
+        "sector_group": "Crypto",
+        "direction": "long",
+        "trades": 55,
+        "net_pnl": 1845.4085,
+        "avg_trade_pnl": 33.5529,
+        "trade_cvar95_pnl": -1130.7173,
+        "trade_cvar95_return_pct": -9.322,
+        "worst_trade_pnl": -2106.3041
+      },
+      {
+        "sector_group": "Crypto",
+        "direction": "short",
+        "trades": 54,
+        "net_pnl": 2229.06,
+        "avg_trade_pnl": 41.2789,
+        "trade_cvar95_pnl": -1479.4905,
+        "trade_cvar95_return_pct": -10.0432,
+        "worst_trade_pnl": -1828.9707
+      },
+      {
+        "sector_group": "Energy",
+        "direction": "long",
+        "trades": 35,
+        "net_pnl": 4543.786,
+        "avg_trade_pnl": 129.8225,
+        "trade_cvar95_pnl": -416.7982,
+        "trade_cvar95_return_pct": -9.082,
+        "worst_trade_pnl": -658.8988
+      },
+      {
+        "sector_group": "Energy",
+        "direction": "short",
+        "trades": 50,
+        "net_pnl": -2449.8837,
+        "avg_trade_pnl": -48.9977,
+        "trade_cvar95_pnl": -676.2291,
+        "trade_cvar95_return_pct": -9.6264,
+        "worst_trade_pnl": -800.1379
+      },
+      {
+        "sector_group": "Financials",
+        "direction": "long",
+        "trades": 29,
+        "net_pnl": 17488.8775,
+        "avg_trade_pnl": 603.0647,
+        "trade_cvar95_pnl": -464.0854,
+        "trade_cvar95_return_pct": -10.0371,
+        "worst_trade_pnl": -494.465
+      },
+      {
+        "sector_group": "Financials",
+        "direction": "short",
+        "trades": 10,
+        "net_pnl": 18537.4828,
+        "avg_trade_pnl": 1853.7483,
+        "trade_cvar95_pnl": -545.4916,
+        "trade_cvar95_return_pct": -10.043,
+        "worst_trade_pnl": -545.4916
+      },
+      {
+        "sector_group": "Gold",
+        "direction": "long",
+        "trades": 53,
+        "net_pnl": 8789.1827,
+        "avg_trade_pnl": 165.8336,
+        "trade_cvar95_pnl": -271.7922,
+        "trade_cvar95_return_pct": -3.8392,
+        "worst_trade_pnl": -406.8935
+      },
+      {
+        "sector_group": "Gold",
+        "direction": "short",
+        "trades": 13,
+        "net_pnl": 49.5026,
+        "avg_trade_pnl": 3.8079,
+        "trade_cvar95_pnl": -21.2239,
+        "trade_cvar95_return_pct": -2.7367,
+        "worst_trade_pnl": -21.2239
+      },
+      {
+        "sector_group": "Information Technology",
+        "direction": "long",
+        "trades": 57,
+        "net_pnl": 9333.9805,
+        "avg_trade_pnl": 163.754,
+        "trade_cvar95_pnl": -1736.3606,
+        "trade_cvar95_return_pct": -10.037,
+        "worst_trade_pnl": -2294.3888
+      },
+      {
+        "sector_group": "Information Technology",
+        "direction": "short",
+        "trades": 33,
+        "net_pnl": 8384.6523,
+        "avg_trade_pnl": 254.0804,
+        "trade_cvar95_pnl": -1457.6413,
+        "trade_cvar95_return_pct": -10.043,
+        "worst_trade_pnl": -2011.9219
+      },
+      {
+        "sector_group": "Metals",
+        "direction": "long",
+        "trades": 54,
+        "net_pnl": 25587.5111,
+        "avg_trade_pnl": 473.8428,
+        "trade_cvar95_pnl": -347.372,
+        "trade_cvar95_return_pct": -5.995,
+        "worst_trade_pnl": -451.1703
+      },
+      {
+        "sector_group": "Metals",
+        "direction": "short",
+        "trades": 34,
+        "net_pnl": -352.9876,
+        "avg_trade_pnl": -10.382,
+        "trade_cvar95_pnl": -123.5885,
+        "trade_cvar95_return_pct": -3.3899,
+        "worst_trade_pnl": -169.5586
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+ticker,source,session_count,asset_bucket,sector_group,sub_sector
+AMZN,tiingo,1,equity,Consumer Discretionary,Broadline Retail
+BRENT,tiingo,1,energy,Energy,
+BTC-USD,binance,2,crypto,Crypto,
+COIN,tiingo,1,equity,Financials,Capital Markets
+COPPER,tiingo,1,metals,Metals,
+CRCL,tiingo,1,equity,Financials,Transaction & Payment Processing
+ETH-USD,binance,2,crypto,Crypto,
+GLD,tiingo,1,gold,Gold,
+GOOGL,tiingo,1,equity,Communication Services,Interactive Media & Services
+HOOD,tiingo,1,equity,Financials,Brokerage & Capital Markets
+INTC,tiingo,1,equity,Information Technology,Semiconductors
+META,tiingo,1,equity,Communication Services,Interactive Media & Services
+MSTR,tiingo,1,equity,Information Technology,Application Software
+NATGAS,tiingo,1,energy,Energy,
+NVDA,tiingo,1,equity,Information Technology,Semiconductors
+PAXG-USD,binance,2,gold,Gold,
+PLTR,tiingo,1,equity,Information Technology,Application Software
+PPLT,tiingo,1,metals,Metals,
+SLV,tiingo,1,metals,Metals,
+SOL-USD,binance,2,crypto,Crypto,
+TSLA,tiingo,1,equity,Consumer Discretionary,Automobiles

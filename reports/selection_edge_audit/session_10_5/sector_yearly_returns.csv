@@ -1,0 +1,44 @@
+label,year,return_pct,observations
+Communication Services,2022,-68.35,230
+Communication Services,2023,118.46,260
+Communication Services,2024,52.1,261
+Communication Services,2025,38.89,261
+Communication Services,2026,-16.11,62
+Consumer Discretionary,2023,108.16,257
+Consumer Discretionary,2024,60.11,260
+Consumer Discretionary,2025,12.26,259
+Consumer Discretionary,2026,-9.47,42
+Crypto,2022,-74.22,324
+Crypto,2023,294.32,365
+Crypto,2024,90.27,366
+Crypto,2025,-14.27,365
+Crypto,2026,-30.11,56
+Energy,2022,15.77,230
+Energy,2023,-38.03,260
+Energy,2024,153.07,261
+Energy,2025,-13.02,261
+Energy,2026,38.08,63
+Financials,2023,205.34,257
+Financials,2024,113.27,260
+Financials,2025,69.89,260
+Financials,2026,-17.15,42
+Gold,2022,-0.6,324
+Gold,2023,12.93,365
+Gold,2024,31.78,366
+Gold,2025,66.77,365
+Gold,2026,25.07,58
+Information Technology,2022,-43.41,230
+Information Technology,2023,216.13,260
+Information Technology,2024,51.53,262
+Information Technology,2025,46.57,261
+Information Technology,2026,-8.94,62
+Market,2022,-50.8,324
+Market,2023,170.4,365
+Market,2024,111.82,366
+Market,2025,56.1,365
+Market,2026,-14.29,79
+Metals,2022,-17.71,231
+Metals,2023,-2.15,260
+Metals,2024,3.32,262
+Metals,2025,111.72,261
+Metals,2026,14.82,50

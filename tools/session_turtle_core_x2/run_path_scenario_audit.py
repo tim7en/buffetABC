@@ -52,6 +52,7 @@ import edgar.services.session_turtle_portfolio as stp
 import edgar.services.session_turtle_trend_strategy as stts
 from edgar.services.binance_data import load_local_binance_klines as _orig_load_binance_klines
 from edgar.services.local_tiingo_data import load_local_tiingo_klines as _orig_load_tiingo_klines
+from edgar.services.session_open_utils import SessionBar
 from edgar.services.session_turtle_portfolio import (
     build_extended_hours_proxy_state,
     build_per_asset_technical_state,
@@ -370,6 +371,36 @@ def _load_macro_state(root: Path) -> dict:
     return build_extended_hours_proxy_state(daily_vix_closes=vix_closes, crypto_fg_scores=crypto_fg)
 
 
+def _identity_session_bars(bars: list[dict], session_open: str):
+    del session_open
+    sessions = [
+        SessionBar(
+            anchor=bar["timestamp"],
+            open=float(bar["open"]),
+            high=float(bar["high"]),
+            low=float(bar["low"]),
+            close=float(bar["close"]),
+            volume=float(bar.get("volume", 0.0) or 0.0),
+        )
+        for bar in bars
+    ]
+    mapping = list(range(len(bars)))
+    return sessions, mapping
+
+
+@contextmanager
+def _patched_raw_5m_sessions(enabled: bool):
+    if not enabled:
+        yield
+        return
+    old_aggregate = stts.aggregate_session_bars
+    stts.aggregate_session_bars = _identity_session_bars
+    try:
+        yield
+    finally:
+        stts.aggregate_session_bars = old_aggregate
+
+
 def _equity_curve_from_trades(*, trades: list[dict], initial_capital: float, start_date: datetime) -> list[dict]:
     capital = float(initial_capital)
     rows = [{"date": start_date.isoformat(), "equity": round(capital, 4)}]
@@ -532,23 +563,28 @@ def _run_variant(
     label: str,
     description: str,
     root: Path,
+    report_summary: dict,
+    raw_5m_channels: bool,
 ) -> dict:
     macro_state = _load_macro_state(root)
     with _patched_universe() as universe:
         with _patched_loaders(scenario):
-            tech_state = build_per_asset_technical_state(
-                universe=list(dict.fromkeys(universe)),
-                lookback_years=5.0,
-                warmup_days=300,
-                ema_period=EMA_PERIOD,
-                adx_period=14,
-            )
-            candidates = build_session_turtle_shared_account_candidates(**CURRENT_BASELINE_CANDIDATE_KWARGS)
-            report_kwargs = dict(CURRENT_BASELINE_REPORT_KWARGS)
-            report_kwargs["extended_hours_proxy_state"] = macro_state
-            report_kwargs["per_asset_technical_state"] = tech_state
-            report_kwargs["precomputed_candidates"] = candidates
-            result = generate_session_turtle_shared_account_report(**report_kwargs)
+            with _patched_raw_5m_sessions(raw_5m_channels):
+                tech_state = build_per_asset_technical_state(
+                    universe=list(dict.fromkeys(universe)),
+                    lookback_years=5.0,
+                    warmup_days=300,
+                    ema_period=EMA_PERIOD,
+                    adx_period=14,
+                )
+                candidate_kwargs = dict(CURRENT_BASELINE_CANDIDATE_KWARGS)
+                candidate_kwargs["channel_period"] = int(report_summary.get("channel_period", CHANNEL_PERIOD) or CHANNEL_PERIOD)
+                candidates = build_session_turtle_shared_account_candidates(**candidate_kwargs)
+                report_kwargs = dict(CURRENT_BASELINE_REPORT_KWARGS)
+                report_kwargs["extended_hours_proxy_state"] = macro_state
+                report_kwargs["per_asset_technical_state"] = tech_state
+                report_kwargs["precomputed_candidates"] = candidates
+                result = generate_session_turtle_shared_account_report(**report_kwargs)
 
     return {
         "name": "baseline" if scenario is None else scenario.name,
@@ -723,6 +759,7 @@ def _plot_capture_lag(rows: list[dict], *, label: str) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run counterfactual cross-asset path shocks against the current baseline.")
+    parser.add_argument("--report-dir", type=Path, default=REPORT_DIR)
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     parser.add_argument("--shock-start", type=str, default=None, help="Shock start date in YYYY-MM-DD. Defaults to 180 calendar days before report end.")
     return parser.parse_args()
@@ -731,6 +768,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     root = Path(__file__).resolve().parents[2]
+    report_dir = args.report_dir.resolve()
     output_dir = args.output_dir.resolve()
     chart_dir = output_dir / "charts"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -742,7 +780,8 @@ def main() -> None:
 
     _ensure_tiingo_cache_symbols()
 
-    report_summary = json.loads((REPORT_DIR / "summary.json").read_text())
+    report_summary = json.loads((report_dir / "summary.json").read_text())
+    raw_5m_channels = bool(report_summary.get("raw_5m_channels", False))
     analysis_end = _dt(report_summary["end_date"]).date()
     shock_start = _date(args.shock_start) if args.shock_start else (analysis_end - timedelta(days=180))
     shock_end = analysis_end
@@ -755,6 +794,8 @@ def main() -> None:
         label="Current baseline replay",
         description="Unshocked replay using the current baseline configuration and the current local caches.",
         root=root,
+        report_summary=report_summary,
+        raw_5m_channels=raw_5m_channels,
     )
 
     runs = [baseline_run]
@@ -766,6 +807,8 @@ def main() -> None:
                 label=scenario.label,
                 description=scenario.description,
                 root=root,
+                report_summary=report_summary,
+                raw_5m_channels=raw_5m_channels,
             )
         )
 
@@ -842,7 +885,7 @@ def main() -> None:
     _save_json(
         output_dir / "summary.json",
         {
-            "report_source": str(REPORT_DIR.resolve()),
+            "report_source": str(report_dir.resolve()),
             "shock_start": shock_start.isoformat(),
             "shock_end": shock_end.isoformat(),
             "method": {

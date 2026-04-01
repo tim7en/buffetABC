@@ -1,0 +1,211 @@
+left_ticker,right_ticker,left_sector,right_sector,left_bucket,right_bucket,same_sector,same_bucket,corr,abs_corr,obs
+AMZN,BRENT,Consumer Discretionary,Energy,equity,energy,False,False,0.0911,0.0911,817
+AMZN,BTC-USD,Consumer Discretionary,Crypto,equity,crypto,False,False,0.2225,0.2225,816
+AMZN,COIN,Consumer Discretionary,Financials,equity,equity,False,True,0.3723,0.3723,818
+AMZN,COPPER,Consumer Discretionary,Metals,equity,metals,False,False,0.165,0.165,783
+AMZN,CRCL,Consumer Discretionary,Financials,equity,equity,False,True,0.1386,0.1386,190
+AMZN,ETH-USD,Consumer Discretionary,Crypto,equity,crypto,False,False,0.2396,0.2396,816
+AMZN,GLD,Consumer Discretionary,Gold,equity,gold,False,False,-0.0188,0.0188,818
+AMZN,GOOGL,Consumer Discretionary,Communication Services,equity,equity,False,True,0.556,0.556,817
+AMZN,HOOD,Consumer Discretionary,Financials,equity,equity,False,True,0.4145,0.4145,816
+AMZN,INTC,Consumer Discretionary,Information Technology,equity,equity,False,True,0.3183,0.3183,818
+AMZN,META,Consumer Discretionary,Communication Services,equity,equity,False,True,0.5946,0.5946,817
+AMZN,MSTR,Consumer Discretionary,Information Technology,equity,equity,False,True,0.2251,0.2251,818
+AMZN,NATGAS,Consumer Discretionary,Energy,equity,energy,False,False,0.0222,0.0222,817
+AMZN,NVDA,Consumer Discretionary,Information Technology,equity,equity,False,True,0.2937,0.2937,817
+AMZN,PAXG-USD,Consumer Discretionary,Gold,equity,gold,False,False,-0.0037,0.0037,816
+AMZN,PLTR,Consumer Discretionary,Information Technology,equity,equity,False,True,0.4022,0.4022,818
+AMZN,PPLT,Consumer Discretionary,Metals,equity,metals,False,False,0.087,0.087,818
+AMZN,SLV,Consumer Discretionary,Metals,equity,metals,False,False,0.1172,0.1172,775
+AMZN,SOL-USD,Consumer Discretionary,Crypto,equity,crypto,False,False,0.2192,0.2192,816
+AMZN,TSLA,Consumer Discretionary,Consumer Discretionary,equity,equity,True,True,0.405,0.405,818
+BRENT,BTC-USD,Energy,Crypto,energy,crypto,False,False,0.0485,0.0485,1052
+BRENT,COIN,Energy,Financials,energy,equity,False,False,0.0455,0.0455,817
+BRENT,COPPER,Energy,Metals,energy,metals,False,False,0.2804,0.2804,1027
+BRENT,CRCL,Energy,Financials,energy,equity,False,False,0.1173,0.1173,191
+BRENT,ETH-USD,Energy,Crypto,energy,crypto,False,False,0.071,0.071,1052
+BRENT,GLD,Energy,Gold,energy,gold,False,False,0.1675,0.1675,817
+BRENT,GOOGL,Energy,Communication Services,energy,equity,False,False,-0.0275,0.0275,1074
+BRENT,HOOD,Energy,Financials,energy,equity,False,False,0.1233,0.1233,816
+BRENT,INTC,Energy,Information Technology,energy,equity,False,False,0.0425,0.0425,817
+BRENT,META,Energy,Communication Services,energy,equity,False,False,0.0102,0.0102,1074
+BRENT,MSTR,Energy,Information Technology,energy,equity,False,False,0.0352,0.0352,817
+BRENT,NATGAS,Energy,Energy,energy,energy,True,True,0.0748,0.0748,1075
+BRENT,NVDA,Energy,Information Technology,energy,equity,False,False,0.0152,0.0152,1074
+BRENT,PAXG-USD,Energy,Gold,energy,gold,False,False,0.1895,0.1895,1052
+BRENT,PLTR,Energy,Information Technology,energy,equity,False,False,0.07,0.07,817
+BRENT,PPLT,Energy,Metals,energy,metals,False,False,0.1053,0.1053,818
+BRENT,SLV,Energy,Metals,energy,metals,False,False,0.1739,0.1739,774
+BRENT,SOL-USD,Energy,Crypto,energy,crypto,False,False,0.055,0.055,1052
+BRENT,TSLA,Energy,Consumer Discretionary,energy,equity,False,False,0.0738,0.0738,817
+BTC-USD,COIN,Crypto,Financials,crypto,equity,False,False,0.5693,0.5693,816
+BTC-USD,COPPER,Crypto,Metals,crypto,metals,False,False,0.1538,0.1538,1019
+BTC-USD,CRCL,Crypto,Financials,crypto,equity,False,False,0.3874,0.3874,189
+BTC-USD,ETH-USD,Crypto,Crypto,crypto,crypto,True,True,0.834,0.834,1476
+BTC-USD,GLD,Crypto,Gold,crypto,gold,False,False,0.0983,0.0983,816
+BTC-USD,GOOGL,Crypto,Communication Services,crypto,equity,False,False,0.1056,0.1056,1052
+BTC-USD,HOOD,Crypto,Financials,crypto,equity,False,False,0.4276,0.4276,815
+BTC-USD,INTC,Crypto,Information Technology,crypto,equity,False,False,0.1769,0.1769,816
+BTC-USD,META,Crypto,Communication Services,crypto,equity,False,False,0.2553,0.2553,1052
+BTC-USD,MSTR,Crypto,Information Technology,crypto,equity,False,False,0.5176,0.5176,816
+BTC-USD,NATGAS,Crypto,Energy,crypto,energy,False,False,0.0164,0.0164,1052
+BTC-USD,NVDA,Crypto,Information Technology,crypto,equity,False,False,0.2548,0.2548,1052
+BTC-USD,PAXG-USD,Crypto,Gold,crypto,gold,False,False,0.1308,0.1308,1476
+BTC-USD,PLTR,Crypto,Information Technology,crypto,equity,False,False,0.2539,0.2539,816
+BTC-USD,PPLT,Crypto,Metals,crypto,metals,False,False,0.1472,0.1472,816
+BTC-USD,SLV,Crypto,Metals,crypto,metals,False,False,0.1618,0.1618,773
+BTC-USD,SOL-USD,Crypto,Crypto,crypto,crypto,True,True,0.7436,0.7436,1476
+BTC-USD,TSLA,Crypto,Consumer Discretionary,crypto,equity,False,False,0.2795,0.2795,816
+COIN,COPPER,Financials,Metals,equity,metals,False,False,0.153,0.153,783
+COIN,CRCL,Financials,Financials,equity,equity,True,True,0.5786,0.5786,190
+COIN,ETH-USD,Financials,Crypto,equity,crypto,False,False,0.5342,0.5342,816
+COIN,GLD,Financials,Gold,equity,gold,False,False,0.0426,0.0426,818
+COIN,GOOGL,Financials,Communication Services,equity,equity,False,True,0.327,0.327,817
+COIN,HOOD,Financials,Financials,equity,equity,True,True,0.6588,0.6588,816
+COIN,INTC,Financials,Information Technology,equity,equity,False,True,0.2171,0.2171,818
+COIN,META,Financials,Communication Services,equity,equity,False,True,0.3209,0.3209,817
+COIN,MSTR,Financials,Information Technology,equity,equity,False,True,0.5769,0.5769,818
+COIN,NATGAS,Financials,Energy,equity,energy,False,False,-0.0153,0.0153,817
+COIN,NVDA,Financials,Information Technology,equity,equity,False,True,0.2419,0.2419,817
+COIN,PAXG-USD,Financials,Gold,equity,gold,False,False,0.0653,0.0653,816
+COIN,PLTR,Financials,Information Technology,equity,equity,False,True,0.4211,0.4211,818
+COIN,PPLT,Financials,Metals,equity,metals,False,False,0.1604,0.1604,818
+COIN,SLV,Financials,Metals,equity,metals,False,False,0.1345,0.1345,775
+COIN,SOL-USD,Financials,Crypto,equity,crypto,False,False,0.4665,0.4665,816
+COIN,TSLA,Financials,Consumer Discretionary,equity,equity,False,True,0.4136,0.4136,818
+COPPER,CRCL,Metals,Financials,metals,equity,False,False,0.0345,0.0345,157
+COPPER,ETH-USD,Metals,Crypto,metals,crypto,False,False,0.1804,0.1804,1019
+COPPER,GLD,Metals,Gold,metals,gold,False,False,0.4059,0.4059,783
+COPPER,GOOGL,Metals,Communication Services,metals,equity,False,False,0.0588,0.0588,1027
+COPPER,HOOD,Metals,Financials,metals,equity,False,False,0.2221,0.2221,783
+COPPER,INTC,Metals,Information Technology,metals,equity,False,False,0.1594,0.1594,783
+COPPER,META,Metals,Communication Services,metals,equity,False,False,0.1822,0.1822,1027
+COPPER,MSTR,Metals,Information Technology,metals,equity,False,False,0.1432,0.1432,783
+COPPER,NATGAS,Metals,Energy,metals,energy,False,False,0.0505,0.0505,1027
+COPPER,NVDA,Metals,Information Technology,metals,equity,False,False,0.1503,0.1503,1027
+COPPER,PAXG-USD,Metals,Gold,metals,gold,False,False,0.3828,0.3828,1019
+COPPER,PLTR,Metals,Information Technology,metals,equity,False,False,0.1321,0.1321,783
+COPPER,PPLT,Metals,Metals,metals,metals,True,True,0.4598,0.4598,784
+COPPER,SLV,Metals,Metals,metals,metals,True,True,0.482,0.482,741
+COPPER,SOL-USD,Metals,Crypto,metals,crypto,False,False,0.1354,0.1354,1019
+COPPER,TSLA,Metals,Consumer Discretionary,metals,equity,False,False,0.1953,0.1953,783
+CRCL,ETH-USD,Financials,Crypto,equity,crypto,False,False,0.3487,0.3487,189
+CRCL,GLD,Financials,Gold,equity,gold,False,False,0.0294,0.0294,190
+CRCL,GOOGL,Financials,Communication Services,equity,equity,False,True,0.0182,0.0182,191
+CRCL,HOOD,Financials,Financials,equity,equity,True,True,0.3869,0.3869,189
+CRCL,INTC,Financials,Information Technology,equity,equity,False,True,0.1057,0.1057,190
+CRCL,META,Financials,Communication Services,equity,equity,False,True,0.151,0.151,191
+CRCL,MSTR,Financials,Information Technology,equity,equity,False,True,0.3894,0.3894,190
+CRCL,NATGAS,Financials,Energy,equity,energy,False,False,-0.0231,0.0231,191
+CRCL,NVDA,Financials,Information Technology,equity,equity,False,True,0.1145,0.1145,191
+CRCL,PAXG-USD,Financials,Gold,equity,gold,False,False,0.0731,0.0731,189
+CRCL,PLTR,Financials,Information Technology,equity,equity,False,True,0.364,0.364,190
+CRCL,PPLT,Financials,Metals,equity,metals,False,False,0.1251,0.1251,190
+CRCL,SLV,Financials,Metals,equity,metals,False,False,0.0644,0.0644,190
+CRCL,SOL-USD,Financials,Crypto,equity,crypto,False,False,0.2986,0.2986,189
+CRCL,TSLA,Financials,Consumer Discretionary,equity,equity,False,True,0.2375,0.2375,190
+ETH-USD,GLD,Crypto,Gold,crypto,gold,False,False,0.0774,0.0774,816
+ETH-USD,GOOGL,Crypto,Communication Services,crypto,equity,False,False,0.0717,0.0717,1052
+ETH-USD,HOOD,Crypto,Financials,crypto,equity,False,False,0.4312,0.4312,815
+ETH-USD,INTC,Crypto,Information Technology,crypto,equity,False,False,0.2265,0.2265,816
+ETH-USD,META,Crypto,Communication Services,crypto,equity,False,False,0.272,0.272,1052
+ETH-USD,MSTR,Crypto,Information Technology,crypto,equity,False,False,0.4171,0.4171,816
+ETH-USD,NATGAS,Crypto,Energy,crypto,energy,False,False,0.0052,0.0052,1052
+ETH-USD,NVDA,Crypto,Information Technology,crypto,equity,False,False,0.271,0.271,1052
+ETH-USD,PAXG-USD,Crypto,Gold,crypto,gold,False,False,0.1063,0.1063,1476
+ETH-USD,PLTR,Crypto,Information Technology,crypto,equity,False,False,0.2666,0.2666,816
+ETH-USD,PPLT,Crypto,Metals,crypto,metals,False,False,0.1531,0.1531,816
+ETH-USD,SLV,Crypto,Metals,crypto,metals,False,False,0.1556,0.1556,773
+ETH-USD,SOL-USD,Crypto,Crypto,crypto,crypto,True,True,0.7397,0.7397,1476
+ETH-USD,TSLA,Crypto,Consumer Discretionary,crypto,equity,False,False,0.3008,0.3008,816
+GLD,GOOGL,Gold,Communication Services,gold,equity,False,False,0.0504,0.0504,817
+GLD,HOOD,Gold,Financials,gold,equity,False,False,0.1031,0.1031,816
+GLD,INTC,Gold,Information Technology,gold,equity,False,False,0.0913,0.0913,818
+GLD,META,Gold,Communication Services,gold,equity,False,False,-0.0126,0.0126,817
+GLD,MSTR,Gold,Information Technology,gold,equity,False,False,0.0523,0.0523,818
+GLD,NATGAS,Gold,Energy,gold,energy,False,False,-0.0163,0.0163,817
+GLD,NVDA,Gold,Information Technology,gold,equity,False,False,-0.0029,0.0029,817
+GLD,PAXG-USD,Gold,Gold,gold,gold,True,True,0.8709,0.8709,816
+GLD,PLTR,Gold,Information Technology,gold,equity,False,False,0.0692,0.0692,818
+GLD,PPLT,Gold,Metals,gold,metals,False,False,0.5801,0.5801,818
+GLD,SLV,Gold,Metals,gold,metals,False,False,0.7599,0.7599,775
+GLD,SOL-USD,Gold,Crypto,gold,crypto,False,False,0.0612,0.0612,816
+GLD,TSLA,Gold,Consumer Discretionary,gold,equity,False,False,0.0013,0.0013,818
+GOOGL,HOOD,Communication Services,Financials,equity,equity,False,True,0.3373,0.3373,816
+GOOGL,INTC,Communication Services,Information Technology,equity,equity,False,True,0.2249,0.2249,817
+GOOGL,META,Communication Services,Communication Services,equity,equity,True,True,0.3062,0.3062,1074
+GOOGL,MSTR,Communication Services,Information Technology,equity,equity,False,True,0.2007,0.2007,817
+GOOGL,NATGAS,Communication Services,Energy,equity,energy,False,False,0.005,0.005,1074
+GOOGL,NVDA,Communication Services,Information Technology,equity,equity,False,True,0.21,0.21,1074
+GOOGL,PAXG-USD,Communication Services,Gold,equity,gold,False,False,0.0399,0.0399,1052
+GOOGL,PLTR,Communication Services,Information Technology,equity,equity,False,True,0.3139,0.3139,817
+GOOGL,PPLT,Communication Services,Metals,equity,metals,False,False,0.1006,0.1006,818
+GOOGL,SLV,Communication Services,Metals,equity,metals,False,False,0.1093,0.1093,774
+GOOGL,SOL-USD,Communication Services,Crypto,equity,crypto,False,False,0.1138,0.1138,1052
+GOOGL,TSLA,Communication Services,Consumer Discretionary,equity,equity,False,True,0.3822,0.3822,817
+HOOD,INTC,Financials,Information Technology,equity,equity,False,True,0.2637,0.2637,816
+HOOD,META,Financials,Communication Services,equity,equity,False,True,0.3284,0.3284,816
+HOOD,MSTR,Financials,Information Technology,equity,equity,False,True,0.4456,0.4456,816
+HOOD,NATGAS,Financials,Energy,equity,energy,False,False,-0.0065,0.0065,816
+HOOD,NVDA,Financials,Information Technology,equity,equity,False,True,0.2439,0.2439,816
+HOOD,PAXG-USD,Financials,Gold,equity,gold,False,False,0.0994,0.0994,815
+HOOD,PLTR,Financials,Information Technology,equity,equity,False,True,0.4471,0.4471,816
+HOOD,PPLT,Financials,Metals,equity,metals,False,False,0.1876,0.1876,816
+HOOD,SLV,Financials,Metals,equity,metals,False,False,0.1646,0.1646,773
+HOOD,SOL-USD,Financials,Crypto,equity,crypto,False,False,0.343,0.343,815
+HOOD,TSLA,Financials,Consumer Discretionary,equity,equity,False,True,0.4388,0.4388,816
+INTC,META,Information Technology,Communication Services,equity,equity,False,True,0.2231,0.2231,817
+INTC,MSTR,Information Technology,Information Technology,equity,equity,True,True,0.1133,0.1133,818
+INTC,NATGAS,Information Technology,Energy,equity,energy,False,False,0.001,0.001,817
+INTC,NVDA,Information Technology,Information Technology,equity,equity,True,True,0.1888,0.1888,817
+INTC,PAXG-USD,Information Technology,Gold,equity,gold,False,False,0.095,0.095,816
+INTC,PLTR,Information Technology,Information Technology,equity,equity,True,True,0.2399,0.2399,818
+INTC,PPLT,Information Technology,Metals,equity,metals,False,False,0.1214,0.1214,818
+INTC,SLV,Information Technology,Metals,equity,metals,False,False,0.1398,0.1398,775
+INTC,SOL-USD,Information Technology,Crypto,equity,crypto,False,False,0.1757,0.1757,816
+INTC,TSLA,Information Technology,Consumer Discretionary,equity,equity,False,True,0.2527,0.2527,818
+META,MSTR,Communication Services,Information Technology,equity,equity,False,True,0.181,0.181,817
+META,NATGAS,Communication Services,Energy,equity,energy,False,False,0.0221,0.0221,1074
+META,NVDA,Communication Services,Information Technology,equity,equity,False,True,0.3766,0.3766,1074
+META,PAXG-USD,Communication Services,Gold,equity,gold,False,False,0.0231,0.0231,1052
+META,PLTR,Communication Services,Information Technology,equity,equity,False,True,0.3615,0.3615,817
+META,PPLT,Communication Services,Metals,equity,metals,False,False,0.0612,0.0612,818
+META,SLV,Communication Services,Metals,equity,metals,False,False,0.0723,0.0723,774
+META,SOL-USD,Communication Services,Crypto,equity,crypto,False,False,0.2445,0.2445,1052
+META,TSLA,Communication Services,Consumer Discretionary,equity,equity,False,True,0.3396,0.3396,817
+MSTR,NATGAS,Information Technology,Energy,equity,energy,False,False,0.0034,0.0034,817
+MSTR,NVDA,Information Technology,Information Technology,equity,equity,True,True,0.1678,0.1678,817
+MSTR,PAXG-USD,Information Technology,Gold,equity,gold,False,False,0.0552,0.0552,816
+MSTR,PLTR,Information Technology,Information Technology,equity,equity,True,True,0.2466,0.2466,818
+MSTR,PPLT,Information Technology,Metals,equity,metals,False,False,0.1045,0.1045,818
+MSTR,SLV,Information Technology,Metals,equity,metals,False,False,0.1408,0.1408,775
+MSTR,SOL-USD,Information Technology,Crypto,equity,crypto,False,False,0.4,0.4,816
+MSTR,TSLA,Information Technology,Consumer Discretionary,equity,equity,False,True,0.2807,0.2807,818
+NATGAS,NVDA,Energy,Information Technology,energy,equity,False,False,0.0316,0.0316,1074
+NATGAS,PAXG-USD,Energy,Gold,energy,gold,False,False,-0.0022,0.0022,1052
+NATGAS,PLTR,Energy,Information Technology,energy,equity,False,False,-0.0231,0.0231,817
+NATGAS,PPLT,Energy,Metals,energy,metals,False,False,-0.0144,0.0144,818
+NATGAS,SLV,Energy,Metals,energy,metals,False,False,0.0019,0.0019,774
+NATGAS,SOL-USD,Energy,Crypto,energy,crypto,False,False,0.0318,0.0318,1052
+NATGAS,TSLA,Energy,Consumer Discretionary,energy,equity,False,False,0.0123,0.0123,817
+NVDA,PAXG-USD,Information Technology,Gold,equity,gold,False,False,0.0417,0.0417,1052
+NVDA,PLTR,Information Technology,Information Technology,equity,equity,True,True,0.2859,0.2859,817
+NVDA,PPLT,Information Technology,Metals,equity,metals,False,False,0.0594,0.0594,818
+NVDA,SLV,Information Technology,Metals,equity,metals,False,False,0.0414,0.0414,774
+NVDA,SOL-USD,Information Technology,Crypto,equity,crypto,False,False,0.2433,0.2433,1052
+NVDA,TSLA,Information Technology,Consumer Discretionary,equity,equity,False,True,0.2799,0.2799,817
+PAXG-USD,PLTR,Gold,Information Technology,gold,equity,False,False,0.0814,0.0814,816
+PAXG-USD,PPLT,Gold,Metals,gold,metals,False,False,0.5589,0.5589,816
+PAXG-USD,SLV,Gold,Metals,gold,metals,False,False,0.7055,0.7055,773
+PAXG-USD,SOL-USD,Gold,Crypto,gold,crypto,False,False,0.0681,0.0681,1476
+PAXG-USD,TSLA,Gold,Consumer Discretionary,gold,equity,False,False,0.0137,0.0137,816
+PLTR,PPLT,Information Technology,Metals,equity,metals,False,False,0.1241,0.1241,818
+PLTR,SLV,Information Technology,Metals,equity,metals,False,False,0.1134,0.1134,775
+PLTR,SOL-USD,Information Technology,Crypto,equity,crypto,False,False,0.2281,0.2281,816
+PLTR,TSLA,Information Technology,Consumer Discretionary,equity,equity,False,True,0.4259,0.4259,818
+PPLT,SLV,Metals,Metals,metals,metals,True,True,0.7058,0.7058,775
+PPLT,SOL-USD,Metals,Crypto,metals,crypto,False,False,0.1167,0.1167,816
+PPLT,TSLA,Metals,Consumer Discretionary,metals,equity,False,False,0.0762,0.0762,818
+SLV,SOL-USD,Metals,Crypto,metals,crypto,False,False,0.1393,0.1393,773
+SLV,TSLA,Metals,Consumer Discretionary,metals,equity,False,False,0.0383,0.0383,775
+SOL-USD,TSLA,Crypto,Consumer Discretionary,crypto,equity,False,False,0.2504,0.2504,816
