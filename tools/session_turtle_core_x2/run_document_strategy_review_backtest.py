@@ -4,7 +4,7 @@ This script approximates the 2026-04-03 strategy review the user supplied.
 
 Important differences versus the pasted live-strategy review:
   - The current repo allocator does not implement the old ranked-fill / priority_score path.
-  - The local cache is missing XPD-USD, so the run excludes it.
+  - All requested tickers are now available in local cache.
   - Some requested review tickers are mapped to local cache proxies:
       XAG-USD -> SLV
       XPT-USD -> PPLT
@@ -67,7 +67,7 @@ REQUESTED_SYMBOLS: tuple[RequestedSymbol, ...] = (
     RequestedSymbol("PAXG-USD", "PAXG-USD", "binance", ("hong_kong_open", "new_york_equity_open"), "gold"),
     RequestedSymbol("COPPER-USD", "COPPER-USD", "tiingo", ("new_york_equity_open",), "metals"),
     RequestedSymbol("XAG-USD", "SLV", "tiingo", ("new_york_equity_open",), "metals", "proxy=SLV"),
-    RequestedSymbol("XPD-USD", None, "tiingo", ("new_york_equity_open",), "metals", "missing local cache"),
+    RequestedSymbol("XPD-USD", "XPD-USD", "tiingo", ("new_york_equity_open",), "metals"),
     RequestedSymbol("XPT-USD", "PPLT", "tiingo", ("new_york_equity_open",), "metals", "proxy=PPLT"),
     RequestedSymbol("BZ-USD", "BRENT", "tiingo", ("new_york_equity_open",), "energy", "proxy=BRENT"),
     RequestedSymbol("NATGAS-USD", "NATGAS-USD", "tiingo", ("new_york_equity_open",), "energy"),
