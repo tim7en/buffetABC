@@ -20,14 +20,23 @@ from edgar.services.session_turtle_portfolio import (
     build_per_asset_technical_state,
 )
 
-EXPOSURE_MULTS = [3.0, 4.0, 5.0]
+SCENARIOS = [
+    # (label, exposure_mult, dd_trigger1, dd_mult1, dd_trigger2, dd_mult2)
+    ("x3  DD 15/25",  3.0, 15.0, 1.5, 25.0, 0.5),   # current baseline
+    ("x4  DD 15/25",  4.0, 15.0, 1.5, 25.0, 0.5),   # x4 with current DD
+    ("x4  DD 18/30",  4.0, 18.0, 1.5, 30.0, 0.5),   # x4 with +20% relaxed DD
+    ("x4  DD 21/35",  4.0, 21.0, 1.5, 35.0, 0.5),   # x4 with +40% relaxed DD
+    ("x5  DD 15/25",  5.0, 15.0, 1.5, 25.0, 0.5),   # x5 with current DD
+    ("x5  DD 18/30",  5.0, 18.0, 1.5, 30.0, 0.5),   # x5 with +20% relaxed DD
+    ("x5  DD 21/35",  5.0, 21.0, 1.5, 35.0, 0.5),   # x5 with +40% relaxed DD
+]
 
 
 def main():
     runnable, missing = _resolve_runnable_symbols()
 
     print(f"Symbols: {len(runnable)} runnable, {len(missing)} missing")
-    print(f"Testing exposure multiples: {EXPOSURE_MULTS}\n")
+    print(f"Testing {len(SCENARIOS)} scenarios\n")
 
     macro_state = _load_macro_state(ROOT)
 
@@ -54,18 +63,18 @@ def main():
             trend_slow_period=200,
         )
 
-        print(f"{'Exp':>4s}  {'Trades':>6s}  {'Final $':>12s}  {'Return%':>10s}  {'CAGR%':>8s}  {'MaxDD%':>7s}  {'PF':>5s}  {'WR%':>5s}  {'Zero$':>5s}")
-        print("-" * 80)
+        print(f"{'Scenario':<14s}  {'Trades':>6s}  {'Final $':>12s}  {'Return%':>10s}  {'CAGR%':>8s}  {'MaxDD%':>7s}  {'PF':>5s}  {'WR%':>5s}  {'Zero$':>5s}")
+        print("-" * 90)
 
-        for mult in EXPOSURE_MULTS:
+        for label, mult, dd1_pct, dd1_mult, dd2_pct, dd2_mult in SCENARIOS:
             result = generate_session_turtle_shared_account_report(
                 basket="core",
                 exposure_mult=mult,
                 use_drawdown_governor=True,
-                drawdown_trigger_1_pct=15.0,
-                drawdown_exposure_mult_1=1.5,
-                drawdown_trigger_2_pct=25.0,
-                drawdown_exposure_mult_2=0.5,
+                drawdown_trigger_1_pct=dd1_pct,
+                drawdown_exposure_mult_1=dd1_mult,
+                drawdown_trigger_2_pct=dd2_pct,
+                drawdown_exposure_mult_2=dd2_mult,
                 crypto_cap_mult=1.0,
                 gold_cap_mult=1.0,
                 metals_cap_mult=1.0,
@@ -110,7 +119,7 @@ def main():
             wins = sum(1 for t in trades if t["net_pnl"] > 0)
             wr = wins / len(trades) * 100 if trades else 0
 
-            print(f" x{mult:<3.0f}  {s['executed_trades']:>6d}  ${s['final_equity']:>10,.2f}  "
+            print(f" {label:<13s}  {s['executed_trades']:>6d}  ${s['final_equity']:>10,.2f}  "
                   f"{s['total_return_pct']:>+9.2f}%  {s['cagr_pct']:>7.2f}%  {s['max_realized_drawdown_pct']:>6.2f}%  "
                   f"{s['profit_factor']:>5.2f}  {wr:>4.1f}%  {zero_notional:>5d}")
 
