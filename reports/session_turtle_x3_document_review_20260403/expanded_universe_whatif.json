@@ -1,0 +1,209 @@
+{
+  "run_timestamp": "20260403_220448",
+  "original_universe_size": 23,
+  "expanded_universe_size": 27,
+  "extra_symbols": [
+    "QQQ",
+    "SPY",
+    "TSM",
+    "AAPL"
+  ],
+  "scenarios": [
+    {
+      "scenario": "x3  DD 15/25",
+      "original": {
+        "trades": 581,
+        "final_equity": 35406.07,
+        "total_return_pct": 3440.61,
+        "cagr_pct": 137.1,
+        "max_drawdown_pct": 24.99,
+        "profit_factor": 2.72,
+        "win_rate_pct": 39.6,
+        "zero_notional_trades": 41
+      },
+      "expanded": {
+        "trades": 554,
+        "final_equity": 4078.39,
+        "total_return_pct": 307.84,
+        "cagr_pct": 40.43,
+        "max_drawdown_pct": 37.23,
+        "profit_factor": 1.31,
+        "win_rate_pct": 37.4,
+        "zero_notional_trades": 39
+      },
+      "delta": {
+        "cagr_pct": -96.67,
+        "max_drawdown_pct": 12.24,
+        "profit_factor": -1.41
+      }
+    },
+    {
+      "scenario": "x4  DD 15/25",
+      "original": {
+        "trades": 261,
+        "final_equity": 1471.56,
+        "total_return_pct": 47.16,
+        "cagr_pct": 9.8,
+        "max_drawdown_pct": 43.29,
+        "profit_factor": 1.18,
+        "win_rate_pct": 35.6,
+        "zero_notional_trades": 15
+      },
+      "expanded": {
+        "trades": 354,
+        "final_equity": 1259.38,
+        "total_return_pct": 25.94,
+        "cagr_pct": 5.73,
+        "max_drawdown_pct": 42.52,
+        "profit_factor": 1.09,
+        "win_rate_pct": 35.6,
+        "zero_notional_trades": 54
+      },
+      "delta": {
+        "cagr_pct": -4.07,
+        "max_drawdown_pct": -0.77,
+        "profit_factor": -0.09
+      }
+    },
+    {
+      "scenario": "x4  DD 18/30",
+      "original": {
+        "trades": 631,
+        "final_equity": 53179.87,
+        "total_return_pct": 5217.99,
+        "cagr_pct": 161.63,
+        "max_drawdown_pct": 29.54,
+        "profit_factor": 2.77,
+        "win_rate_pct": 39.0,
+        "zero_notional_trades": 41
+      },
+      "expanded": {
+        "trades": 695,
+        "final_equity": 23649.94,
+        "total_return_pct": 2264.99,
+        "cagr_pct": 114.71,
+        "max_drawdown_pct": 28.12,
+        "profit_factor": 1.92,
+        "win_rate_pct": 38.8,
+        "zero_notional_trades": 38
+      },
+      "delta": {
+        "cagr_pct": -46.92,
+        "max_drawdown_pct": -1.42,
+        "profit_factor": -0.85
+      }
+    },
+    {
+      "scenario": "x4  DD 21/35",
+      "original": {
+        "trades": 708,
+        "final_equity": 69684.32,
+        "total_return_pct": 6868.43,
+        "cagr_pct": 179.31,
+        "max_drawdown_pct": 27.97,
+        "profit_factor": 2.71,
+        "win_rate_pct": 38.6,
+        "zero_notional_trades": 41
+      },
+      "expanded": {
+        "trades": 601,
+        "final_equity": 14505.06,
+        "total_return_pct": 1350.51,
+        "cagr_pct": 90.79,
+        "max_drawdown_pct": 37.25,
+        "profit_factor": 1.9,
+        "win_rate_pct": 38.4,
+        "zero_notional_trades": 40
+      },
+      "delta": {
+        "cagr_pct": -88.52,
+        "max_drawdown_pct": 9.28,
+        "profit_factor": -0.81
+      }
+    },
+    {
+      "scenario": "x5  DD 15/25",
+      "original": {
+        "trades": 271,
+        "final_equity": 1533.22,
+        "total_return_pct": 53.32,
+        "cagr_pct": 10.9,
+        "max_drawdown_pct": 40.84,
+        "profit_factor": 1.17,
+        "win_rate_pct": 37.3,
+        "zero_notional_trades": 15
+      },
+      "expanded": {
+        "trades": 348,
+        "final_equity": 1358.58,
+        "total_return_pct": 35.86,
+        "cagr_pct": 7.68,
+        "max_drawdown_pct": 42.36,
+        "profit_factor": 1.12,
+        "win_rate_pct": 34.5,
+        "zero_notional_trades": 55
+      },
+      "delta": {
+        "cagr_pct": -3.22,
+        "max_drawdown_pct": 1.52,
+        "profit_factor": -0.05
+      }
+    },
+    {
+      "scenario": "x5  DD 18/30",
+      "original": {
+        "trades": 660,
+        "final_equity": 100579.37,
+        "total_return_pct": 9957.94,
+        "cagr_pct": 205.26,
+        "max_drawdown_pct": 31.56,
+        "profit_factor": 2.97,
+        "win_rate_pct": 38.0,
+        "zero_notional_trades": 44
+      },
+      "expanded": {
+        "trades": 583,
+        "final_equity": 29169.61,
+        "total_return_pct": 2816.96,
+        "cagr_pct": 125.87,
+        "max_drawdown_pct": 43.88,
+        "profit_factor": 2.46,
+        "win_rate_pct": 38.3,
+        "zero_notional_trades": 52
+      },
+      "delta": {
+        "cagr_pct": -79.39,
+        "max_drawdown_pct": 12.32,
+        "profit_factor": -0.51
+      }
+    },
+    {
+      "scenario": "x5  DD 21/35",
+      "original": {
+        "trades": 720,
+        "final_equity": 90801.75,
+        "total_return_pct": 8980.17,
+        "cagr_pct": 197.79,
+        "max_drawdown_pct": 34.87,
+        "profit_factor": 2.86,
+        "win_rate_pct": 38.5,
+        "zero_notional_trades": 38
+      },
+      "expanded": {
+        "trades": 759,
+        "final_equity": 56204.14,
+        "total_return_pct": 5520.41,
+        "cagr_pct": 164.64,
+        "max_drawdown_pct": 31.88,
+        "profit_factor": 2.31,
+        "win_rate_pct": 39.5,
+        "zero_notional_trades": 39
+      },
+      "delta": {
+        "cagr_pct": -33.15,
+        "max_drawdown_pct": -2.99,
+        "profit_factor": -0.55
+      }
+    }
+  ]
+}

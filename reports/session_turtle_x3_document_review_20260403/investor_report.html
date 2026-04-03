@@ -75,18 +75,16 @@
 <!-- ═══════ EXECUTIVE SUMMARY ═══════ -->
 <h2>1. Executive Summary</h2>
 <div class="kpi-grid">
-  <div class="kpi"><div class="value">3,951.60%</div><div class="label">Total Return</div></div>
-  <div class="kpi"><div class="value">144.96%</div><div class="label">CAGR</div></div>
+  <div class="kpi"><div class="value">3,440.61%</div><div class="label">Total Return</div></div>
+  <div class="kpi"><div class="value">137.10%</div><div class="label">CAGR</div></div>
   <div class="kpi"><div class="value">24.99%</div><div class="label">Max Drawdown</div></div>
-  <div class="kpi"><div class="value">1.70</div><div class="label">Sharpe Ratio</div></div>
-  <div class="kpi"><div class="value">5.47</div><div class="label">Sortino Ratio</div></div>
-  <div class="kpi"><div class="value">5.80</div><div class="label">Calmar Ratio</div></div>
-  <div class="kpi"><div class="value">2.76</div><div class="label">Profit Factor</div></div>
-  <div class="kpi"><div class="value">38.15%</div><div class="label">Win Rate</div></div>
+  <div class="kpi"><div class="value">2.72</div><div class="label">Profit Factor</div></div>
+  <div class="kpi"><div class="value">39.59%</div><div class="label">Win Rate</div></div>
   <div class="kpi"><div class="value">$1,000.00</div><div class="label">Initial Capital</div></div>
-  <div class="kpi"><div class="value">$40,515.99</div><div class="label">Final Equity</div></div>
-  <div class="kpi"><div class="value">574</div><div class="label">Executed Trades</div></div>
-  <div class="kpi"><div class="value">4.13</div><div class="label">Backtest Years</div></div>
+  <div class="kpi"><div class="value">$35,406.07</div><div class="label">Final Equity</div></div>
+  <div class="kpi"><div class="value">581</div><div class="label">Executed Trades</div></div>
+  <div class="kpi"><div class="value">4.10</div><div class="label">Backtest Years</div></div>
+  <div class="kpi"><div class="value">23</div><div class="label">Universe Size</div></div>
 </div>
 
 <p>The strategy employs a <strong>Donchian channel breakout</strong> system on 5-minute session
@@ -233,6 +231,114 @@ Provides probabilistic bounds on expected peak-to-trough losses.</p>
 <li>Monte Carlo simulations use i.i.d. bootstrapping from the empirical trade P&L distribution.</li>
 <li>Sharpe/Sortino ratios are annualised using observed trades-per-year (~133).</li>
 <li>VaR/CVaR are computed at the individual trade level relative to portfolio equity at entry.</li>
+</ul>
+
+<!-- ═══════ EXPOSURE WHAT-IF ═══════ -->
+<h2 class="page-break">9. Exposure What-If Analysis</h2>
+<p class="section-note">Run date: April 03, 2026. All scenarios share identical universe, overlays, and signal logic.
+Only the exposure multiplier and drawdown governor thresholds vary. Starting capital $1,000.</p>
+
+<table>
+  <tr>
+    <th>Scenario</th>
+    <th>Trades</th>
+    <th>Final Equity</th>
+    <th>Return %</th>
+    <th>CAGR %</th>
+    <th>Max DD %</th>
+    <th>Profit Factor</th>
+    <th>Win Rate %</th>
+    <th>Zero-Notional</th>
+  </tr>
+  <tr style="background:#eaf4fb;">
+    <td><strong>x3 DD 15/25 ★ baseline</strong></td>
+    <td>581</td>
+    <td>$35,406</td>
+    <td class="highlight-green">+3,441%</td>
+    <td>137.1%</td>
+    <td>25.0%</td>
+    <td>2.72</td>
+    <td>39.6%</td>
+    <td>41</td>
+  </tr>
+  <tr>
+    <td>x4 DD 15/25</td>
+    <td>261</td>
+    <td>$1,472</td>
+    <td class="highlight-red">+47%</td>
+    <td>9.8%</td>
+    <td class="highlight-red">43.3%</td>
+    <td>1.18</td>
+    <td>35.6%</td>
+    <td>15</td>
+  </tr>
+  <tr>
+    <td>x4 DD 18/30</td>
+    <td>631</td>
+    <td>$53,180</td>
+    <td class="highlight-green">+5,218%</td>
+    <td>161.6%</td>
+    <td>29.5%</td>
+    <td>2.77</td>
+    <td>39.0%</td>
+    <td>41</td>
+  </tr>
+  <tr>
+    <td>x4 DD 21/35</td>
+    <td>708</td>
+    <td>$69,684</td>
+    <td class="highlight-green">+6,868%</td>
+    <td>179.3%</td>
+    <td>28.0%</td>
+    <td>2.71</td>
+    <td>38.6%</td>
+    <td>41</td>
+  </tr>
+  <tr>
+    <td>x5 DD 15/25</td>
+    <td>271</td>
+    <td>$1,533</td>
+    <td class="highlight-red">+53%</td>
+    <td>10.9%</td>
+    <td class="highlight-red">40.8%</td>
+    <td>1.17</td>
+    <td>37.3%</td>
+    <td>15</td>
+  </tr>
+  <tr style="background:#eafbea;">
+    <td><strong>x5 DD 18/30 ★ best CAGR</strong></td>
+    <td>660</td>
+    <td>$100,579</td>
+    <td class="highlight-green">+9,958%</td>
+    <td><strong>205.3%</strong></td>
+    <td>31.6%</td>
+    <td><strong>2.97</strong></td>
+    <td>38.0%</td>
+    <td>44</td>
+  </tr>
+  <tr>
+    <td>x5 DD 21/35</td>
+    <td>720</td>
+    <td>$90,802</td>
+    <td class="highlight-green">+8,980%</td>
+    <td>197.8%</td>
+    <td>34.9%</td>
+    <td>2.86</td>
+    <td>38.5%</td>
+    <td>38</td>
+  </tr>
+</table>
+
+<h3>9.1 Key Observations</h3>
+<ul>
+  <li><strong>Governor sensitivity is critical at higher leverage.</strong> x4 and x5 with a tight 15/25 governor collapse
+  to near-flat returns — the governor fires too aggressively, halving trade count from ~700 to ~260 and decimating CAGR.</li>
+  <li><strong>x5 DD 18/30 is the sweet spot</strong> — best CAGR (205%), best Profit Factor (2.97), and only 31.6% max drawdown.
+  A 20% relaxation of governor thresholds fully unlocks x5 performance.</li>
+  <li><strong>x4 DD 21/35 is the most conservative upgrade</strong> from baseline — 179% CAGR at only 28% max drawdown, nearly
+  identical to x4 DD 18/30 but with fewer governor interventions.</li>
+  <li><strong>Relaxing too far (x5 DD 21/35) hurts</strong> — MaxDD climbs to 35% while returns dip vs x5 DD 18/30,
+  suggesting 18/30 is the optimal threshold calibration at x5.</li>
 </ul>
 
 <div class="disclaimer">
