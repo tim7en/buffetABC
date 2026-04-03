@@ -159,7 +159,11 @@ def plot_monthly_returns_heatmap(df):
 
 def plot_return_distribution(df):
     """Trade return distribution with VaR markers."""
-    rets = df["return_pct"].values
+    rets = df["return_pct"].dropna().values
+    if len(rets) == 0:
+        fig, ax = plt.subplots(figsize=(12, 5))
+        ax.text(0.5, 0.5, "No valid return data", transform=ax.transAxes, ha="center")
+        return fig_to_base64(fig)
     fig, ax = plt.subplots(figsize=(12, 5))
     bins = np.linspace(np.percentile(rets, 0.5), np.percentile(rets, 99.5), 80)
     ax.hist(rets, bins=bins, color=BLUE, alpha=0.6, edgecolor="white", linewidth=0.5)

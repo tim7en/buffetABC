@@ -4,7 +4,7 @@ This script approximates the 2026-04-03 strategy review the user supplied.
 
 Important differences versus the pasted live-strategy review:
   - The current repo allocator does not implement the old ranked-fill / priority_score path.
-  - The local cache is missing EWJ, EWY, and XPD-USD, so the run excludes them.
+  - The local cache is missing XPD-USD, so the run excludes it.
   - Some requested review tickers are mapped to local cache proxies:
       XAG-USD -> SLV
       XPT-USD -> PPLT
@@ -82,8 +82,8 @@ REQUESTED_SYMBOLS: tuple[RequestedSymbol, ...] = (
     RequestedSymbol("NVDA", "NVDA", "tiingo", ("new_york_equity_open",), "equity"),
     RequestedSymbol("PLTR", "PLTR", "tiingo", ("new_york_equity_open",), "equity"),
     RequestedSymbol("TSLA", "TSLA", "tiingo", ("new_york_equity_open",), "equity"),
-    RequestedSymbol("EWJ", None, "tiingo", ("new_york_equity_open",), "equity", "missing local cache"),
-    RequestedSymbol("EWY", None, "tiingo", ("new_york_equity_open",), "equity", "missing local cache"),
+    RequestedSymbol("EWJ", "EWJ", "tiingo", ("new_york_equity_open",), "equity"),
+    RequestedSymbol("EWY", "EWY", "tiingo", ("new_york_equity_open",), "equity"),
 )
 
 
