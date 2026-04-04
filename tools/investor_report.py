@@ -29,9 +29,10 @@ import seaborn as sns
 from scipy import stats
 
 # ── paths ────────────────────────────────────────────────────────────
-TRADES_CSV = Path(r"d:\buffetABC\reports\session_turtle_x3_document_review_20260403\trades.csv")
-SUMMARY_JSON = Path(r"d:\buffetABC\reports\session_turtle_x3_document_review_20260403\summary.json")
-OUTPUT_HTML = Path(r"d:\buffetABC\reports\session_turtle_x3_document_review_20260403\investor_report.html")
+TRADES_CSV = Path(r"d:\buffetABC\reports\pruned_grouped_backtest_20260404\trades.csv")
+SUMMARY_JSON = Path(r"d:\buffetABC\reports\pruned_grouped_backtest_20260404\summary.json")
+REALISTIC_JSON = Path(r"d:\buffetABC\reports\pruned_grouped_backtest_20260404\realistic_simulation.json")
+OUTPUT_HTML = Path(r"d:\buffetABC\reports\pruned_grouped_backtest_20260404\investor_report.html")
 
 # ── style ────────────────────────────────────────────────────────────
 BRAND = "#1a1a2e"
@@ -75,14 +76,17 @@ def fig_to_base64(fig, dpi=150, tight=True):
 def load():
     df = pd.read_csv(TRADES_CSV, parse_dates=["entry_ts", "exit_ts"])
     with open(SUMMARY_JSON) as f:
-        s = json.load(f)
+        raw = json.load(f)
+    s = raw.get("summary", raw)  # handle both nested and flat JSON
+    with open(REALISTIC_JSON) as f:
+        realistic = json.load(f)
     df = df.sort_values("exit_ts").reset_index(drop=True)
     df["holding_hours"] = (df["exit_ts"] - df["entry_ts"]).dt.total_seconds() / 3600
     df["return_pct"] = df["net_pnl"] / df["notional"] * 100
     df["exit_month"] = df["exit_ts"].dt.to_period("M")
     df["exit_quarter"] = df["exit_ts"].dt.to_period("Q")
     df["exit_year"] = df["exit_ts"].dt.year
-    return df, s
+    return df, s, realistic
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -697,8 +701,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <body>
 
 <div class="header-bar">
-  <h1>Session Turtle Trend x3</h1>
-  <p class="subtitle">Quantitative Strategy Research Report &mdash; Document Review Variant<br>
+  <h1>Session Turtle Trend x3 — Pruned &amp; Grouped</h1>
+  <p class="subtitle">Quantitative Strategy Research Report &mdash; 21-Symbol Pruned Universe<br>
   Report generated {{report_date}} &bull; Data period: {{start_date}} to {{end_date}}</p>
 </div>
 
@@ -832,7 +836,8 @@ Provides probabilistic bounds on expected peak-to-trough losses.</p>
 <h3>8.1 Strategy Parameters</h3>
 <table>
 <tr><th>Parameter</th><th>Value</th><th>Description</th></tr>
-<tr><td>Channel Period</td><td>10/5</td><td>Entry/exit Donchian channel lookback (session bars)</td></tr>
+<tr><td>Channel Period (Group A)</td><td>10/5</td><td>Entry/exit Donchian for commodities &amp; high-beta equities</td></tr>
+<tr><td>Channel Period (Group B)</td><td>20/10</td><td>Entry/exit Donchian for crypto &amp; mega-cap equities</td></tr>
 <tr><td>Exposure Multiplier</td><td>3.0x</td><td>Maximum notional leverage</td></tr>
 <tr><td>Base Risk %</td><td>5.0%</td><td>Risk per trade as % of equity</td></tr>
 <tr><td>Fixed Stop</td><td>10.0%</td><td>Hard stop-loss distance</td></tr>
@@ -845,15 +850,15 @@ Provides probabilistic bounds on expected peak-to-trough losses.</p>
 <tr><td>Portfolio Cap</td><td>90%</td><td>Maximum portfolio notional as % of equity &times; exposure</td></tr>
 </table>
 
-<h3>8.2 Universe Composition</h3>
+<h3>8.2 Universe Composition (Pruned — 21 Symbols)</h3>
 <table>
-<tr><th>Asset Class</th><th>Tickers</th></tr>
-<tr><td>Crypto</td><td>BTC-USD, ETH-USD, SOL-USD, PAXG-USD</td></tr>
-<tr><td>Equity</td><td>NVDA, META, GOOGL, AMZN, TSLA, PLTR, INTC, HOOD, COIN, MSTR, CRCL</td></tr>
-<tr><td>Gold</td><td>PAXG-USD (via crypto sessions)</td></tr>
-<tr><td>Metals</td><td>SLV, PPLT, COPPER-USD</td></tr>
-<tr><td>Energy</td><td>BRENT, NATGAS-USD</td></tr>
+<tr><th>Group</th><th>Channel</th><th>Asset Class</th><th>Tickers</th></tr>
+<tr><td>A</td><td>10/5</td><td>Commodity</td><td>BRENT, NATGAS-USD, COPPER-USD, XPD-USD, PPLT, SLV</td></tr>
+<tr><td>A</td><td>10/5</td><td>High-Beta Equity</td><td>COIN, CRCL, HOOD, INTC, MSTR, PLTR, TSLA</td></tr>
+<tr><td>B</td><td>20/10</td><td>Crypto</td><td>BTC-USD, ETH-USD, SOL-USD, PAXG-USD</td></tr>
+<tr><td>B</td><td>20/10</td><td>Mega-Cap/ETF</td><td>GOOGL, META, TSM, EWY</td></tr>
 </table>
+<p><em>Removed (PF &lt; 1.0 in backtest): AAPL, AMZN, NVDA, SPY, QQQ, EWJ</em></p>
 
 <h3>8.3 Methodology Notes</h3>
 <ul>
@@ -865,13 +870,57 @@ Provides probabilistic bounds on expected peak-to-trough losses.</p>
 <li>VaR/CVaR are computed at the individual trade level relative to portfolio equity at entry.</li>
 </ul>
 
+<!-- ═══════ REALISTIC SCENARIOS ═══════ -->
+<h2 class="page-break">9. Realistic Scenario Analysis</h2>
+
+<p>The headline return assumes uninterrupted compounding at 3x leverage.
+Below we stress-test the results under conservative assumptions to bound
+realistic live-trading expectations.</p>
+
+<h3>9.1 Scenario Comparison</h3>
+<table>
+<tr><th>Scenario</th><th>Total Return</th><th>CAGR</th><th>Final Equity</th></tr>
+{% for key, sc in scenarios.items() %}
+<tr><td>{{sc.label}}</td>
+    <td>{{sc.total_return_pct | round(1)}}%</td>
+    <td>{{sc.cagr_pct | round(1)}}%</td>
+    <td>${{sc.final_equity | round(0) | int | format_number}}</td></tr>
+{% endfor %}
+</table>
+
+<h3>9.2 Key Risk Observations</h3>
+<table>
+<tr><th>Metric</th><th>Value</th><th>Implication</th></tr>
+<tr><td>Top-10 win concentration</td><td>{{analysis.top_10_win_concentration_pct}}% of gross profit</td>
+    <td>Strategy is tail-dependent — typical for trend-following</td></tr>
+<tr><td>Late-quarter PnL share</td><td>{{analysis.late_quarter_pnl_pct}}% from last 25% of trades</td>
+    <td>Compounding inflates later trades; headline number is aspirational</td></tr>
+<tr><td>Trades per free parameter</td><td>{{analysis.trades_per_parameter}}</td>
+    <td>Borderline (rule of thumb: 20+). Channel period choices limited to {10,20,55}</td></tr>
+<tr><td>Universe pruning</td><td>6 of 27 removed</td>
+    <td>In-sample selection bias — removed assets may outperform going forward</td></tr>
+</table>
+
+<h3>9.3 Honest Expectations</h3>
+<ul>
+<li><strong>Conservative CAGR estimate (3x leverage):</strong> 80–120% — accounts for
+    funding costs, position caps, and execution degradation.</li>
+<li><strong>At 1x leverage:</strong> 40–80% CAGR — still strong edge, lower drawdown risk.</li>
+<li><strong>Key risk:</strong> Breakout strategies underperform in choppy, mean-reverting markets.
+    2024 saw the lowest PF (1.40), suggesting vulnerability to range-bound periods.</li>
+<li><strong>Core edge is real:</strong> Profit factor exceeds 1.0 in every calendar year (2022–2026)
+    on both compounded and fixed-notional basis.</li>
+</ul>
+
 <div class="disclaimer">
 <strong>Important Disclosures:</strong> This document is provided for informational and research
 purposes only. Past performance, whether actual or simulated, is not indicative of future
 results. The strategy results shown are based on backtested data and do not account for
 all potential real-world factors including but not limited to: slippage beyond modelled
 estimates, exchange downtime, liquidity constraints, regulatory changes, or funding costs.
-All figures assume reinvestment of profits. This is not investment advice. Prospective
+All figures assume reinvestment of profits unless noted otherwise.
+The "Conservative" scenario is the recommended baseline for setting expectations.
+This is not investment advice. Prospective
 investors should conduct their own due diligence and consult with qualified advisors
 before making any investment decisions.
 </div>
@@ -890,7 +939,7 @@ before making any investment decisions.
 # ─────────────────────────────────────────────────────────────────────
 def main():
     print("Loading data...")
-    df, s = load()
+    df, s, realistic = load()
 
     print("Computing risk metrics...")
     m = compute_risk_metrics(df, s)
@@ -914,13 +963,21 @@ def main():
     plot_lev = plot_leverage_timeline(df, s)
 
     print("Rendering HTML report...")
-    from jinja2 import Template
-    tmpl = Template(HTML_TEMPLATE)
+    from jinja2 import Environment
+
+    def format_number(value):
+        return f"{int(value):,}"
+
+    env = Environment()
+    env.filters["format_number"] = format_number
+    tmpl = env.from_string(HTML_TEMPLATE)
     html = tmpl.render(
         report_date=datetime.now().strftime("%B %d, %Y"),
         start_date=s["start_date"][:10],
         end_date=s["end_date"][:10],
         m=m,
+        scenarios=realistic["scenarios"],
+        analysis=realistic["analysis"],
         plot_equity=plot_equity,
         plot_heatmap=plot_heatmap,
         plot_distribution=plot_distribution,

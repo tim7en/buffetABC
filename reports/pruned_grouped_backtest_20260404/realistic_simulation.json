@@ -1,0 +1,64 @@
+{
+  "scenarios": {
+    "baseline": {
+      "label": "Backtest (as-is, 3x, compounding)",
+      "total_pnl": 52879.01,
+      "total_return_pct": 5287.9,
+      "cagr_pct": 162.3,
+      "final_equity": 53879.01
+    },
+    "fixed_notional": {
+      "label": "Fixed $3,000 notional (no compounding)",
+      "total_pnl": 28623.95,
+      "total_return_pct": 2862.4,
+      "cagr_pct": 127.0,
+      "final_equity": 29623.95
+    },
+    "fixed_1x": {
+      "label": "Fixed $1,000 notional (1x, no compounding)",
+      "total_pnl": 9541.32,
+      "total_return_pct": 954.1,
+      "cagr_pct": 76.8,
+      "final_equity": 10541.32
+    },
+    "with_funding": {
+      "label": "Backtest + 8% funding cost on borrowed capital",
+      "total_pnl": 50270.18,
+      "total_return_pct": 5027.0,
+      "cagr_pct": 159.2,
+      "total_funding_cost": 2608.84,
+      "final_equity": 51270.18
+    },
+    "higher_costs": {
+      "label": "Backtest + 3 bps extra slippage per side",
+      "total_pnl": 52245.61,
+      "total_return_pct": 5224.6,
+      "cagr_pct": 161.6,
+      "total_extra_cost": 633.4,
+      "final_equity": 53245.61
+    },
+    "conservative": {
+      "label": "CONSERVATIVE: fixed notional + funding + extra slippage",
+      "total_pnl": 24952.65,
+      "total_return_pct": 2495.3,
+      "cagr_pct": 119.8,
+      "final_equity": 25952.65
+    },
+    "exclude_2026": {
+      "label": "Exclude Q1 2026 (4-year only)",
+      "total_pnl": 18509.74,
+      "total_return_pct": 1851.0,
+      "cagr_pct": 114.6,
+      "trades": 420,
+      "final_equity": 19509.74
+    }
+  },
+  "analysis": {
+    "top_10_win_concentration_pct": 58.9,
+    "late_quarter_pnl_pct": 89.7,
+    "total_years": 4.13,
+    "total_trades": 447,
+    "free_parameters": 26,
+    "trades_per_parameter": 17.2
+  }
+}
