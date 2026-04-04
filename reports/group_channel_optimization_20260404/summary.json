@@ -1,0 +1,1099 @@
+{
+  "run_timestamp": "20260404_173241",
+  "groups": {
+    "CRYPTO": {
+      "tickers": [
+        "BTC-USD",
+        "ETH-USD",
+        "SOL-USD",
+        "PAXG-USD"
+      ],
+      "description": "24/7 crypto assets"
+    },
+    "COMMODITY": {
+      "tickers": [
+        "BRENT",
+        "NATGAS-USD",
+        "COPPER-USD",
+        "XPD-USD",
+        "PPLT",
+        "SLV"
+      ],
+      "description": "Near-24h commodities and precious metals"
+    },
+    "MEGA_ETF": {
+      "tickers": [
+        "AAPL",
+        "AMZN",
+        "GOOGL",
+        "META",
+        "NVDA",
+        "TSM",
+        "QQQ",
+        "SPY",
+        "EWJ",
+        "EWY"
+      ],
+      "description": "US mega-caps and broad ETFs"
+    },
+    "HIGH_BETA": {
+      "tickers": [
+        "COIN",
+        "CRCL",
+        "HOOD",
+        "INTC",
+        "MSTR",
+        "PLTR",
+        "TSLA"
+      ],
+      "description": "US high-beta / mid-cap equities"
+    }
+  },
+  "channel_periods_tested": [
+    "10/5",
+    "20/10",
+    "55/27"
+  ],
+  "phase1_isolated": {
+    "CRYPTO": {
+      "results": [
+        {
+          "period": "10/5",
+          "entry": 10,
+          "exit": 5,
+          "trades": 245,
+          "return_pct": -5.27,
+          "cagr_pct": -1.33,
+          "max_dd_pct": 31.45,
+          "profit_factor": 0.98,
+          "win_rate_pct": 32.65,
+          "final_equity": 947.2746
+        },
+        {
+          "period": "20/10",
+          "entry": 20,
+          "exit": 10,
+          "trades": 164,
+          "return_pct": 642.91,
+          "cagr_pct": 64.9,
+          "max_dd_pct": 23.18,
+          "profit_factor": 2.02,
+          "win_rate_pct": 35.37,
+          "final_equity": 7429.0687
+        },
+        {
+          "period": "55/27",
+          "entry": 55,
+          "exit": 27,
+          "trades": 61,
+          "return_pct": -10.76,
+          "cagr_pct": -2.94,
+          "max_dd_pct": 41.61,
+          "profit_factor": 0.91,
+          "win_rate_pct": 27.87,
+          "final_equity": 892.4374
+        }
+      ],
+      "best_by_pf": "20/10",
+      "best_by_cagr": "20/10",
+      "best_by_risk_adj": "20/10"
+    },
+    "COMMODITY": {
+      "results": [
+        {
+          "period": "10/5",
+          "entry": 10,
+          "exit": 5,
+          "trades": 190,
+          "return_pct": 101.69,
+          "cagr_pct": 18.49,
+          "max_dd_pct": 28.69,
+          "profit_factor": 1.42,
+          "win_rate_pct": 36.32,
+          "final_equity": 2016.9222
+        },
+        {
+          "period": "20/10",
+          "entry": 20,
+          "exit": 10,
+          "trades": 78,
+          "return_pct": -23.85,
+          "cagr_pct": -6.39,
+          "max_dd_pct": 43.28,
+          "profit_factor": 0.78,
+          "win_rate_pct": 32.05,
+          "final_equity": 761.5186
+        },
+        {
+          "period": "55/27",
+          "entry": 55,
+          "exit": 27,
+          "trades": 47,
+          "return_pct": -21.51,
+          "cagr_pct": -5.75,
+          "max_dd_pct": 43.53,
+          "profit_factor": 0.84,
+          "win_rate_pct": 29.79,
+          "final_equity": 784.9242
+        }
+      ],
+      "best_by_pf": "10/5",
+      "best_by_cagr": "10/5",
+      "best_by_risk_adj": "10/5"
+    },
+    "MEGA_ETF": {
+      "results": [
+        {
+          "period": "10/5",
+          "entry": 10,
+          "exit": 5,
+          "trades": 287,
+          "return_pct": 128.6,
+          "cagr_pct": 22.3,
+          "max_dd_pct": 30.93,
+          "profit_factor": 1.53,
+          "win_rate_pct": 43.9,
+          "final_equity": 2286.0214
+        },
+        {
+          "period": "20/10",
+          "entry": 20,
+          "exit": 10,
+          "trades": 183,
+          "return_pct": 246.65,
+          "cagr_pct": 35.35,
+          "max_dd_pct": 20.56,
+          "profit_factor": 1.73,
+          "win_rate_pct": 42.08,
+          "final_equity": 3466.5461
+        },
+        {
+          "period": "55/27",
+          "entry": 55,
+          "exit": 27,
+          "trades": 75,
+          "return_pct": 72.38,
+          "cagr_pct": 14.25,
+          "max_dd_pct": 24.98,
+          "profit_factor": 1.56,
+          "win_rate_pct": 45.33,
+          "final_equity": 1723.7765
+        }
+      ],
+      "best_by_pf": "20/10",
+      "best_by_cagr": "20/10",
+      "best_by_risk_adj": "10/5"
+    },
+    "HIGH_BETA": {
+      "results": [
+        {
+          "period": "10/5",
+          "entry": 10,
+          "exit": 5,
+          "trades": 158,
+          "return_pct": 2223.63,
+          "cagr_pct": 202.86,
+          "max_dd_pct": 28.2,
+          "profit_factor": 2.63,
+          "win_rate_pct": 43.67,
+          "final_equity": 23236.3195
+        },
+        {
+          "period": "20/10",
+          "entry": 20,
+          "exit": 10,
+          "trades": 84,
+          "return_pct": 375.61,
+          "cagr_pct": 73.17,
+          "max_dd_pct": 34.79,
+          "profit_factor": 2.17,
+          "win_rate_pct": 38.1,
+          "final_equity": 4756.0534
+        },
+        {
+          "period": "55/27",
+          "entry": 55,
+          "exit": 27,
+          "trades": 39,
+          "return_pct": 123.06,
+          "cagr_pct": 33.97,
+          "max_dd_pct": 29.94,
+          "profit_factor": 1.94,
+          "win_rate_pct": 41.03,
+          "final_equity": 2230.5924
+        }
+      ],
+      "best_by_pf": "10/5",
+      "best_by_cagr": "10/5",
+      "best_by_risk_adj": "10/5"
+    }
+  },
+  "phase2_combined": [
+    {
+      "label": "BASELINE (all 10/5)",
+      "config": {
+        "CRYPTO": "10/5",
+        "COMMODITY": "10/5",
+        "MEGA_ETF": "10/5",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 465,
+      "return_pct": 206.4,
+      "cagr_pct": 31.06,
+      "max_dd_pct": 37.23,
+      "profit_factor": 1.3,
+      "win_rate_pct": 38.49,
+      "final_equity": 3064.0206,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": -648.58,
+          "trades": 107,
+          "win_rate": 29.0
+        },
+        "COMMODITY": {
+          "pnl": 320.62,
+          "trades": 112,
+          "win_rate": 34.8
+        },
+        "MEGA_ETF": {
+          "pnl": 288.4,
+          "trades": 177,
+          "win_rate": 45.2
+        },
+        "HIGH_BETA": {
+          "pnl": 2103.59,
+          "trades": 69,
+          "win_rate": 42.0
+        }
+      }
+    },
+    {
+      "label": "ALL 20/10",
+      "config": {
+        "CRYPTO": "20/10",
+        "COMMODITY": "20/10",
+        "MEGA_ETF": "20/10",
+        "HIGH_BETA": "20/10"
+      },
+      "trades": 253,
+      "return_pct": 376.04,
+      "cagr_pct": 45.74,
+      "max_dd_pct": 29.51,
+      "profit_factor": 1.72,
+      "win_rate_pct": 34.78,
+      "final_equity": 4760.39,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": -274.56,
+          "trades": 66,
+          "win_rate": 30.3
+        },
+        "COMMODITY": {
+          "pnl": 426.65,
+          "trades": 52,
+          "win_rate": 30.8
+        },
+        "MEGA_ETF": {
+          "pnl": 887.9,
+          "trades": 98,
+          "win_rate": 38.8
+        },
+        "HIGH_BETA": {
+          "pnl": 2720.4,
+          "trades": 37,
+          "win_rate": 37.8
+        }
+      }
+    },
+    {
+      "label": "ALL 55/27",
+      "config": {
+        "CRYPTO": "55/27",
+        "COMMODITY": "55/27",
+        "MEGA_ETF": "55/27",
+        "HIGH_BETA": "55/27"
+      },
+      "trades": 90,
+      "return_pct": -19.09,
+      "cagr_pct": -5.05,
+      "max_dd_pct": 36.38,
+      "profit_factor": 0.85,
+      "win_rate_pct": 34.44,
+      "final_equity": 809.1454,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": -285.85,
+          "trades": 29,
+          "win_rate": 34.5
+        },
+        "COMMODITY": {
+          "pnl": 117.55,
+          "trades": 21,
+          "win_rate": 28.6
+        },
+        "MEGA_ETF": {
+          "pnl": 13.76,
+          "trades": 27,
+          "win_rate": 44.4
+        },
+        "HIGH_BETA": {
+          "pnl": -36.3,
+          "trades": 13,
+          "win_rate": 23.1
+        }
+      }
+    },
+    {
+      "label": "BEST_PF per group",
+      "config": {
+        "CRYPTO": "20/10",
+        "COMMODITY": "10/5",
+        "MEGA_ETF": "20/10",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 459,
+      "return_pct": 2556.08,
+      "cagr_pct": 120.69,
+      "max_dd_pct": 21.52,
+      "profit_factor": 2.6,
+      "win_rate_pct": 41.18,
+      "final_equity": 26560.8204,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": 4814.74,
+          "trades": 98,
+          "win_rate": 36.7
+        },
+        "COMMODITY": {
+          "pnl": 8187.76,
+          "trades": 147,
+          "win_rate": 40.8
+        },
+        "MEGA_ETF": {
+          "pnl": 2984.87,
+          "trades": 134,
+          "win_rate": 44.0
+        },
+        "HIGH_BETA": {
+          "pnl": 9573.45,
+          "trades": 80,
+          "win_rate": 42.5
+        }
+      }
+    },
+    {
+      "label": "BEST_CAGR per group",
+      "config": {
+        "CRYPTO": "20/10",
+        "COMMODITY": "10/5",
+        "MEGA_ETF": "20/10",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 459,
+      "return_pct": 2556.08,
+      "cagr_pct": 120.69,
+      "max_dd_pct": 21.52,
+      "profit_factor": 2.6,
+      "win_rate_pct": 41.18,
+      "final_equity": 26560.8204,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": 4814.74,
+          "trades": 98,
+          "win_rate": 36.7
+        },
+        "COMMODITY": {
+          "pnl": 8187.76,
+          "trades": 147,
+          "win_rate": 40.8
+        },
+        "MEGA_ETF": {
+          "pnl": 2984.87,
+          "trades": 134,
+          "win_rate": 44.0
+        },
+        "HIGH_BETA": {
+          "pnl": 9573.45,
+          "trades": 80,
+          "win_rate": 42.5
+        }
+      }
+    },
+    {
+      "label": "BEST_RISK_ADJ per group",
+      "config": {
+        "CRYPTO": "20/10",
+        "COMMODITY": "10/5",
+        "MEGA_ETF": "10/5",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 573,
+      "return_pct": 1424.34,
+      "cagr_pct": 93.0,
+      "max_dd_pct": 24.19,
+      "profit_factor": 2.13,
+      "win_rate_pct": 40.49,
+      "final_equity": 15243.4392,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": 1585.33,
+          "trades": 86,
+          "win_rate": 37.2
+        },
+        "COMMODITY": {
+          "pnl": 6343.31,
+          "trades": 156,
+          "win_rate": 37.2
+        },
+        "MEGA_ETF": {
+          "pnl": 2026.75,
+          "trades": 244,
+          "win_rate": 43.4
+        },
+        "HIGH_BETA": {
+          "pnl": 4288.03,
+          "trades": 87,
+          "win_rate": 41.4
+        }
+      }
+    },
+    {
+      "label": "24h 20/10 + US 10/5",
+      "config": {
+        "CRYPTO": "20/10",
+        "COMMODITY": "20/10",
+        "MEGA_ETF": "10/5",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 449,
+      "return_pct": 789.14,
+      "cagr_pct": 69.47,
+      "max_dd_pct": 29.26,
+      "profit_factor": 1.63,
+      "win_rate_pct": 38.75,
+      "final_equity": 8891.4145,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": 3304.77,
+          "trades": 86,
+          "win_rate": 36.0
+        },
+        "COMMODITY": {
+          "pnl": 613.22,
+          "trades": 65,
+          "win_rate": 36.9
+        },
+        "MEGA_ETF": {
+          "pnl": 677.78,
+          "trades": 212,
+          "win_rate": 40.6
+        },
+        "HIGH_BETA": {
+          "pnl": 3295.63,
+          "trades": 86,
+          "win_rate": 38.4
+        }
+      }
+    },
+    {
+      "label": "24h 55/27 + US 10/5",
+      "config": {
+        "CRYPTO": "55/27",
+        "COMMODITY": "55/27",
+        "MEGA_ETF": "10/5",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 213,
+      "return_pct": 24.66,
+      "cagr_pct": 5.51,
+      "max_dd_pct": 39.05,
+      "profit_factor": 1.1,
+      "win_rate_pct": 27.7,
+      "final_equity": 1246.5876,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": 957.91,
+          "trades": 25,
+          "win_rate": 24.0
+        },
+        "COMMODITY": {
+          "pnl": -8.31,
+          "trades": 16,
+          "win_rate": 31.2
+        },
+        "MEGA_ETF": {
+          "pnl": -385.59,
+          "trades": 129,
+          "win_rate": 28.7
+        },
+        "HIGH_BETA": {
+          "pnl": -317.43,
+          "trades": 43,
+          "win_rate": 25.6
+        }
+      }
+    },
+    {
+      "label": "24h 20/10 + Mega 20/10 + HiBeta 10/5",
+      "config": {
+        "CRYPTO": "20/10",
+        "COMMODITY": "20/10",
+        "MEGA_ETF": "20/10",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 331,
+      "return_pct": 915.18,
+      "cagr_pct": 74.98,
+      "max_dd_pct": 31.31,
+      "profit_factor": 2.22,
+      "win_rate_pct": 40.18,
+      "final_equity": 10151.8085,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": 1469.85,
+          "trades": 84,
+          "win_rate": 35.7
+        },
+        "COMMODITY": {
+          "pnl": 728.55,
+          "trades": 65,
+          "win_rate": 36.9
+        },
+        "MEGA_ETF": {
+          "pnl": 2141.66,
+          "trades": 112,
+          "win_rate": 39.3
+        },
+        "HIGH_BETA": {
+          "pnl": 4811.75,
+          "trades": 70,
+          "win_rate": 50.0
+        }
+      }
+    },
+    {
+      "label": "CRYPTO 20/10 + COMMODITY 10/5 + US 10/5",
+      "config": {
+        "CRYPTO": "20/10",
+        "COMMODITY": "10/5",
+        "MEGA_ETF": "10/5",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 573,
+      "return_pct": 1424.34,
+      "cagr_pct": 93.0,
+      "max_dd_pct": 24.19,
+      "profit_factor": 2.13,
+      "win_rate_pct": 40.49,
+      "final_equity": 15243.4392,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": 1585.33,
+          "trades": 86,
+          "win_rate": 37.2
+        },
+        "COMMODITY": {
+          "pnl": 6343.31,
+          "trades": 156,
+          "win_rate": 37.2
+        },
+        "MEGA_ETF": {
+          "pnl": 2026.75,
+          "trades": 244,
+          "win_rate": 43.4
+        },
+        "HIGH_BETA": {
+          "pnl": 4288.03,
+          "trades": 87,
+          "win_rate": 41.4
+        }
+      }
+    },
+    {
+      "label": "CRYPTO 55/27 + rest 10/5",
+      "config": {
+        "CRYPTO": "55/27",
+        "COMMODITY": "10/5",
+        "MEGA_ETF": "10/5",
+        "HIGH_BETA": "10/5"
+      },
+      "trades": 528,
+      "return_pct": 2104.65,
+      "cagr_pct": 110.98,
+      "max_dd_pct": 22.21,
+      "profit_factor": 2.37,
+      "win_rate_pct": 43.56,
+      "final_equity": 22046.5305,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": 725.45,
+          "trades": 47,
+          "win_rate": 38.3
+        },
+        "COMMODITY": {
+          "pnl": 7811.19,
+          "trades": 154,
+          "win_rate": 40.3
+        },
+        "MEGA_ETF": {
+          "pnl": 3654.67,
+          "trades": 236,
+          "win_rate": 44.5
+        },
+        "HIGH_BETA": {
+          "pnl": 8855.24,
+          "trades": 91,
+          "win_rate": 49.5
+        }
+      }
+    },
+    {
+      "label": "24h 20/10 + Mega 20/10 + HiBeta 20/10",
+      "config": {
+        "CRYPTO": "20/10",
+        "COMMODITY": "20/10",
+        "MEGA_ETF": "20/10",
+        "HIGH_BETA": "20/10"
+      },
+      "trades": 253,
+      "return_pct": 376.04,
+      "cagr_pct": 45.74,
+      "max_dd_pct": 29.51,
+      "profit_factor": 1.72,
+      "win_rate_pct": 34.78,
+      "final_equity": 4760.39,
+      "per_group_pnl": {
+        "CRYPTO": {
+          "pnl": -274.56,
+          "trades": 66,
+          "win_rate": 30.3
+        },
+        "COMMODITY": {
+          "pnl": 426.65,
+          "trades": 52,
+          "win_rate": 30.8
+        },
+        "MEGA_ETF": {
+          "pnl": 887.9,
+          "trades": 98,
+          "win_rate": 38.8
+        },
+        "HIGH_BETA": {
+          "pnl": 2720.4,
+          "trades": 37,
+          "win_rate": 37.8
+        }
+      }
+    }
+  ],
+  "phase2_best_config": {
+    "label": "BEST_PF per group",
+    "per_asset": {
+      "COPPER-USD": {
+        "n": 29,
+        "wins": 9,
+        "gross_win": 790.5028,
+        "gross_loss": 548.5146,
+        "total_pnl": 241.99,
+        "bucket": "other",
+        "long_n": 20,
+        "short_n": 9,
+        "long_pnl": 388.19,
+        "short_pnl": -146.21,
+        "group": "COMMODITY",
+        "win_rate_pct": 31.0,
+        "profit_factor": 1.44
+      },
+      "ETH-USD": {
+        "n": 28,
+        "wins": 8,
+        "gross_win": 1918.748,
+        "gross_loss": 446.0477,
+        "total_pnl": 1472.7,
+        "bucket": "crypto",
+        "long_n": 14,
+        "short_n": 14,
+        "long_pnl": 242.76,
+        "short_pnl": 1229.94,
+        "group": "CRYPTO",
+        "win_rate_pct": 28.6,
+        "profit_factor": 4.3
+      },
+      "PAXG-USD": {
+        "n": 21,
+        "wins": 8,
+        "gross_win": 514.0084999999999,
+        "gross_loss": 236.6197,
+        "total_pnl": 277.39,
+        "bucket": "gold",
+        "long_n": 15,
+        "short_n": 6,
+        "long_pnl": 243.03,
+        "short_pnl": 34.36,
+        "group": "CRYPTO",
+        "win_rate_pct": 38.1,
+        "profit_factor": 2.17
+      },
+      "SOL-USD": {
+        "n": 26,
+        "wins": 10,
+        "gross_win": 3883.9881,
+        "gross_loss": 1056.194,
+        "total_pnl": 2827.79,
+        "bucket": "crypto",
+        "long_n": 11,
+        "short_n": 15,
+        "long_pnl": 778.74,
+        "short_pnl": 2049.06,
+        "group": "CRYPTO",
+        "win_rate_pct": 38.5,
+        "profit_factor": 3.68
+      },
+      "NATGAS-USD": {
+        "n": 25,
+        "wins": 11,
+        "gross_win": 1282.4963,
+        "gross_loss": 920.2027,
+        "total_pnl": 362.29,
+        "bucket": "other",
+        "long_n": 10,
+        "short_n": 15,
+        "long_pnl": 912.94,
+        "short_pnl": -550.65,
+        "group": "COMMODITY",
+        "win_rate_pct": 44.0,
+        "profit_factor": 1.39
+      },
+      "XPD-USD": {
+        "n": 29,
+        "wins": 14,
+        "gross_win": 2225.4267,
+        "gross_loss": 760.3362000000001,
+        "total_pnl": 1465.09,
+        "bucket": "other",
+        "long_n": 8,
+        "short_n": 21,
+        "long_pnl": 1296.75,
+        "short_pnl": 168.34,
+        "group": "COMMODITY",
+        "win_rate_pct": 48.3,
+        "profit_factor": 2.93
+      },
+      "BRENT": {
+        "n": 32,
+        "wins": 13,
+        "gross_win": 3793.3028999999997,
+        "gross_loss": 778.7941,
+        "total_pnl": 3014.51,
+        "bucket": "energy",
+        "long_n": 15,
+        "short_n": 17,
+        "long_pnl": 3195.72,
+        "short_pnl": -181.21,
+        "group": "COMMODITY",
+        "win_rate_pct": 40.6,
+        "profit_factor": 4.87
+      },
+      "META": {
+        "n": 18,
+        "wins": 13,
+        "gross_win": 3478.7051,
+        "gross_loss": 112.3193,
+        "total_pnl": 3366.39,
+        "bucket": "other",
+        "long_n": 10,
+        "short_n": 8,
+        "long_pnl": 714.06,
+        "short_pnl": 2652.33,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 72.2,
+        "profit_factor": 30.97
+      },
+      "AAPL": {
+        "n": 16,
+        "wins": 1,
+        "gross_win": 38.5691,
+        "gross_loss": 1364.7727,
+        "total_pnl": -1326.2,
+        "bucket": "other",
+        "long_n": 9,
+        "short_n": 7,
+        "long_pnl": -834.32,
+        "short_pnl": -491.88,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 6.2,
+        "profit_factor": 0.03
+      },
+      "TSM": {
+        "n": 11,
+        "wins": 7,
+        "gross_win": 305.5523,
+        "gross_loss": 194.4104,
+        "total_pnl": 111.14,
+        "bucket": "other",
+        "long_n": 6,
+        "short_n": 5,
+        "long_pnl": 80.06,
+        "short_pnl": 31.08,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 63.6,
+        "profit_factor": 1.57
+      },
+      "BTC-USD": {
+        "n": 23,
+        "wins": 10,
+        "gross_win": 1291.8917000000001,
+        "gross_loss": 1055.0307,
+        "total_pnl": 236.86,
+        "bucket": "crypto",
+        "long_n": 12,
+        "short_n": 11,
+        "long_pnl": -296.07,
+        "short_pnl": 532.93,
+        "group": "CRYPTO",
+        "win_rate_pct": 43.5,
+        "profit_factor": 1.22
+      },
+      "EWJ": {
+        "n": 14,
+        "wins": 6,
+        "gross_win": 243.8872,
+        "gross_loss": 463.3136,
+        "total_pnl": -219.43,
+        "bucket": "other",
+        "long_n": 9,
+        "short_n": 5,
+        "long_pnl": -210.78,
+        "short_pnl": -8.65,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 42.9,
+        "profit_factor": 0.53
+      },
+      "EWY": {
+        "n": 15,
+        "wins": 9,
+        "gross_win": 2053.9491,
+        "gross_loss": 132.2326,
+        "total_pnl": 1921.72,
+        "bucket": "other",
+        "long_n": 8,
+        "short_n": 7,
+        "long_pnl": 1949.65,
+        "short_pnl": -27.93,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 60.0,
+        "profit_factor": 15.53
+      },
+      "NVDA": {
+        "n": 18,
+        "wins": 7,
+        "gross_win": 1498.1926999999998,
+        "gross_loss": 2515.4165000000003,
+        "total_pnl": -1017.22,
+        "bucket": "other",
+        "long_n": 10,
+        "short_n": 8,
+        "long_pnl": -1191.56,
+        "short_pnl": 174.34,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 38.9,
+        "profit_factor": 0.6
+      },
+      "GOOGL": {
+        "n": 16,
+        "wins": 7,
+        "gross_win": 1104.3997,
+        "gross_loss": 374.10569999999996,
+        "total_pnl": 730.29,
+        "bucket": "other",
+        "long_n": 5,
+        "short_n": 11,
+        "long_pnl": 752.57,
+        "short_pnl": -22.28,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 43.8,
+        "profit_factor": 2.95
+      },
+      "QQQ": {
+        "n": 13,
+        "wins": 6,
+        "gross_win": 239.4031,
+        "gross_loss": 296.9388,
+        "total_pnl": -57.54,
+        "bucket": "equity",
+        "long_n": 9,
+        "short_n": 4,
+        "long_pnl": 44.29,
+        "short_pnl": -101.82,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 46.2,
+        "profit_factor": 0.81
+      },
+      "SPY": {
+        "n": 7,
+        "wins": 2,
+        "gross_win": 49.9164,
+        "gross_loss": 176.40849999999998,
+        "total_pnl": -126.49,
+        "bucket": "equity",
+        "long_n": 7,
+        "short_n": 0,
+        "long_pnl": -126.49,
+        "short_pnl": 0.0,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 28.6,
+        "profit_factor": 0.28
+      },
+      "PPLT": {
+        "n": 17,
+        "wins": 6,
+        "gross_win": 1048.2517,
+        "gross_loss": 307.9263,
+        "total_pnl": 740.33,
+        "bucket": "metals",
+        "long_n": 12,
+        "short_n": 5,
+        "long_pnl": 817.89,
+        "short_pnl": -77.57,
+        "group": "COMMODITY",
+        "win_rate_pct": 35.3,
+        "profit_factor": 3.4
+      },
+      "HOOD": {
+        "n": 16,
+        "wins": 7,
+        "gross_win": 2651.1824,
+        "gross_loss": 507.81940000000003,
+        "total_pnl": 2143.36,
+        "bucket": "equity",
+        "long_n": 12,
+        "short_n": 4,
+        "long_pnl": 2229.5,
+        "short_pnl": -86.14,
+        "group": "HIGH_BETA",
+        "win_rate_pct": 43.8,
+        "profit_factor": 5.22
+      },
+      "SLV": {
+        "n": 15,
+        "wins": 7,
+        "gross_win": 2542.4394,
+        "gross_loss": 178.88469999999998,
+        "total_pnl": 2363.55,
+        "bucket": "metals",
+        "long_n": 12,
+        "short_n": 3,
+        "long_pnl": 2362.47,
+        "short_pnl": 1.09,
+        "group": "COMMODITY",
+        "win_rate_pct": 46.7,
+        "profit_factor": 14.21
+      },
+      "COIN": {
+        "n": 10,
+        "wins": 5,
+        "gross_win": 3310.1014,
+        "gross_loss": 265.61089999999996,
+        "total_pnl": 3044.49,
+        "bucket": "equity",
+        "long_n": 5,
+        "short_n": 5,
+        "long_pnl": 661.61,
+        "short_pnl": 2382.88,
+        "group": "HIGH_BETA",
+        "win_rate_pct": 50.0,
+        "profit_factor": 12.46
+      },
+      "TSLA": {
+        "n": 14,
+        "wins": 5,
+        "gross_win": 849.9059,
+        "gross_loss": 476.3779,
+        "total_pnl": 373.53,
+        "bucket": "equity",
+        "long_n": 10,
+        "short_n": 4,
+        "long_pnl": 567.68,
+        "short_pnl": -194.15,
+        "group": "HIGH_BETA",
+        "win_rate_pct": 35.7,
+        "profit_factor": 1.78
+      },
+      "PLTR": {
+        "n": 18,
+        "wins": 9,
+        "gross_win": 999.9700999999999,
+        "gross_loss": 716.774,
+        "total_pnl": 283.2,
+        "bucket": "equity",
+        "long_n": 16,
+        "short_n": 2,
+        "long_pnl": 283.2,
+        "short_pnl": 0.0,
+        "group": "HIGH_BETA",
+        "win_rate_pct": 50.0,
+        "profit_factor": 1.4
+      },
+      "MSTR": {
+        "n": 10,
+        "wins": 4,
+        "gross_win": 1973.1295,
+        "gross_loss": 627.1796999999999,
+        "total_pnl": 1345.95,
+        "bucket": "equity",
+        "long_n": 5,
+        "short_n": 5,
+        "long_pnl": -221.55,
+        "short_pnl": 1567.5,
+        "group": "HIGH_BETA",
+        "win_rate_pct": 40.0,
+        "profit_factor": 3.15
+      },
+      "AMZN": {
+        "n": 6,
+        "wins": 1,
+        "gross_win": 24.9032,
+        "gross_loss": 422.6917,
+        "total_pnl": -397.79,
+        "bucket": "equity",
+        "long_n": 5,
+        "short_n": 1,
+        "long_pnl": -298.37,
+        "short_pnl": -99.42,
+        "group": "MEGA_ETF",
+        "win_rate_pct": 16.7,
+        "profit_factor": 0.06
+      },
+      "INTC": {
+        "n": 10,
+        "wins": 3,
+        "gross_win": 3090.7757,
+        "gross_loss": 1030.2987,
+        "total_pnl": 2060.48,
+        "bucket": "equity",
+        "long_n": 4,
+        "short_n": 6,
+        "long_pnl": 1383.69,
+        "short_pnl": 676.79,
+        "group": "HIGH_BETA",
+        "win_rate_pct": 30.0,
+        "profit_factor": 3.0
+      },
+      "CRCL": {
+        "n": 2,
+        "wins": 1,
+        "gross_win": 322.4422,
+        "gross_loss": 0.0,
+        "total_pnl": 322.44,
+        "bucket": "equity",
+        "long_n": 0,
+        "short_n": 2,
+        "long_pnl": 0.0,
+        "short_pnl": 322.44,
+        "group": "HIGH_BETA",
+        "win_rate_pct": 50.0,
+        "profit_factor": Infinity
+      }
+    }
+  }
+}
