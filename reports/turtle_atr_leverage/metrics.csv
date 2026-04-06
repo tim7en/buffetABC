@@ -1,0 +1,17 @@
+Strategy,Total Return,CAGR,Max DD,Sharpe,Final $,Avg Lev,% in Mkt
+B&H QQQ 1x,93.8%,14.2%,-35.6%,0.69,"$19,377",-,-
+Fixed 3x Don+SMA QQQ,133.1%,18.5%,-32.7%,0.71,"$23,310",-,-
+Fixed 3x Don65/25+SMA225 QQQ,122.1%,17.3%,-33.4%,0.69,"$22,214",-,-
+Fixed 3x Don+SMA QQQ Ratchet 3%,89.1%,13.6%,-30.4%,0.59,"$18,913",-,-
+Fixed 3x Don+SMA QQQ Ratchet 2%,100.8%,15.0%,-27.6%,0.63,"$20,082",-,-
+Fixed 3x Don+SMA SPY,15.9%,3.0%,-31.6%,0.24,"$11,586",-,-
+ATR-sized 3x QQQ,26.0%,4.7%,-7.2%,0.79,"$12,602",0.59x,37%
+ATR-pyramid 3x QQQ,78.1%,12.2%,-23.0%,0.73,"$17,811",1.76x,37%
+ATR-pyramid+VolGate QQQ,82.4%,12.8%,-23.0%,0.76,"$18,238",1.74x,37%
+ATR-sized 3x SPY,11.1%,2.1%,-9.6%,0.39,"$11,107",0.83x,38%
+ATR-pyramid 3x SPY,35.3%,6.2%,-19.4%,0.44,"$13,530",2.25x,38%
+ATR-pyramid+VolGate SPY,35.3%,6.2%,-19.4%,0.44,"$13,530",2.25x,38%
+Fixed 3x Regime L/S QQQ,-45.0%,-11.3%,-78.9%,0.01,"$5,497",-,-
+ATR-pyramid 3x Regime L/S QQQ,24.5%,4.5%,-34.6%,0.31,"$12,453",1.56x,48%
+ATR-pyramid+VolGate Regime L/S QQQ,52.5%,8.8%,-23.3%,0.52,"$15,245",1.48x,48%
+ATR-pyramid+VolGate+Slope40 L/S QQQ,68.9%,11.1%,-23.0%,0.66,"$16,894",1.56x,43%
