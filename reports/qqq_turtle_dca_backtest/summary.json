@@ -22,6 +22,19 @@
     "atr_period": 20,
     "sma_period": 200,
     "volume_period": 40,
+    "tactical_fast_ma": 50,
+    "tactical_slow_ma": 200,
+    "tactical_ma_threshold": 1.0,
+    "tactical_grid_fast_mas": [
+      50,
+      60,
+      70
+    ],
+    "tactical_grid_slow_mas": [
+      200,
+      210,
+      220
+    ],
     "risk_per_unit": 0.02,
     "boosted_risk_per_unit": 0.03,
     "min_rel_volume": 1.25,

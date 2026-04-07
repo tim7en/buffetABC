@@ -264,6 +264,132 @@ def leveraged_dca_monthly(
     return equity_series, leverage_series
 
 
+def ma_tactical_dca_sleeve(
+    close: pd.Series,
+    capital: float,
+    leverage: float,
+    borrow_rate: float,
+    slippage_bps: float,
+    commission_bps: float,
+    fast_ma: int,
+    slow_ma: int,
+    threshold: float,
+    label: str,
+) -> tuple[pd.Series, pd.Series]:
+    """DCA normally, but route cheap-regime contributions into a 3x sleeve."""
+    months = pd.PeriodIndex(close.index, freq="M").unique()
+    installment = capital / len(months)
+    cost_rate = (slippage_bps + commission_bps) / 10_000.0
+    ma_ratio = (close.rolling(fast_ma).mean() / close.rolling(slow_ma).mean()).shift(1)
+    cash = capital
+    normal_shares = 0.0
+    leveraged_equity = 0.0
+    equity: list[float] = []
+    portfolio_leverage: list[float] = []
+    previous_month: pd.Period | None = None
+    previous_price: float | None = None
+
+    for date, price in close.items():
+        current_price = float(price)
+        ratio = float(ma_ratio.loc[date]) if pd.notna(ma_ratio.loc[date]) else np.nan
+        cheap_regime = bool(np.isfinite(ratio) and ratio < threshold)
+
+        if previous_price is not None:
+            if not cheap_regime and leveraged_equity > 0.0:
+                post_sell = max(0.0, leveraged_equity - leveraged_equity * leverage * cost_rate)
+                post_buy = max(0.0, post_sell - post_sell * cost_rate)
+                normal_shares += post_buy / previous_price
+                leveraged_equity = 0.0
+            if leveraged_equity > 0.0:
+                day_return = current_price / previous_price - 1.0
+                borrow_cost = max(leverage - 1.0, 0.0) * borrow_rate / 252.0
+                leveraged_equity *= max(0.0, 1.0 + leverage * day_return - borrow_cost)
+
+        month = pd.Period(date, freq="M")
+        if month != previous_month:
+            contribution = min(installment, cash)
+            if contribution > 0.0:
+                if cheap_regime:
+                    leveraged_equity += max(0.0, contribution - contribution * leverage * cost_rate)
+                else:
+                    normal_shares += max(0.0, contribution - contribution * cost_rate) / current_price
+                cash -= contribution
+            previous_month = month
+
+        normal_equity = normal_shares * current_price
+        total_equity = cash + normal_equity + leveraged_equity
+        gross_exposure = normal_equity + leveraged_equity * leverage
+        equity.append(total_equity)
+        portfolio_leverage.append(gross_exposure / total_equity if total_equity > 0.0 else 0.0)
+        previous_price = current_price
+
+    equity_series = pd.Series(equity, index=close.index, name=label)
+    leverage_series = pd.Series(portfolio_leverage, index=close.index, name=f"{label} leverage")
+    return equity_series, leverage_series
+
+
+def ma_tactical_dca_portfolio(
+    close: pd.Series,
+    capital: float,
+    leverage: float,
+    borrow_rate: float,
+    slippage_bps: float,
+    commission_bps: float,
+    fast_ma: int,
+    slow_ma: int,
+    threshold: float,
+    label: str,
+) -> tuple[pd.Series, pd.Series]:
+    """DCA while switching the whole invested balance between 1x and 3x."""
+    months = pd.PeriodIndex(close.index, freq="M").unique()
+    installment = capital / len(months)
+    cost_rate = (slippage_bps + commission_bps) / 10_000.0
+    ma_ratio = (close.rolling(fast_ma).mean() / close.rolling(slow_ma).mean()).shift(1)
+    cash = capital
+    invested_equity = 0.0
+    active_leverage = 1.0
+    equity: list[float] = []
+    portfolio_leverage: list[float] = []
+    previous_month: pd.Period | None = None
+    previous_price: float | None = None
+
+    for date, price in close.items():
+        current_price = float(price)
+        ratio = float(ma_ratio.loc[date]) if pd.notna(ma_ratio.loc[date]) else np.nan
+        cheap_regime = bool(np.isfinite(ratio) and ratio < threshold)
+        target_leverage = leverage if cheap_regime else 1.0
+
+        if previous_price is not None:
+            if invested_equity > 0.0 and target_leverage != active_leverage:
+                leverage_delta = abs(target_leverage - active_leverage)
+                invested_equity = max(0.0, invested_equity - invested_equity * leverage_delta * cost_rate)
+            active_leverage = target_leverage
+            if invested_equity > 0.0:
+                day_return = current_price / previous_price - 1.0
+                borrow_cost = max(active_leverage - 1.0, 0.0) * borrow_rate / 252.0
+                invested_equity *= max(0.0, 1.0 + active_leverage * day_return - borrow_cost)
+        else:
+            active_leverage = target_leverage
+
+        month = pd.Period(date, freq="M")
+        if month != previous_month:
+            contribution = min(installment, cash)
+            if contribution > 0.0:
+                invested_equity += max(0.0, contribution - contribution * active_leverage * cost_rate)
+                cash -= contribution
+            previous_month = month
+
+        total_equity = cash + invested_equity
+        gross_exposure = invested_equity * active_leverage
+        equity.append(total_equity)
+        portfolio_leverage.append(gross_exposure / total_equity if total_equity > 0.0 else 0.0)
+        previous_price = current_price
+
+    equity_series = pd.Series(equity, index=close.index, name=label)
+    leverage_series = pd.Series(portfolio_leverage, index=close.index, name=f"{label} leverage")
+    return equity_series, leverage_series
+
+
 def _volume_confirmed(row: pd.Series, direction: int, cfg: TurtleConfig) -> bool:
     rel_volume = float(row.get("rel_volume", np.nan))
     if not np.isfinite(rel_volume):
@@ -718,6 +844,62 @@ def run_grid(
     return grid
 
 
+def run_tactical_ma_grid(
+    close: pd.Series,
+    args: argparse.Namespace,
+    dca: pd.Series,
+) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    for fast_ma, slow_ma in product(args.tactical_grid_fast_mas, args.tactical_grid_slow_mas):
+        if fast_ma >= slow_ma:
+            continue
+        configs = [
+            (
+                "sleeve",
+                ma_tactical_dca_sleeve,
+                f"MA{fast_ma}/{slow_ma} Tactical Sleeve DCA {args.max_leverage:g}x",
+            ),
+            (
+                "portfolio",
+                ma_tactical_dca_portfolio,
+                f"MA{fast_ma}/{slow_ma} Tactical Portfolio DCA {args.max_leverage:g}x",
+            ),
+        ]
+        for variant, runner, label in configs:
+            equity, leverage = runner(
+                close,
+                args.initial_capital,
+                leverage=args.max_leverage,
+                borrow_rate=args.borrow_rate,
+                slippage_bps=args.slippage_bps,
+                commission_bps=args.commission_bps,
+                fast_ma=fast_ma,
+                slow_ma=slow_ma,
+                threshold=args.tactical_ma_threshold,
+                label=label,
+            )
+            row = compute_metrics(equity, label, leverage=leverage, dca_equity=dca)
+            row.update(
+                {
+                    "variant": variant,
+                    "fast_ma": fast_ma,
+                    "slow_ma": slow_ma,
+                    "threshold": args.tactical_ma_threshold,
+                    "days_over_1_5x": int((leverage > 1.5).sum()),
+                    "avg_portfolio_leverage": float(leverage.mean()),
+                }
+            )
+            rows.append(row)
+
+    grid = pd.DataFrame(rows)
+    if not grid.empty:
+        grid = grid.sort_values(
+            ["beats_dca_final", "cagr_pct", "max_drawdown_pct"],
+            ascending=[False, False, False],
+        ).reset_index(drop=True)
+    return grid
+
+
 def plot_results(
     equity_df: pd.DataFrame,
     leverage_df: pd.DataFrame,
@@ -829,6 +1011,7 @@ def write_report(
         f"- Turtle entry/exit: `{args.entry_period}`-day breakout / `{args.exit_period}`-day exit channel",
         f"- Trend filter: close above/below `{args.sma_period}`-day SMA",
         f"- RVOL confirmation: volume >= `{args.min_rel_volume:g}x` prior `{args.volume_period}`-day average and close location threshold `{args.close_location_threshold:g}`",
+        f"- Tactical MA DCA: cheap when `{args.tactical_fast_ma}`-day SMA / `{args.tactical_slow_ma}`-day SMA < `{args.tactical_ma_threshold:g}`",
         f"- Shorting enabled: `{bool(args.allow_shorts)}`",
         "",
         "## Results",
@@ -866,6 +1049,7 @@ def write_report(
     )
     if args.run_grid:
         lines.append("- `grid_results.csv`: optional fixed-leverage parameter scan")
+        lines.append("- `tactical_ma_grid_results.csv`: optional tactical MA DCA parameter scan")
     (out_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -889,6 +1073,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--atr-period", type=int, default=20)
     parser.add_argument("--sma-period", type=int, default=200)
     parser.add_argument("--volume-period", type=int, default=40)
+    parser.add_argument("--tactical-fast-ma", type=int, default=50)
+    parser.add_argument("--tactical-slow-ma", type=int, default=200)
+    parser.add_argument("--tactical-ma-threshold", type=float, default=1.0)
+    parser.add_argument("--tactical-grid-fast-mas", type=int, nargs="+", default=[50, 60, 70])
+    parser.add_argument("--tactical-grid-slow-mas", type=int, nargs="+", default=[200, 210, 220])
     parser.add_argument("--risk-per-unit", type=float, default=0.02)
     parser.add_argument("--boosted-risk-per-unit", type=float, default=0.03)
     parser.add_argument("--min-rel-volume", type=float, default=1.25)
@@ -957,15 +1146,55 @@ def main() -> None:
         commission_bps=args.commission_bps,
         label=f"DCA Monthly {symbol} {args.max_leverage:g}x",
     )
+    tactical_sleeve, tactical_sleeve_leverage = ma_tactical_dca_sleeve(
+        close,
+        args.initial_capital,
+        leverage=args.max_leverage,
+        borrow_rate=args.borrow_rate,
+        slippage_bps=args.slippage_bps,
+        commission_bps=args.commission_bps,
+        fast_ma=args.tactical_fast_ma,
+        slow_ma=args.tactical_slow_ma,
+        threshold=args.tactical_ma_threshold,
+        label=f"MA{args.tactical_fast_ma}/{args.tactical_slow_ma} Tactical Sleeve DCA {args.max_leverage:g}x",
+    )
+    tactical_portfolio, tactical_portfolio_leverage = ma_tactical_dca_portfolio(
+        close,
+        args.initial_capital,
+        leverage=args.max_leverage,
+        borrow_rate=args.borrow_rate,
+        slippage_bps=args.slippage_bps,
+        commission_bps=args.commission_bps,
+        fast_ma=args.tactical_fast_ma,
+        slow_ma=args.tactical_slow_ma,
+        threshold=args.tactical_ma_threshold,
+        label=f"MA{args.tactical_fast_ma}/{args.tactical_slow_ma} Tactical Portfolio DCA {args.max_leverage:g}x",
+    )
     buy_hold = buy_and_hold(close, args.initial_capital, f"Buy & Hold {symbol} 1x")
 
-    equity_curves = [buy_hold, dca, dca_lev]
-    leverage_curves: list[pd.Series] = [dca_lev_leverage]
+    equity_curves = [buy_hold, dca, dca_lev, tactical_sleeve, tactical_portfolio]
+    leverage_curves: list[pd.Series] = [
+        dca_lev_leverage,
+        tactical_sleeve_leverage,
+        tactical_portfolio_leverage,
+    ]
     all_trades: list[dict[str, Any]] = []
     metrics_rows = [
         compute_metrics(buy_hold, buy_hold.name, dca_equity=dca),
         compute_metrics(dca, dca.name, dca_equity=dca),
         compute_metrics(dca_lev, dca_lev.name, leverage=dca_lev_leverage, dca_equity=dca),
+        compute_metrics(
+            tactical_sleeve,
+            tactical_sleeve.name,
+            leverage=tactical_sleeve_leverage,
+            dca_equity=dca,
+        ),
+        compute_metrics(
+            tactical_portfolio,
+            tactical_portfolio.name,
+            leverage=tactical_portfolio_leverage,
+            dca_equity=dca,
+        ),
     ]
 
     configs = build_default_configs(args)
@@ -997,6 +1226,8 @@ def main() -> None:
     if args.run_grid:
         grid_df = run_grid(daily, args, dca=dca)
         grid_df.to_csv(out_dir / "grid_results.csv", index=False)
+        tactical_grid_df = run_tactical_ma_grid(close, args, dca=dca)
+        tactical_grid_df.to_csv(out_dir / "tactical_ma_grid_results.csv", index=False)
 
     if not args.no_plot:
         plot_results(
