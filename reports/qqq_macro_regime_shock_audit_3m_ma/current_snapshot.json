@@ -1,0 +1,110 @@
+{
+  "as_of": "2026-04-06",
+  "qqq_adj_close": 588.5,
+  "risk_regime": "neutral",
+  "risk_score": -0.19375000000000006,
+  "risk_score_0_100": 40.31249999999999,
+  "major_shock": false,
+  "active_shocks": [
+    "oil_up_shock"
+  ],
+  "component_scores": {
+    "vix_score": 0.0,
+    "hy_oas_score": -1.0,
+    "nfci_score": -1.0,
+    "curve_score": -0.5,
+    "qqq_trend_score": 0.5,
+    "qqq_momentum_score": 0.0,
+    "rate_score": 0.0,
+    "dxy_score": 0.0,
+    "oil_score": 1.0
+  },
+  "external_status": {
+    "vix": "loaded",
+    "hy_oas": "loaded",
+    "nfci": "loaded",
+    "t10y3m": "loaded"
+  },
+  "forward_return_context": {
+    "252": {
+      "regime": {
+        "n": 99,
+        "mean_cagr": 0.13599631101484858,
+        "median_cagr": 0.21245303340740684,
+        "p25_cagr": -0.06239693763931731,
+        "p75_cagr": 0.326217379682878,
+        "positive_rate": 0.7373737373737373
+      },
+      "shock_state": {
+        "n": 192,
+        "mean_cagr": 0.17126797098526425,
+        "median_cagr": 0.18523564801001802,
+        "p25_cagr": 0.05774931709028047,
+        "p75_cagr": 0.2821910584544762,
+        "positive_rate": 0.90625
+      }
+    },
+    "504": {
+      "regime": {
+        "n": 98,
+        "mean_cagr": 0.09591618306528644,
+        "median_cagr": 0.18782967102405657,
+        "p25_cagr": -0.011341636207836014,
+        "p75_cagr": 0.23062404448072343,
+        "positive_rate": 0.7244897959183674
+      },
+      "shock_state": {
+        "n": 183,
+        "mean_cagr": 0.12874393828681344,
+        "median_cagr": 0.1420475696029475,
+        "p25_cagr": 0.07636444713325341,
+        "p75_cagr": 0.2106905712778817,
+        "positive_rate": 0.8688524590163934
+      }
+    }
+  },
+  "active_shock_context": {
+    "252": {
+      "oil_up_shock": {
+        "shock": {
+          "n": 78,
+          "mean_cagr": 0.0820707683789349,
+          "median_cagr": 0.12019478879344347,
+          "p25_cagr": -0.10997511978028293,
+          "p75_cagr": 0.28588644864025814,
+          "positive_rate": 0.6538461538461539
+        },
+        "no_shock": {
+          "n": 235,
+          "mean_cagr": 0.14809313814323133,
+          "median_cagr": 0.18982025979965833,
+          "p25_cagr": 0.05177858860143081,
+          "p75_cagr": 0.2928188829673306,
+          "positive_rate": 0.8468085106382979
+        },
+        "mean_delta": -0.06602236976429643
+      }
+    },
+    "504": {
+      "oil_up_shock": {
+        "shock": {
+          "n": 78,
+          "mean_cagr": 0.06015205710185466,
+          "median_cagr": 0.09229000272003851,
+          "p25_cagr": -0.02714511442129461,
+          "p75_cagr": 0.2161850253092661,
+          "positive_rate": 0.6794871794871795
+        },
+        "no_shock": {
+          "n": 223,
+          "mean_cagr": 0.12596288280873508,
+          "median_cagr": 0.15276615575656072,
+          "p25_cagr": 0.07008818223985713,
+          "p75_cagr": 0.23168723516665302,
+          "positive_rate": 0.8385650224215246
+        },
+        "mean_delta": -0.06581082570688042
+      }
+    }
+  }
+}
