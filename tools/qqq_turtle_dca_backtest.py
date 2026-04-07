@@ -456,8 +456,27 @@ def _taper_levels(max_leverage: float) -> list[float]:
     return [max_leverage]
 
 
+def _entry_ramp_levels(max_leverage: float) -> list[float]:
+    """Step into leverage gradually during cheap regimes."""
+    levels: list[float] = []
+    for level in [2.0, 3.0, 4.0, 5.0]:
+        if level < max_leverage:
+            levels.append(level)
+    levels.append(max_leverage)
+    return sorted(set(levels))
+
+
+def _entry_ramp_leverage(max_leverage: float, cheap_regime_day: int | None, phase_days: int) -> float:
+    if phase_days <= 0 or cheap_regime_day is None:
+        return max_leverage
+    levels = _entry_ramp_levels(max_leverage)
+    step = min(cheap_regime_day // phase_days, len(levels) - 1)
+    return levels[step]
+
+
 def ma_tactical_dca_portfolio_exit_policy(
     close: pd.Series,
+    volume: pd.Series | None,
     capital: float,
     leverage: float,
     borrow_rate: float,
@@ -470,6 +489,10 @@ def ma_tactical_dca_portfolio_exit_policy(
     label: str,
     taper_phase_days: int = 20,
     momentum_lookback: int = 20,
+    require_rvol_entry: bool = False,
+    min_entry_rvol: float = 1.25,
+    rvol_period: int = 40,
+    entry_ramp_phase_days: int = 0,
 ) -> tuple[pd.Series, pd.Series, pd.Series]:
     """Portfolio tactical DCA with configurable no-lookahead post-reclaim exit."""
     months = pd.PeriodIndex(close.index, freq="M").unique()
@@ -479,8 +502,11 @@ def ma_tactical_dca_portfolio_exit_policy(
     momentum_return = close.pct_change(momentum_lookback).shift(1)
     momentum_sma = close.rolling(momentum_lookback).mean().shift(1)
     fast_sma = close.rolling(fast_ma).mean().shift(1)
-    fast_sma_slope = fast_sma - fast_sma.shift(momentum_lookback)
+    fast_sma_slope = fast_sma - fast_sma.shift(1)
     prior_close = close.shift(1)
+    rel_volume = None
+    if volume is not None:
+        rel_volume = (volume / volume.rolling(rvol_period).mean()).shift(1)
     levels = _taper_levels(leverage)
 
     cash = capital
@@ -489,7 +515,12 @@ def ma_tactical_dca_portfolio_exit_policy(
     previous_month: pd.Period | None = None
     previous_price: float | None = None
     post_reclaim_day: int | None = None
+    cheap_regime_day: int | None = None
+    last_cheap_target_leverage = 1.0
+    post_reclaim_start_leverage = 1.0
     was_cheap = False
+    was_effective_cheap = False
+    cycle_confirmed = not require_rvol_entry
 
     equity: list[float] = []
     portfolio_leverage: list[float] = []
@@ -499,33 +530,62 @@ def ma_tactical_dca_portfolio_exit_policy(
         current_price = float(price)
         ratio = float(ma_ratio.loc[date]) if pd.notna(ma_ratio.loc[date]) else np.nan
         cheap_regime = bool(np.isfinite(ratio) and ratio < threshold)
+        rvol_ok = True
+        if require_rvol_entry:
+            rvol_ok = bool(
+                rel_volume is not None
+                and pd.notna(rel_volume.loc[date])
+                and float(rel_volume.loc[date]) >= min_entry_rvol
+            )
 
         if cheap_regime:
+            if not was_cheap:
+                cycle_confirmed = rvol_ok
+            elif not cycle_confirmed and rvol_ok:
+                cycle_confirmed = True
             post_reclaim_day = None
         elif was_cheap and not cheap_regime:
-            post_reclaim_day = 0
+            post_reclaim_day = 0 if cycle_confirmed else None
+            post_reclaim_start_leverage = last_cheap_target_leverage if cycle_confirmed else 1.0
         elif post_reclaim_day is not None:
             post_reclaim_day += 1
+        else:
+            cycle_confirmed = not require_rvol_entry
+            post_reclaim_start_leverage = 1.0
+            last_cheap_target_leverage = 1.0
 
-        if cheap_regime:
-            target_leverage = leverage
+        effective_cheap_regime = cheap_regime and cycle_confirmed
+        if effective_cheap_regime:
+            cheap_regime_day = 0 if not was_effective_cheap or cheap_regime_day is None else cheap_regime_day + 1
+        else:
+            cheap_regime_day = None
+
+        if effective_cheap_regime:
+            target_leverage = _entry_ramp_leverage(leverage, cheap_regime_day, entry_ramp_phase_days)
+            last_cheap_target_leverage = target_leverage
+        elif exit_policy == "hold":
+            if post_reclaim_day is None or post_reclaim_day >= taper_phase_days:
+                target_leverage = 1.0
+            else:
+                target_leverage = post_reclaim_start_leverage
         elif exit_policy == "reclaim":
             target_leverage = 1.0
         elif exit_policy == "taper":
             if post_reclaim_day is None or taper_phase_days <= 0:
                 target_leverage = 1.0
             else:
+                levels = _taper_levels(post_reclaim_start_leverage)
                 step = post_reclaim_day // taper_phase_days
                 target_leverage = levels[step] if step < len(levels) else 1.0
         elif exit_policy == "momentum_return":
             momentum_ok = bool(pd.notna(momentum_return.loc[date]) and momentum_return.loc[date] > 0.0)
-            target_leverage = leverage if post_reclaim_day is not None and momentum_ok else 1.0
+            target_leverage = post_reclaim_start_leverage if post_reclaim_day is not None and momentum_ok else 1.0
         elif exit_policy == "momentum_sma":
             momentum_ok = bool(pd.notna(momentum_sma.loc[date]) and prior_close.loc[date] > momentum_sma.loc[date])
-            target_leverage = leverage if post_reclaim_day is not None and momentum_ok else 1.0
+            target_leverage = post_reclaim_start_leverage if post_reclaim_day is not None and momentum_ok else 1.0
         elif exit_policy == "momentum_slope":
             momentum_ok = bool(pd.notna(fast_sma_slope.loc[date]) and fast_sma_slope.loc[date] > 0.0)
-            target_leverage = leverage if post_reclaim_day is not None and momentum_ok else 1.0
+            target_leverage = post_reclaim_start_leverage if post_reclaim_day is not None and momentum_ok else 1.0
         else:
             raise ValueError(f"Unsupported tactical exit policy: {exit_policy}")
 
@@ -556,6 +616,7 @@ def ma_tactical_dca_portfolio_exit_policy(
         target_leverage_log.append(active_leverage)
         previous_price = current_price
         was_cheap = cheap_regime
+        was_effective_cheap = effective_cheap_regime
 
     equity_series = pd.Series(equity, index=close.index, name=label)
     leverage_series = pd.Series(portfolio_leverage, index=close.index, name=f"{label} leverage")
@@ -1075,12 +1136,14 @@ def run_tactical_ma_grid(
 
 def run_post_reclaim_exit_grid(
     close: pd.Series,
+    volume: pd.Series | None,
     args: argparse.Namespace,
     dca: pd.Series,
 ) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     base_kwargs = dict(
         close=close,
+        volume=volume,
         capital=args.initial_capital,
         leverage=args.max_leverage,
         borrow_rate=args.borrow_rate,
@@ -1091,7 +1154,9 @@ def run_post_reclaim_exit_grid(
         threshold=args.tactical_ma_threshold,
     )
 
-    policy_specs: list[tuple[str, int, int]] = [("reclaim", 0, args.momentum_exit_lookbacks[0])]
+    policy_specs: list[tuple[str, int, int]] = []
+    for hold_days in args.hold_after_reclaim_days:
+        policy_specs.append(("hold", hold_days, args.momentum_exit_lookbacks[0]))
     for taper_days in args.taper_phase_days:
         policy_specs.append(("taper", taper_days, args.momentum_exit_lookbacks[0]))
     for lookback in args.momentum_exit_lookbacks:
@@ -1099,41 +1164,60 @@ def run_post_reclaim_exit_grid(
             [
                 ("momentum_return", 0, lookback),
                 ("momentum_sma", 0, lookback),
-                ("momentum_slope", 0, lookback),
             ]
         )
+    policy_specs.append(("momentum_slope", 0, 1))
 
-    for policy, taper_days, momentum_lookback in policy_specs:
-        label_bits = [f"MA{args.tactical_fast_ma}/{args.tactical_slow_ma}", policy]
-        if policy == "taper":
-            label_bits.append(f"{taper_days}d")
-        if policy.startswith("momentum"):
-            label_bits.append(f"{momentum_lookback}d")
-        label_bits.append(f"DCA {args.max_leverage:g}x")
-        label = " ".join(label_bits)
-        equity, leverage, target_leverage = ma_tactical_dca_portfolio_exit_policy(
-            **base_kwargs,
-            exit_policy=policy,
-            label=label,
-            taper_phase_days=taper_days,
-            momentum_lookback=momentum_lookback,
-        )
-        row = compute_metrics(equity, label, leverage=leverage, dca_equity=dca)
-        target_above_one = target_leverage > 1.0
-        row.update(
-            {
-                "policy": policy,
-                "fast_ma": args.tactical_fast_ma,
-                "slow_ma": args.tactical_slow_ma,
-                "threshold": args.tactical_ma_threshold,
-                "taper_phase_days": taper_days,
-                "momentum_lookback": momentum_lookback,
-                "target_leveraged_days": int(target_above_one.sum()),
-                "avg_portfolio_leverage": float(leverage.mean()),
-                "max_target_leverage": float(target_leverage.max()),
-            }
-        )
-        rows.append(row)
+    for entry_ramp_phase_days in args.entry_ramp_phase_days:
+        for min_entry_rvol in args.tactical_rvol_thresholds:
+            require_rvol_entry = min_entry_rvol > 0.0
+            for policy, taper_days, momentum_lookback in policy_specs:
+                label_bits = [f"MA{args.tactical_fast_ma}/{args.tactical_slow_ma}", policy]
+                if policy in {"hold", "taper"}:
+                    label_bits.append(f"{taper_days}d")
+                if policy in {"momentum_return", "momentum_sma"}:
+                    label_bits.append(f"{momentum_lookback}d")
+                if policy == "momentum_slope":
+                    label_bits.append("60sma_slope")
+                if entry_ramp_phase_days > 0:
+                    label_bits.append(f"entryramp{entry_ramp_phase_days}d")
+                if require_rvol_entry:
+                    label_bits.append(f"rvol{min_entry_rvol:g}")
+                label_bits.append(f"DCA {args.max_leverage:g}x")
+                label = " ".join(label_bits)
+                equity, leverage, target_leverage = ma_tactical_dca_portfolio_exit_policy(
+                    **base_kwargs,
+                    exit_policy=policy,
+                    label=label,
+                    taper_phase_days=taper_days,
+                    momentum_lookback=momentum_lookback,
+                    require_rvol_entry=require_rvol_entry,
+                    min_entry_rvol=min_entry_rvol,
+                    rvol_period=args.volume_period,
+                    entry_ramp_phase_days=entry_ramp_phase_days,
+                )
+                row = compute_metrics(equity, label, leverage=leverage, dca_equity=dca)
+                target_above_one = target_leverage > 1.0
+                row.update(
+                    {
+                        "policy": policy,
+                        "fast_ma": args.tactical_fast_ma,
+                        "slow_ma": args.tactical_slow_ma,
+                        "threshold": args.tactical_ma_threshold,
+                        "hold_days": taper_days if policy == "hold" else 0,
+                        "taper_phase_days": taper_days if policy == "taper" else 0,
+                        "momentum_lookback": momentum_lookback if policy != "momentum_slope" else 1,
+                        "entry_ramp_phase_days": entry_ramp_phase_days,
+                        "entry_ramp_levels": ",".join(f"{level:g}" for level in _entry_ramp_levels(args.max_leverage)),
+                        "require_rvol_entry": require_rvol_entry,
+                        "min_entry_rvol": min_entry_rvol,
+                        "rvol_period": args.volume_period,
+                        "target_leveraged_days": int(target_above_one.sum()),
+                        "avg_portfolio_leverage": float(leverage.mean()),
+                        "max_target_leverage": float(target_leverage.max()),
+                    }
+                )
+                rows.append(row)
 
     grid = pd.DataFrame(rows)
     if not grid.empty:
@@ -1261,6 +1345,8 @@ def write_report(
         f"- Trend filter: close above/below `{args.sma_period}`-day SMA",
         f"- RVOL confirmation: volume >= `{args.min_rel_volume:g}x` prior `{args.volume_period}`-day average and close location threshold `{args.close_location_threshold:g}`",
         f"- Tactical MA DCA: cheap when `{args.tactical_fast_ma}`-day SMA / `{args.tactical_slow_ma}`-day SMA < `{args.tactical_ma_threshold:g}`",
+        f"- Tactical entry ramp phase days: `{', '.join(str(x) for x in args.entry_ramp_phase_days)}`; `0` means immediate max leverage",
+        f"- Tactical RVOL scan thresholds: `{', '.join(f'{x:g}' for x in args.tactical_rvol_thresholds)}`; `0` means no RVOL confirmation",
         f"- Shorting enabled: `{bool(args.allow_shorts)}`",
         "",
         "## Results",
@@ -1334,8 +1420,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tactical-ma-threshold", type=float, default=1.0)
     parser.add_argument("--tactical-grid-fast-mas", type=int, nargs="+", default=[50, 60, 70])
     parser.add_argument("--tactical-grid-slow-mas", type=int, nargs="+", default=[200, 210, 220])
+    parser.add_argument("--hold-after-reclaim-days", type=int, nargs="+", default=[0, 20, 40, 60, 90])
     parser.add_argument("--taper-phase-days", type=int, nargs="+", default=[10, 20, 40, 60])
     parser.add_argument("--momentum-exit-lookbacks", type=int, nargs="+", default=[10, 20, 40, 60])
+    parser.add_argument("--tactical-rvol-thresholds", type=float, nargs="+", default=[0.0, 1.0, 1.25, 1.5])
+    parser.add_argument("--entry-ramp-phase-days", type=int, nargs="+", default=[0])
     parser.add_argument("--risk-per-unit", type=float, default=0.02)
     parser.add_argument("--boosted-risk-per-unit", type=float, default=0.03)
     parser.add_argument("--min-rel-volume", type=float, default=1.25)
@@ -1374,6 +1463,8 @@ def parse_args() -> argparse.Namespace:
 
     if args.max_leverage <= 0 or args.max_leverage > 5.0:
         raise ValueError("--max-leverage must be > 0 and <= 5.0 for this research setup")
+    if any(day < 0 for day in args.entry_ramp_phase_days):
+        raise ValueError("--entry-ramp-phase-days values must be non-negative")
     if args.exit_period >= args.entry_period:
         raise ValueError("--exit-period should be smaller than --entry-period")
     return args
@@ -1493,7 +1584,7 @@ def main() -> None:
         grid_df.to_csv(out_dir / "grid_results.csv", index=False)
         tactical_grid_df = run_tactical_ma_grid(close, args, dca=dca)
         tactical_grid_df.to_csv(out_dir / "tactical_ma_grid_results.csv", index=False)
-        post_reclaim_grid_df = run_post_reclaim_exit_grid(close, args, dca=dca)
+        post_reclaim_grid_df = run_post_reclaim_exit_grid(close, daily["volume"], args, dca=dca)
         post_reclaim_grid_df.to_csv(out_dir / "post_reclaim_exit_grid_results.csv", index=False)
 
     if not args.no_plot:
