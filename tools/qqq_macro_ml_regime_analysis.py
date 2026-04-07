@@ -665,6 +665,34 @@ def compute_vif(sample: pd.DataFrame, features: list[str]) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values("vif", ascending=False)
 
 
+def select_vif_filtered_features(
+    sample: pd.DataFrame,
+    features: list[str],
+    max_vif: float = 20.0,
+) -> tuple[list[str], pd.DataFrame]:
+    selected = list(features)
+    protected = {"latent_sentiment_index", "external_shock_score", "qqq_feedback_score"}
+    drop_rows: list[dict[str, Any]] = []
+    while len(selected) > 3:
+        vif = compute_vif(sample, selected)
+        if vif.empty or float(vif.iloc[0]["vif"]) <= max_vif:
+            break
+        candidates = vif[~vif["feature"].isin(protected)].copy()
+        if candidates.empty:
+            break
+        drop = candidates.iloc[0]
+        selected.remove(str(drop["feature"]))
+        drop_rows.append(
+            {
+                "dropped_feature": str(drop["feature"]),
+                "vif_at_drop": float(drop["vif"]),
+                "max_vif_threshold": max_vif,
+                "remaining_feature_count": len(selected),
+            }
+        )
+    return selected, pd.DataFrame(drop_rows)
+
+
 def classify_gmm_regimes(df: pd.DataFrame, features: list[str], random_state: int) -> tuple[pd.DataFrame, pd.DataFrame]:
     out = df.copy()
     use_features = available_features(out, features, min_non_na=756)
@@ -1267,3 +1295,315 @@ def fmt_num(value: Any, decimals: int = 2) -> str:
     if value is None or pd.isna(value):
         return ""
     return f"{float(value):.{decimals}f}"
+
+
+def write_report(
+    out_dir: Path,
+    dataset: pd.DataFrame,
+    fred_status: dict[str, str],
+    impact: pd.DataFrame,
+    mediation: pd.DataFrame,
+    model_metrics: pd.DataFrame,
+    dca_table: pd.DataFrame,
+    current_signal: dict[str, Any],
+    target_horizon: int,
+    args: argparse.Namespace,
+) -> None:
+    latest = dataset.iloc[-1]
+    lines: list[str] = []
+    lines.append("# QQQ Macro ML Regime Analysis")
+    lines.append("")
+    lines.append("This is a research audit, not investment advice or a live trading recommendation.")
+    lines.append("")
+    lines.append("## Method")
+    lines.append("")
+    lines.append(f"- Daily aligned sample: `{dataset.index.min().date()}` to `{dataset.index.max().date()}`.")
+    lines.append(f"- Main supervised regime horizon: `{target_horizon}` trading days.")
+    lines.append(f"- CPI and unemployment are lagged by `{args.monthly_release_lag_days}` calendar days before forward fill.")
+    lines.append("- OLS impact tests use standardized features and Newey-West standard errors on month-end observations.")
+    lines.append("- OLS impact tests drop high-VIF terms above `20` before significance scoring; the full VIF audit is still saved.")
+    lines.append("- ML validation is chronological with purge/embargo of overlapping forward-return windows.")
+    lines.append("- The latent sentiment variable is a black-box proxy, not an observed sentiment dataset.")
+    lines.append("")
+    lines.append("## Data Sources")
+    lines.append("")
+    lines.append(f"- QQQ parquet: `{args.qqq_path}`")
+    lines.append(f"- Macro parquet: `{args.macro_path}`")
+    for label, status in fred_status.items():
+        lines.append(f"- FRED `{FRED_STRESS_SERIES[label]}` as `{label}`: `{status}`")
+    lines.append("")
+    lines.append("## Current Snapshot")
+    lines.append("")
+    lines.append(f"- As of: `{dataset.index[-1].date()}`")
+    lines.append(f"- QQQ adjusted close: `{fmt_num(latest.get('qqq_close'), 2)}`")
+    lines.append(f"- GMM regime: `{latest.get('gmm_regime', 'unknown')}`")
+    lines.append(f"- Latent sentiment index: `{fmt_num(latest.get('latent_sentiment_index'), 2)}`")
+    lines.append(f"- External shock score: `{fmt_num(latest.get('external_shock_score'), 2)}`")
+    lines.append(f"- Logistic current risk-off probability: `{fmt_pct(current_signal.get('current_risk_off_target_probability'))}`")
+    lines.append(f"- Logistic current jump-in probability: `{fmt_pct(current_signal.get('current_jump_in_target_probability'))}`")
+    lines.append(f"- Research allocation label: `{current_signal.get('latest_signal', 'unknown')}`")
+    lines.append(f"- Research target equity allocation: `{fmt_pct(current_signal.get('latest_target_equity_allocation'))}`")
+    lines.append("")
+
+    lines.append("## Strongest Significant Impact Tests")
+    lines.append("")
+    sig = impact[(impact["q_value_bh_fdr"] <= 0.10) & (impact["term"] != "intercept")].copy() if not impact.empty else pd.DataFrame()
+    if sig.empty:
+        lines.append("- No features cleared 10% Benjamini-Hochberg FDR in the standardized Newey-West OLS tests.")
+    else:
+        top = sig.reindex(sig["coef_pct_points_per_1sd"].abs().sort_values(ascending=False).index).head(12)
+        lines.append("| Horizon | Feature | Coef pp / 1 sd | p-value | q-value |")
+        lines.append("|---:|---|---:|---:|---:|")
+        for _, row in top.iterrows():
+            lines.append(
+                f"| {int(row['horizon_days'])} | {row['term']} | {row['coef_pct_points_per_1sd']:.2f} | "
+                f"{row['p_value']:.4f} | {row['q_value_bh_fdr']:.4f} |"
+            )
+    lines.append("")
+
+    lines.append("## Sentiment Black-Box Tests")
+    lines.append("")
+    if mediation.empty:
+        lines.append("- Mediation-style tests could not be computed with the available feature set.")
+    else:
+        view = mediation[mediation["term"].isin(["latent_sentiment_index", "qqq_feedback_score", "external_shock_score"])].copy()
+        if view.empty:
+            view = mediation.head(10).copy()
+        lines.append("| Test | Outcome | Term | Coef | p-value | q-value |")
+        lines.append("|---|---|---|---:|---:|---:|")
+        for _, row in view.head(12).iterrows():
+            lines.append(
+                f"| {row['test']} | {row['outcome']} | {row['term']} | {row['coef']:.4f} | "
+                f"{row['p_value']:.4f} | {row['q_value_bh_fdr']:.4f} |"
+            )
+    lines.append("")
+
+    lines.append("## Holdout ML Validation")
+    lines.append("")
+    if model_metrics.empty:
+        lines.append("- Model validation could not be computed with the available sample.")
+    else:
+        lines.append("| Target | Model | Train N | Test N | AUC/R2 | MAE/Brier | Spearman/Recall |")
+        lines.append("|---|---|---:|---:|---:|---:|---:|")
+        for _, row in model_metrics.iterrows():
+            score = row.get("auc") if pd.notna(row.get("auc")) else row.get("r2", np.nan)
+            error = row.get("brier") if pd.notna(row.get("brier")) else row.get("mae", np.nan)
+            extra = (
+                row.get("recall_at_50pct")
+                if pd.notna(row.get("recall_at_50pct"))
+                else row.get("spearman_pred_actual", np.nan)
+            )
+            lines.append(
+                f"| {row['target']} | {row['model']} | {int(row['train_n'])} | {int(row['test_n'])} | "
+                f"{fmt_num(score, 3)} | {fmt_num(error, 3)} | {fmt_num(extra, 3)} |"
+            )
+    lines.append("")
+
+    lines.append("## DCA Backtest")
+    lines.append("")
+    if dca_table.empty:
+        lines.append("- DCA backtest could not be computed.")
+    else:
+        lines.append("| Strategy | Final | Total Contributed | Profit/Contrib | XIRR | Max DD | Avg Allocation |")
+        lines.append("|---|---:|---:|---:|---:|---:|---:|")
+        for _, row in dca_table.iterrows():
+            lines.append(
+                f"| {row['strategy']} | ${row['final_value']:,.0f} | ${row['total_contributed']:,.0f} | "
+                f"{fmt_pct(row['profit_on_contributed'])} | {fmt_pct(row['xirr'])} | "
+                f"{fmt_pct(row['max_drawdown_on_account_value'])} | {fmt_pct(row['avg_equity_allocation'])} |"
+            )
+    lines.append("")
+
+    lines.append("## Files")
+    lines.append("")
+    for filename in [
+        "aligned_daily_dataset.csv",
+        "month_end_model_sample.csv",
+        "ols_newey_west_impact.csv",
+        "sentiment_mediation_tests.csv",
+        "feature_correlation_spearman.csv",
+        "feature_vif.csv",
+        "ols_feature_vif_filter.csv",
+        "gmm_regime_summary.csv",
+        "shock_forward_return_tests.csv",
+        "model_validation_metrics.csv",
+        "model_feature_importance.csv",
+        "walkforward_allocation_signal.csv",
+        "dca_backtest_metrics.csv",
+        "dca_equity_curves.csv",
+        "dca_allocations.csv",
+        "current_signal.json",
+        "plots/",
+    ]:
+        lines.append(f"- `{filename}`")
+    lines.append("")
+    lines.append("## Caveats")
+    lines.append("")
+    lines.append("- Significance is historical association, not proof of causality.")
+    lines.append("- FRED monthly macro data is not true point-in-time ALFRED vintage data; the release lag is a conservative approximation.")
+    lines.append("- The black-box sentiment proxy is intentionally transparent enough to audit, but it is still a proxy.")
+    lines.append("- DCA results depend on contribution timing, cash yield assumption, transaction cost, and thresholds.")
+    lines.append("- Treat allocation labels as hypotheses for review, not as automatic execution instructions.")
+    lines.append("")
+    out_dir.joinpath("report.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Industry-grade QQQ macro ML regime and DCA analysis.")
+    parser.add_argument("--qqq-path", type=Path, default=DEFAULT_QQQ_PATH)
+    parser.add_argument("--macro-path", type=Path, default=DEFAULT_MACRO_PATH)
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument("--fred-cache-dir", type=Path, default=DEFAULT_FRED_CACHE_DIR)
+    parser.add_argument("--start", default="1999-03-10")
+    parser.add_argument("--end", default=None)
+    parser.add_argument("--refresh-fred", action="store_true")
+    parser.add_argument("--monthly-release-lag-days", type=int, default=45)
+    parser.add_argument("--target-horizon", type=int, default=63)
+    parser.add_argument("--test-size", type=float, default=0.30)
+    parser.add_argument("--min-train-months", type=int, default=96)
+    parser.add_argument("--initial-capital", type=float, default=10_000.0)
+    parser.add_argument("--monthly-contribution", type=float, default=1_000.0)
+    parser.add_argument("--trading-cost-bps", type=float, default=3.0)
+    parser.add_argument("--risk-off-threshold", type=float, default=0.45)
+    parser.add_argument("--jump-in-threshold", type=float, default=0.55)
+    parser.add_argument("--random-state", type=int, default=RANDOM_STATE)
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    plots_dir = args.out_dir / "plots"
+    plots_dir.mkdir(parents=True, exist_ok=True)
+
+    qqq = load_qqq(args.qqq_path, args.start, args.end)
+    macro = load_macro(args.macro_path, qqq.index, args.monthly_release_lag_days)
+    stress, fred_status = load_stress_proxies(qqq.index, args.fred_cache_dir, args.refresh_fred)
+    dataset = build_dataset(qqq, macro, stress, args.target_horizon)
+    features = available_features(dataset, MODEL_FEATURES, min_non_na=252)
+    if len(features) < 6:
+        raise RuntimeError(f"Not enough usable model features. Found: {features}")
+
+    dataset, gmm_summary = classify_gmm_regimes(dataset, available_features(dataset, GMM_FEATURES, 756), args.random_state)
+    sample = month_end_sample(dataset)
+    sample_features = available_features(sample, features, min_non_na=60)
+    ols_features, ols_feature_filter = select_vif_filtered_features(sample, sample_features)
+
+    impact = run_impact_tests(sample, ols_features)
+    mediation = run_mediation_style_tests(sample, sample_features, args.target_horizon)
+    corr = sample[sample_features].corr(method="spearman")
+    vif = compute_vif(sample, sample_features)
+    shock_tests = shock_return_tests(sample, args.target_horizon)
+    model_metrics, feature_importance, current_signal = evaluate_models(
+        sample, sample_features, args.target_horizon, args.test_size, args.random_state
+    )
+
+    risk_off_prob = walkforward_signal_probabilities(
+        sample, sample_features, "risk_off_target", args.target_horizon, args.min_train_months, args.random_state
+    )
+    jump_in_prob = walkforward_signal_probabilities(
+        sample, sample_features, "jump_in_target", args.target_horizon, args.min_train_months, args.random_state
+    )
+    allocation_signals = build_allocation_signal(
+        sample, risk_off_prob, jump_in_prob, args.risk_off_threshold, args.jump_in_threshold
+    )
+    valid_signal_start = allocation_signals["target_equity_allocation"].first_valid_index()
+    if valid_signal_start is None:
+        valid_signal_start = sample.index[max(min(len(sample) - 1, args.min_train_months), 0)]
+
+    regime_target = allocation_signals["target_equity_allocation"].dropna()
+    plain_target = pd.Series(1.0, index=regime_target.index, name="Plain DCA 100% QQQ")
+    half_cash_target = pd.Series(0.70, index=regime_target.index, name="Static 70/30 DCA")
+    results = [
+        simulate_dca(
+            qqq,
+            plain_target,
+            name="Plain DCA 100% QQQ",
+            start_date=pd.Timestamp(valid_signal_start),
+            initial_capital=args.initial_capital,
+            monthly_contribution=args.monthly_contribution,
+            trading_cost_bps=args.trading_cost_bps,
+        ),
+        simulate_dca(
+            qqq,
+            half_cash_target,
+            name="Static 70/30 DCA",
+            start_date=pd.Timestamp(valid_signal_start),
+            initial_capital=args.initial_capital,
+            monthly_contribution=args.monthly_contribution,
+            trading_cost_bps=args.trading_cost_bps,
+        ),
+        simulate_dca(
+            qqq,
+            regime_target,
+            name="ML Regime DCA Cash Reserve",
+            start_date=pd.Timestamp(valid_signal_start),
+            initial_capital=args.initial_capital,
+            monthly_contribution=args.monthly_contribution,
+            trading_cost_bps=args.trading_cost_bps,
+        ),
+    ]
+    dca_table = dca_metrics(results)
+    equity_curves = pd.concat([result.equity for result in results], axis=1)
+    allocations = pd.concat([result.allocation for result in results], axis=1)
+
+    latest_signal = allocation_signals.dropna(subset=["target_equity_allocation"]).iloc[-1] if not regime_target.empty else None
+    if latest_signal is not None:
+        current_signal["latest_signal_date"] = latest_signal.name
+        current_signal["latest_signal"] = latest_signal["signal"]
+        current_signal["latest_target_equity_allocation"] = float(latest_signal["target_equity_allocation"])
+        current_signal["latest_walkforward_risk_off_probability"] = float(latest_signal["risk_off_probability"])
+        current_signal["latest_walkforward_jump_in_probability"] = float(latest_signal["jump_in_probability"])
+
+    dataset.to_csv(args.out_dir / "aligned_daily_dataset.csv", index_label="date")
+    sample.to_csv(args.out_dir / "month_end_model_sample.csv", index_label="date")
+    impact.to_csv(args.out_dir / "ols_newey_west_impact.csv", index=False)
+    mediation.to_csv(args.out_dir / "sentiment_mediation_tests.csv", index=False)
+    corr.to_csv(args.out_dir / "feature_correlation_spearman.csv")
+    vif.to_csv(args.out_dir / "feature_vif.csv", index=False)
+    ols_feature_filter.to_csv(args.out_dir / "ols_feature_vif_filter.csv", index=False)
+    gmm_summary.to_csv(args.out_dir / "gmm_regime_summary.csv", index=False)
+    shock_tests.to_csv(args.out_dir / "shock_forward_return_tests.csv", index=False)
+    model_metrics.to_csv(args.out_dir / "model_validation_metrics.csv", index=False)
+    feature_importance.to_csv(args.out_dir / "model_feature_importance.csv", index=False)
+    allocation_signals.to_csv(args.out_dir / "walkforward_allocation_signal.csv", index_label="date")
+    dca_table.to_csv(args.out_dir / "dca_backtest_metrics.csv", index=False)
+    equity_curves.to_csv(args.out_dir / "dca_equity_curves.csv", index_label="date")
+    allocations.to_csv(args.out_dir / "dca_allocations.csv", index_label="date")
+    (args.out_dir / "current_signal.json").write_text(json.dumps(current_signal, indent=2, default=_json_default), encoding="utf-8")
+
+    plot_heatmap(corr, plots_dir / "feature_correlation_heatmap.png", "Spearman feature interrelationship heatmap")
+    plot_coefficients(impact, plots_dir / "ols_impact_63d.png", 63)
+    plot_coefficients(impact, plots_dir / "ols_impact_252d.png", 252)
+    plot_feature_importance(feature_importance, plots_dir / "feature_importance_risk_off.png", "risk_off_target")
+    plot_feature_importance(feature_importance, plots_dir / "feature_importance_jump_in.png", "jump_in_target")
+    plot_sentiment(dataset, plots_dir / "latent_sentiment_and_shocks.png")
+    plot_regimes(dataset, plots_dir / "qqq_gmm_regimes.png")
+    plot_dca(results, plots_dir / "dca_equity_curves.png")
+    plot_allocation(allocation_signals.dropna(subset=["target_equity_allocation"]), plots_dir / "walkforward_allocation_signal.png")
+
+    write_report(
+        args.out_dir,
+        dataset,
+        fred_status,
+        impact,
+        mediation,
+        model_metrics,
+        dca_table,
+        current_signal,
+        args.target_horizon,
+        args,
+    )
+
+    print(f"Wrote QQQ macro ML regime analysis to {args.out_dir}")
+    print(f"Latest QQQ date: {dataset.index[-1].date()}, close: {dataset['qqq_close'].iloc[-1]:.2f}")
+    print(f"Latest GMM regime: {dataset['gmm_regime'].iloc[-1]}")
+    if latest_signal is not None:
+        print(
+            "Latest walk-forward signal: "
+            f"{latest_signal['signal']} at {latest_signal['target_equity_allocation']:.0%} target allocation"
+        )
+
+
+if __name__ == "__main__":
+    main()
