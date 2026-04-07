@@ -29,6 +29,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_DIR = ROOT / "cache" / "cache" / "tiingo"
+DEFAULT_DAILY_DATA_PATH = ROOT / "cache" / "cache" / "cache" / "QQQ_daily.parquet"
 DEFAULT_OUT_DIR = ROOT / "reports" / "qqq_turtle_dca_backtest"
 
 
@@ -139,6 +140,63 @@ def load_daily_ohlcv(
     # The local cache can end mid-session. Dropping thin days avoids treating a
     # partial trading day as a real daily close.
     daily = daily[daily["bars"] >= int(min_bars_per_day)].copy()
+
+    if start:
+        daily = daily[daily.index >= pd.Timestamp(start)]
+    if end:
+        daily = daily[daily.index <= pd.Timestamp(end)]
+
+    if len(daily) < 260:
+        raise ValueError(
+            f"Only {len(daily)} usable daily bars after filtering; need at least about 1 year."
+        )
+
+    return daily, path
+
+
+def load_daily_parquet_ohlcv(
+    path: Path,
+    start: str | None,
+    end: str | None,
+) -> tuple[pd.DataFrame, Path]:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing daily data file: {path}")
+
+    try:
+        import pyarrow.parquet as pq
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("pyarrow is required to read the daily parquet cache") from exc
+
+    raw = pq.read_table(path).to_pandas()
+    if "date" in raw.columns:
+        dates = pd.to_datetime(raw["date"])
+    elif "time" in raw.columns:
+        dates = pd.to_datetime(raw["time"]).dt.tz_localize(None)
+    else:
+        raise ValueError("Daily parquet must contain either a date or time column")
+
+    required = {"o", "h", "l", "c", "v"}
+    missing = required - set(raw.columns)
+    if missing:
+        raise ValueError(f"Daily parquet missing required columns: {sorted(missing)}")
+
+    factor = pd.Series(1.0, index=raw.index)
+    if "adj_c" in raw.columns:
+        raw_close = raw["c"].replace(0.0, np.nan)
+        factor = (raw["adj_c"] / raw_close).replace([np.inf, -np.inf], np.nan).fillna(1.0)
+
+    daily = pd.DataFrame(
+        {
+            "open": (raw["o"].astype(float) * factor).to_numpy(),
+            "high": (raw["h"].astype(float) * factor).to_numpy(),
+            "low": (raw["l"].astype(float) * factor).to_numpy(),
+            "close": raw.get("adj_c", raw["c"]).astype(float).to_numpy(),
+            "volume": raw["v"].astype(float).to_numpy(),
+            "bars": 1,
+        },
+        index=dates,
+    ).sort_index()
+    daily.index.name = "date"
 
     if start:
         daily = daily[daily.index >= pd.Timestamp(start)]
@@ -388,6 +446,121 @@ def ma_tactical_dca_portfolio(
     equity_series = pd.Series(equity, index=close.index, name=label)
     leverage_series = pd.Series(portfolio_leverage, index=close.index, name=f"{label} leverage")
     return equity_series, leverage_series
+
+
+def _taper_levels(max_leverage: float) -> list[float]:
+    if max_leverage >= 5.0:
+        return [max_leverage, 3.0, 2.0]
+    if max_leverage >= 3.0:
+        return [max_leverage, 2.0]
+    return [max_leverage]
+
+
+def ma_tactical_dca_portfolio_exit_policy(
+    close: pd.Series,
+    capital: float,
+    leverage: float,
+    borrow_rate: float,
+    slippage_bps: float,
+    commission_bps: float,
+    fast_ma: int,
+    slow_ma: int,
+    threshold: float,
+    exit_policy: str,
+    label: str,
+    taper_phase_days: int = 20,
+    momentum_lookback: int = 20,
+) -> tuple[pd.Series, pd.Series, pd.Series]:
+    """Portfolio tactical DCA with configurable no-lookahead post-reclaim exit."""
+    months = pd.PeriodIndex(close.index, freq="M").unique()
+    installment = capital / len(months)
+    cost_rate = (slippage_bps + commission_bps) / 10_000.0
+    ma_ratio = (close.rolling(fast_ma).mean() / close.rolling(slow_ma).mean()).shift(1)
+    momentum_return = close.pct_change(momentum_lookback).shift(1)
+    momentum_sma = close.rolling(momentum_lookback).mean().shift(1)
+    fast_sma = close.rolling(fast_ma).mean().shift(1)
+    fast_sma_slope = fast_sma - fast_sma.shift(momentum_lookback)
+    prior_close = close.shift(1)
+    levels = _taper_levels(leverage)
+
+    cash = capital
+    invested_equity = 0.0
+    active_leverage = 1.0
+    previous_month: pd.Period | None = None
+    previous_price: float | None = None
+    post_reclaim_day: int | None = None
+    was_cheap = False
+
+    equity: list[float] = []
+    portfolio_leverage: list[float] = []
+    target_leverage_log: list[float] = []
+
+    for date, price in close.items():
+        current_price = float(price)
+        ratio = float(ma_ratio.loc[date]) if pd.notna(ma_ratio.loc[date]) else np.nan
+        cheap_regime = bool(np.isfinite(ratio) and ratio < threshold)
+
+        if cheap_regime:
+            post_reclaim_day = None
+        elif was_cheap and not cheap_regime:
+            post_reclaim_day = 0
+        elif post_reclaim_day is not None:
+            post_reclaim_day += 1
+
+        if cheap_regime:
+            target_leverage = leverage
+        elif exit_policy == "reclaim":
+            target_leverage = 1.0
+        elif exit_policy == "taper":
+            if post_reclaim_day is None or taper_phase_days <= 0:
+                target_leverage = 1.0
+            else:
+                step = post_reclaim_day // taper_phase_days
+                target_leverage = levels[step] if step < len(levels) else 1.0
+        elif exit_policy == "momentum_return":
+            momentum_ok = bool(pd.notna(momentum_return.loc[date]) and momentum_return.loc[date] > 0.0)
+            target_leverage = leverage if post_reclaim_day is not None and momentum_ok else 1.0
+        elif exit_policy == "momentum_sma":
+            momentum_ok = bool(pd.notna(momentum_sma.loc[date]) and prior_close.loc[date] > momentum_sma.loc[date])
+            target_leverage = leverage if post_reclaim_day is not None and momentum_ok else 1.0
+        elif exit_policy == "momentum_slope":
+            momentum_ok = bool(pd.notna(fast_sma_slope.loc[date]) and fast_sma_slope.loc[date] > 0.0)
+            target_leverage = leverage if post_reclaim_day is not None and momentum_ok else 1.0
+        else:
+            raise ValueError(f"Unsupported tactical exit policy: {exit_policy}")
+
+        if previous_price is not None:
+            if invested_equity > 0.0 and target_leverage != active_leverage:
+                leverage_delta = abs(target_leverage - active_leverage)
+                invested_equity = max(0.0, invested_equity - invested_equity * leverage_delta * cost_rate)
+            active_leverage = target_leverage
+            if invested_equity > 0.0:
+                day_return = current_price / previous_price - 1.0
+                borrow_cost = max(active_leverage - 1.0, 0.0) * borrow_rate / 252.0
+                invested_equity *= max(0.0, 1.0 + active_leverage * day_return - borrow_cost)
+        else:
+            active_leverage = target_leverage
+
+        month = pd.Period(date, freq="M")
+        if month != previous_month:
+            contribution = min(installment, cash)
+            if contribution > 0.0:
+                invested_equity += max(0.0, contribution - contribution * active_leverage * cost_rate)
+                cash -= contribution
+            previous_month = month
+
+        total_equity = cash + invested_equity
+        gross_exposure = invested_equity * active_leverage
+        equity.append(total_equity)
+        portfolio_leverage.append(gross_exposure / total_equity if total_equity > 0.0 else 0.0)
+        target_leverage_log.append(active_leverage)
+        previous_price = current_price
+        was_cheap = cheap_regime
+
+    equity_series = pd.Series(equity, index=close.index, name=label)
+    leverage_series = pd.Series(portfolio_leverage, index=close.index, name=f"{label} leverage")
+    target_leverage_series = pd.Series(target_leverage_log, index=close.index, name=f"{label} target leverage")
+    return equity_series, leverage_series, target_leverage_series
 
 
 def _volume_confirmed(row: pd.Series, direction: int, cfg: TurtleConfig) -> bool:
@@ -900,6 +1073,77 @@ def run_tactical_ma_grid(
     return grid
 
 
+def run_post_reclaim_exit_grid(
+    close: pd.Series,
+    args: argparse.Namespace,
+    dca: pd.Series,
+) -> pd.DataFrame:
+    rows: list[dict[str, Any]] = []
+    base_kwargs = dict(
+        close=close,
+        capital=args.initial_capital,
+        leverage=args.max_leverage,
+        borrow_rate=args.borrow_rate,
+        slippage_bps=args.slippage_bps,
+        commission_bps=args.commission_bps,
+        fast_ma=args.tactical_fast_ma,
+        slow_ma=args.tactical_slow_ma,
+        threshold=args.tactical_ma_threshold,
+    )
+
+    policy_specs: list[tuple[str, int, int]] = [("reclaim", 0, args.momentum_exit_lookbacks[0])]
+    for taper_days in args.taper_phase_days:
+        policy_specs.append(("taper", taper_days, args.momentum_exit_lookbacks[0]))
+    for lookback in args.momentum_exit_lookbacks:
+        policy_specs.extend(
+            [
+                ("momentum_return", 0, lookback),
+                ("momentum_sma", 0, lookback),
+                ("momentum_slope", 0, lookback),
+            ]
+        )
+
+    for policy, taper_days, momentum_lookback in policy_specs:
+        label_bits = [f"MA{args.tactical_fast_ma}/{args.tactical_slow_ma}", policy]
+        if policy == "taper":
+            label_bits.append(f"{taper_days}d")
+        if policy.startswith("momentum"):
+            label_bits.append(f"{momentum_lookback}d")
+        label_bits.append(f"DCA {args.max_leverage:g}x")
+        label = " ".join(label_bits)
+        equity, leverage, target_leverage = ma_tactical_dca_portfolio_exit_policy(
+            **base_kwargs,
+            exit_policy=policy,
+            label=label,
+            taper_phase_days=taper_days,
+            momentum_lookback=momentum_lookback,
+        )
+        row = compute_metrics(equity, label, leverage=leverage, dca_equity=dca)
+        target_above_one = target_leverage > 1.0
+        row.update(
+            {
+                "policy": policy,
+                "fast_ma": args.tactical_fast_ma,
+                "slow_ma": args.tactical_slow_ma,
+                "threshold": args.tactical_ma_threshold,
+                "taper_phase_days": taper_days,
+                "momentum_lookback": momentum_lookback,
+                "target_leveraged_days": int(target_above_one.sum()),
+                "avg_portfolio_leverage": float(leverage.mean()),
+                "max_target_leverage": float(target_leverage.max()),
+            }
+        )
+        rows.append(row)
+
+    grid = pd.DataFrame(rows)
+    if not grid.empty:
+        grid = grid.sort_values(
+            ["beats_dca_final", "cagr_pct", "max_drawdown_pct"],
+            ascending=[False, False, False],
+        ).reset_index(drop=True)
+    return grid
+
+
 def plot_results(
     equity_df: pd.DataFrame,
     leverage_df: pd.DataFrame,
@@ -990,6 +1234,11 @@ def write_report(
     args: argparse.Namespace,
 ) -> None:
     sorted_metrics = metrics_df.sort_values("final_equity", ascending=False).copy()
+    coverage_note = (
+        f"- Partial days dropped when fewer than `{args.min_bars_per_day}` 5-minute bars were present"
+        if args.data_source == "intraday-cache"
+        else "- Daily parquet OHLC was adjusted with `adj_c / c` when `adj_c` was available"
+    )
     lines = [
         f"# {symbol} Turtle vs DCA Backtest",
         "",
@@ -1000,7 +1249,7 @@ def write_report(
         f"- Source: `{data_path}`",
         f"- Daily bars used: `{len(daily)}`",
         f"- Date range: `{daily.index[0].date()}` to `{daily.index[-1].date()}`",
-        f"- Partial days dropped when fewer than `{args.min_bars_per_day}` 5-minute bars were present",
+        coverage_note,
         "",
         "## Assumptions",
         "",
@@ -1050,6 +1299,7 @@ def write_report(
     if args.run_grid:
         lines.append("- `grid_results.csv`: optional fixed-leverage parameter scan")
         lines.append("- `tactical_ma_grid_results.csv`: optional tactical MA DCA parameter scan")
+        lines.append("- `post_reclaim_exit_grid_results.csv`: optional post-reclaim de-leveraging scan")
     (out_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -1058,7 +1308,13 @@ def parse_args() -> argparse.Namespace:
         description="Backtest QQQ turtle trading variants against QQQ monthly DCA."
     )
     parser.add_argument("--symbol", default="QQQ")
+    parser.add_argument(
+        "--data-source",
+        choices=["intraday-cache", "daily-parquet"],
+        default="intraday-cache",
+    )
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
+    parser.add_argument("--daily-data-path", type=Path, default=DEFAULT_DAILY_DATA_PATH)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--start", default=None, help="Optional YYYY-MM-DD start date")
     parser.add_argument("--end", default=None, help="Optional YYYY-MM-DD end date")
@@ -1078,6 +1334,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tactical-ma-threshold", type=float, default=1.0)
     parser.add_argument("--tactical-grid-fast-mas", type=int, nargs="+", default=[50, 60, 70])
     parser.add_argument("--tactical-grid-slow-mas", type=int, nargs="+", default=[200, 210, 220])
+    parser.add_argument("--taper-phase-days", type=int, nargs="+", default=[10, 20, 40, 60])
+    parser.add_argument("--momentum-exit-lookbacks", type=int, nargs="+", default=[10, 20, 40, 60])
     parser.add_argument("--risk-per-unit", type=float, default=0.02)
     parser.add_argument("--boosted-risk-per-unit", type=float, default=0.03)
     parser.add_argument("--min-rel-volume", type=float, default=1.25)
@@ -1114,8 +1372,8 @@ def parse_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
 
-    if args.max_leverage <= 0 or args.max_leverage > 3.0:
-        raise ValueError("--max-leverage must be > 0 and <= 3.0 for this research setup")
+    if args.max_leverage <= 0 or args.max_leverage > 5.0:
+        raise ValueError("--max-leverage must be > 0 and <= 5.0 for this research setup")
     if args.exit_period >= args.entry_period:
         raise ValueError("--exit-period should be smaller than --entry-period")
     return args
@@ -1126,13 +1384,20 @@ def main() -> None:
     out_dir = args.out_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    daily, data_path = load_daily_ohlcv(
-        symbol=args.symbol,
-        data_dir=args.data_dir,
-        min_bars_per_day=args.min_bars_per_day,
-        start=args.start,
-        end=args.end,
-    )
+    if args.data_source == "daily-parquet":
+        daily, data_path = load_daily_parquet_ohlcv(
+            path=args.daily_data_path,
+            start=args.start,
+            end=args.end,
+        )
+    else:
+        daily, data_path = load_daily_ohlcv(
+            symbol=args.symbol,
+            data_dir=args.data_dir,
+            min_bars_per_day=args.min_bars_per_day,
+            start=args.start,
+            end=args.end,
+        )
 
     symbol = args.symbol.upper()
     close = daily["close"]
@@ -1228,6 +1493,8 @@ def main() -> None:
         grid_df.to_csv(out_dir / "grid_results.csv", index=False)
         tactical_grid_df = run_tactical_ma_grid(close, args, dca=dca)
         tactical_grid_df.to_csv(out_dir / "tactical_ma_grid_results.csv", index=False)
+        post_reclaim_grid_df = run_post_reclaim_exit_grid(close, args, dca=dca)
+        post_reclaim_grid_df.to_csv(out_dir / "post_reclaim_exit_grid_results.csv", index=False)
 
     if not args.no_plot:
         plot_results(
@@ -1248,6 +1515,7 @@ def main() -> None:
         "date_start": daily.index[0].date().isoformat(),
         "date_end": daily.index[-1].date().isoformat(),
         "daily_bars": len(daily),
+        "data_source": args.data_source,
         "args": {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()},
         "turtle_configs": [asdict(cfg) for cfg in configs],
         "best_by_final_equity": metrics_df.sort_values("final_equity", ascending=False)
