@@ -30,6 +30,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_DIR = ROOT / "cache" / "cache" / "tiingo"
 DEFAULT_DAILY_DATA_PATH = ROOT / "cache" / "cache" / "cache" / "QQQ_daily.parquet"
+DEFAULT_MACRO_DATA_PATH = ROOT / "cache" / "cache" / "macro_daily_1999.parquet"
 DEFAULT_OUT_DIR = ROOT / "reports" / "qqq_turtle_dca_backtest"
 
 
@@ -209,6 +210,76 @@ def load_daily_parquet_ohlcv(
         )
 
     return daily, path
+
+
+def load_macro_features(path: Path, index: pd.DatetimeIndex) -> pd.DataFrame:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing macro data file: {path}")
+
+    raw = pd.read_parquet(path)
+    if "date" not in raw.columns:
+        raise ValueError("Macro parquet must contain a date column")
+
+    macro = raw.copy()
+    macro["date"] = pd.to_datetime(macro["date"]).dt.tz_localize(None)
+    macro = macro.set_index("date").sort_index()
+    macro = macro.rename(
+        columns={
+            "dxy_close": "dxy",
+            "us_2y_yield": "us2y",
+            "us_10y_yield": "us10y",
+            "us_30y_yield": "us30y",
+            "wti_usd_per_bbl": "wti",
+        }
+    )
+    required = ["dxy", "us2y", "us10y", "us30y", "wti"]
+    missing = [col for col in required if col not in macro.columns]
+    if missing:
+        raise ValueError(f"Macro parquet missing required columns: {missing}")
+
+    macro = macro[required].apply(pd.to_numeric, errors="coerce")
+    aligned = macro.reindex(macro.index.union(index)).sort_index().ffill().reindex(index)
+    features = pd.DataFrame(index=index)
+    features["dxy_12m_return"] = aligned["dxy"] / aligned["dxy"].shift(252) - 1.0
+    features["wti_12m_return"] = aligned["wti"] / aligned["wti"].shift(252) - 1.0
+    features["us2y_12m_change_pp"] = aligned["us2y"].diff(252)
+    features["us10y_12m_change_pp"] = aligned["us10y"].diff(252)
+    features["us30y_12m_change_pp"] = aligned["us30y"].diff(252)
+    curve_10y2y = aligned["us10y"] - aligned["us2y"]
+    features["curve_10y2y_12m_change_pp"] = curve_10y2y.diff(252)
+    # Use only macro information known before the trading day being acted on.
+    return features.shift(1)
+
+
+def macro_entry_ok_series(features: pd.DataFrame | None, mode: str, index: pd.DatetimeIndex) -> pd.Series:
+    mode = mode.strip().lower()
+    if mode in {"", "none"}:
+        return pd.Series(True, index=index, name="macro_none")
+    if features is None:
+        raise ValueError(f"Macro entry mode {mode!r} requires macro features")
+
+    wti_falling = features["wti_12m_return"] < 0.0
+    us10y_falling = features["us10y_12m_change_pp"] < 0.0
+    us10y_not_rising = features["us10y_12m_change_pp"] <= 0.0
+    dxy_rising = features["dxy_12m_return"] > 0.0
+    curve_steepening = features["curve_10y2y_12m_change_pp"] > 0.0
+    us2y_falling = features["us2y_12m_change_pp"] < 0.0
+
+    if mode == "wti_falling_yoy":
+        signal = wti_falling
+    elif mode == "wti_falling_or_10y_falling":
+        signal = wti_falling | us10y_falling
+    elif mode == "wti_falling_and_10y_not_rising":
+        signal = wti_falling & us10y_not_rising
+    elif mode == "avoid_wti_10y_stress":
+        signal = ~((features["wti_12m_return"] > 0.0) & (features["us10y_12m_change_pp"] > 0.0))
+    elif mode == "rates_easing_curve_steepening":
+        signal = us2y_falling & curve_steepening
+    elif mode == "dxy_rising_yoy":
+        signal = dxy_rising
+    else:
+        raise ValueError(f"Unsupported --macro-entry-modes value: {mode}")
+    return signal.reindex(index).fillna(False).astype(bool).rename(f"macro_{mode}")
 
 
 def add_indicators(
@@ -493,6 +564,7 @@ def ma_tactical_dca_portfolio_exit_policy(
     min_entry_rvol: float = 1.25,
     rvol_period: int = 40,
     entry_ramp_phase_days: int = 0,
+    macro_entry_ok: pd.Series | None = None,
 ) -> tuple[pd.Series, pd.Series, pd.Series]:
     """Portfolio tactical DCA with configurable no-lookahead post-reclaim exit."""
     months = pd.PeriodIndex(close.index, freq="M").unique()
@@ -537,11 +609,15 @@ def ma_tactical_dca_portfolio_exit_policy(
                 and pd.notna(rel_volume.loc[date])
                 and float(rel_volume.loc[date]) >= min_entry_rvol
             )
+        macro_ok = True
+        if macro_entry_ok is not None:
+            macro_ok = bool(pd.notna(macro_entry_ok.loc[date]) and macro_entry_ok.loc[date])
+        setup_ok = rvol_ok and macro_ok
 
         if cheap_regime:
             if not was_cheap:
-                cycle_confirmed = rvol_ok
-            elif not cycle_confirmed and rvol_ok:
+                cycle_confirmed = setup_ok
+            elif not cycle_confirmed and setup_ok:
                 cycle_confirmed = True
             post_reclaim_day = None
         elif was_cheap and not cheap_regime:
@@ -1137,6 +1213,7 @@ def run_tactical_ma_grid(
 def run_post_reclaim_exit_grid(
     close: pd.Series,
     volume: pd.Series | None,
+    macro_features: pd.DataFrame | None,
     args: argparse.Namespace,
     dca: pd.Series,
 ) -> pd.DataFrame:
@@ -1168,56 +1245,63 @@ def run_post_reclaim_exit_grid(
         )
     policy_specs.append(("momentum_slope", 0, 1))
 
-    for entry_ramp_phase_days in args.entry_ramp_phase_days:
-        for min_entry_rvol in args.tactical_rvol_thresholds:
-            require_rvol_entry = min_entry_rvol > 0.0
-            for policy, taper_days, momentum_lookback in policy_specs:
-                label_bits = [f"MA{args.tactical_fast_ma}/{args.tactical_slow_ma}", policy]
-                if policy in {"hold", "taper"}:
-                    label_bits.append(f"{taper_days}d")
-                if policy in {"momentum_return", "momentum_sma"}:
-                    label_bits.append(f"{momentum_lookback}d")
-                if policy == "momentum_slope":
-                    label_bits.append("60sma_slope")
-                if entry_ramp_phase_days > 0:
-                    label_bits.append(f"entryramp{entry_ramp_phase_days}d")
-                if require_rvol_entry:
-                    label_bits.append(f"rvol{min_entry_rvol:g}")
-                label_bits.append(f"DCA {args.max_leverage:g}x")
-                label = " ".join(label_bits)
-                equity, leverage, target_leverage = ma_tactical_dca_portfolio_exit_policy(
-                    **base_kwargs,
-                    exit_policy=policy,
-                    label=label,
-                    taper_phase_days=taper_days,
-                    momentum_lookback=momentum_lookback,
-                    require_rvol_entry=require_rvol_entry,
-                    min_entry_rvol=min_entry_rvol,
-                    rvol_period=args.volume_period,
-                    entry_ramp_phase_days=entry_ramp_phase_days,
-                )
-                row = compute_metrics(equity, label, leverage=leverage, dca_equity=dca)
-                target_above_one = target_leverage > 1.0
-                row.update(
-                    {
-                        "policy": policy,
-                        "fast_ma": args.tactical_fast_ma,
-                        "slow_ma": args.tactical_slow_ma,
-                        "threshold": args.tactical_ma_threshold,
-                        "hold_days": taper_days if policy == "hold" else 0,
-                        "taper_phase_days": taper_days if policy == "taper" else 0,
-                        "momentum_lookback": momentum_lookback if policy != "momentum_slope" else 1,
-                        "entry_ramp_phase_days": entry_ramp_phase_days,
-                        "entry_ramp_levels": ",".join(f"{level:g}" for level in _entry_ramp_levels(args.max_leverage)),
-                        "require_rvol_entry": require_rvol_entry,
-                        "min_entry_rvol": min_entry_rvol,
-                        "rvol_period": args.volume_period,
-                        "target_leveraged_days": int(target_above_one.sum()),
-                        "avg_portfolio_leverage": float(leverage.mean()),
-                        "max_target_leverage": float(target_leverage.max()),
-                    }
-                )
-                rows.append(row)
+    for macro_entry_mode in args.macro_entry_modes:
+        macro_ok = macro_entry_ok_series(macro_features, macro_entry_mode, close.index)
+        for entry_ramp_phase_days in args.entry_ramp_phase_days:
+            for min_entry_rvol in args.tactical_rvol_thresholds:
+                require_rvol_entry = min_entry_rvol > 0.0
+                for policy, taper_days, momentum_lookback in policy_specs:
+                    label_bits = [f"MA{args.tactical_fast_ma}/{args.tactical_slow_ma}", policy]
+                    if policy in {"hold", "taper"}:
+                        label_bits.append(f"{taper_days}d")
+                    if policy in {"momentum_return", "momentum_sma"}:
+                        label_bits.append(f"{momentum_lookback}d")
+                    if policy == "momentum_slope":
+                        label_bits.append("60sma_slope")
+                    if entry_ramp_phase_days > 0:
+                        label_bits.append(f"entryramp{entry_ramp_phase_days}d")
+                    if macro_entry_mode.strip().lower() not in {"", "none"}:
+                        label_bits.append(f"macro_{macro_entry_mode}")
+                    if require_rvol_entry:
+                        label_bits.append(f"rvol{min_entry_rvol:g}")
+                    label_bits.append(f"DCA {args.max_leverage:g}x")
+                    label = " ".join(label_bits)
+                    equity, leverage, target_leverage = ma_tactical_dca_portfolio_exit_policy(
+                        **base_kwargs,
+                        exit_policy=policy,
+                        label=label,
+                        taper_phase_days=taper_days,
+                        momentum_lookback=momentum_lookback,
+                        require_rvol_entry=require_rvol_entry,
+                        min_entry_rvol=min_entry_rvol,
+                        rvol_period=args.volume_period,
+                        entry_ramp_phase_days=entry_ramp_phase_days,
+                        macro_entry_ok=macro_ok,
+                    )
+                    row = compute_metrics(equity, label, leverage=leverage, dca_equity=dca)
+                    target_above_one = target_leverage > 1.0
+                    row.update(
+                        {
+                            "policy": policy,
+                            "fast_ma": args.tactical_fast_ma,
+                            "slow_ma": args.tactical_slow_ma,
+                            "threshold": args.tactical_ma_threshold,
+                            "hold_days": taper_days if policy == "hold" else 0,
+                            "taper_phase_days": taper_days if policy == "taper" else 0,
+                            "momentum_lookback": momentum_lookback if policy != "momentum_slope" else 1,
+                            "macro_entry_mode": macro_entry_mode,
+                            "macro_entry_days": int(macro_ok.sum()),
+                            "entry_ramp_phase_days": entry_ramp_phase_days,
+                            "entry_ramp_levels": ",".join(f"{level:g}" for level in _entry_ramp_levels(args.max_leverage)),
+                            "require_rvol_entry": require_rvol_entry,
+                            "min_entry_rvol": min_entry_rvol,
+                            "rvol_period": args.volume_period,
+                            "target_leveraged_days": int(target_above_one.sum()),
+                            "avg_portfolio_leverage": float(leverage.mean()),
+                            "max_target_leverage": float(target_leverage.max()),
+                        }
+                    )
+                    rows.append(row)
 
     grid = pd.DataFrame(rows)
     if not grid.empty:
@@ -1347,6 +1431,7 @@ def write_report(
         f"- Tactical MA DCA: cheap when `{args.tactical_fast_ma}`-day SMA / `{args.tactical_slow_ma}`-day SMA < `{args.tactical_ma_threshold:g}`",
         f"- Tactical entry ramp phase days: `{', '.join(str(x) for x in args.entry_ramp_phase_days)}`; `0` means immediate max leverage",
         f"- Tactical RVOL scan thresholds: `{', '.join(f'{x:g}' for x in args.tactical_rvol_thresholds)}`; `0` means no RVOL confirmation",
+        f"- Tactical macro entry modes: `{', '.join(args.macro_entry_modes)}`; macro values are shifted one trading day",
         f"- Shorting enabled: `{bool(args.allow_shorts)}`",
         "",
         "## Results",
@@ -1401,6 +1486,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR)
     parser.add_argument("--daily-data-path", type=Path, default=DEFAULT_DAILY_DATA_PATH)
+    parser.add_argument("--macro-data-path", type=Path, default=DEFAULT_MACRO_DATA_PATH)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--start", default=None, help="Optional YYYY-MM-DD start date")
     parser.add_argument("--end", default=None, help="Optional YYYY-MM-DD end date")
@@ -1425,6 +1511,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--momentum-exit-lookbacks", type=int, nargs="+", default=[10, 20, 40, 60])
     parser.add_argument("--tactical-rvol-thresholds", type=float, nargs="+", default=[0.0, 1.0, 1.25, 1.5])
     parser.add_argument("--entry-ramp-phase-days", type=int, nargs="+", default=[0])
+    parser.add_argument("--macro-entry-modes", nargs="+", default=["none"])
     parser.add_argument("--risk-per-unit", type=float, default=0.02)
     parser.add_argument("--boosted-risk-per-unit", type=float, default=0.03)
     parser.add_argument("--min-rel-volume", type=float, default=1.25)
@@ -1465,6 +1552,8 @@ def parse_args() -> argparse.Namespace:
         raise ValueError("--max-leverage must be > 0 and <= 5.0 for this research setup")
     if any(day < 0 for day in args.entry_ramp_phase_days):
         raise ValueError("--entry-ramp-phase-days values must be non-negative")
+    if not args.macro_entry_modes:
+        raise ValueError("--macro-entry-modes must include at least one mode")
     if args.exit_period >= args.entry_period:
         raise ValueError("--exit-period should be smaller than --entry-period")
     return args
@@ -1491,6 +1580,10 @@ def main() -> None:
         )
 
     symbol = args.symbol.upper()
+    macro_features: pd.DataFrame | None = None
+    if any(mode.strip().lower() not in {"", "none"} for mode in args.macro_entry_modes):
+        macro_features = load_macro_features(args.macro_data_path, daily.index)
+
     close = daily["close"]
     dca = dca_monthly(close, args.initial_capital, f"DCA Monthly {symbol} 1x")
     dca_lev, dca_lev_leverage = leveraged_dca_monthly(
@@ -1584,7 +1677,7 @@ def main() -> None:
         grid_df.to_csv(out_dir / "grid_results.csv", index=False)
         tactical_grid_df = run_tactical_ma_grid(close, args, dca=dca)
         tactical_grid_df.to_csv(out_dir / "tactical_ma_grid_results.csv", index=False)
-        post_reclaim_grid_df = run_post_reclaim_exit_grid(close, daily["volume"], args, dca=dca)
+        post_reclaim_grid_df = run_post_reclaim_exit_grid(close, daily["volume"], macro_features, args, dca=dca)
         post_reclaim_grid_df.to_csv(out_dir / "post_reclaim_exit_grid_results.csv", index=False)
 
     if not args.no_plot:

@@ -76,6 +76,40 @@ This is a descriptive research audit, not a forecast or investment recommendatio
 | curve_10y2y_level | 252 | 0.01 | 0.37 | -0.33 | 0.00 |
 | curve_10y2y_level | 504 | 0.07 | 0.67 | -0.46 | 0.03 |
 
+## Purged Walk-Forward ML Importance
+
+- Models: shallow random forest permutation importance and ridge regression standardized coefficients.
+- Split rule: each test fold is in the future, and training rows are excluded if their forward-return window overlaps the test fold.
+- Treat this as a variable screen, not a fitted trading model.
+
+| Feature | Horizon | Combined Rank | RF Permutation Importance | Ridge Signed Coef |
+|---|---:|---:|---:|---:|
+| curve_10y2y_12m_change_pp | 252 | 3.5 | 0.0008 | -0.1092 |
+| us2y_level | 252 | 6.0 | 0.0055 | -0.0418 |
+| curve_30y2y_12m_change_pp | 252 | 6.0 | 0.0012 | 0.0485 |
+| curve_30y2y_level | 252 | 7.0 | 0.0008 | -0.0074 |
+| us10y_12m_change_pp | 252 | 7.5 | 0.0003 | -0.0988 |
+| wti_12m_return | 252 | 8.0 | 0.0011 | -0.0373 |
+| wti_level | 252 | 9.0 | -0.0003 | -0.1313 |
+| dxy_12m_return | 252 | 9.5 | 0.0004 | -0.0393 |
+| us30y_level | 504 | 2.5 | 0.0001 | -0.0865 |
+| us2y_level | 504 | 3.5 | 0.0004 | -0.0398 |
+| us10y_level | 504 | 3.5 | 0.0002 | -0.0210 |
+| dxy_12m_return | 504 | 6.5 | 0.0006 | -0.0110 |
+| us10y_12m_change_pp | 504 | 7.0 | 0.0001 | -0.0124 |
+| curve_10y2y_12m_change_pp | 504 | 8.5 | 0.0001 | -0.0124 |
+| wti_level | 504 | 9.0 | -0.0004 | -0.0656 |
+| dxy_level | 504 | 10.0 | -0.0001 | -0.0350 |
+
+### ML Fold Metrics
+
+| Horizon | Model | Folds | Avg MAE | Avg R2 | Avg Spearman Pred/Actual |
+|---|---:|---:|---:|---:|---:|
+| 252 | random_forest | 5 | 0.183 | -1.34 | 0.27 |
+| 252 | ridge | 5 | 0.262 | -7.14 | 0.39 |
+| 504 | random_forest | 5 | 0.153 | -6.18 | -0.08 |
+| 504 | ridge | 5 | 0.252 | -16.45 | 0.31 |
+
 ## Files
 
 - `aligned_daily_dataset.csv`: daily aligned QQQ and macro features
@@ -83,3 +117,6 @@ This is a descriptive research audit, not a forecast or investment recommendatio
 - `feature_audit.csv`: univariate feature correlations and tercile buckets
 - `logical_rule_audit.csv`: fixed simple rule outcomes
 - `robustness_audit.csv`: era split and December-only robustness checks
+- `ml_importance_raw.csv`: fold-level ridge and random forest importances
+- `ml_importance.csv`: aggregated ML importance ranking
+- `ml_fold_metrics.csv`: out-of-sample fold metrics

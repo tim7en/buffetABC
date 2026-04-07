@@ -14,6 +14,13 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.inspection import permutation_importance
+from sklearn.linear_model import RidgeCV
+from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,6 +111,7 @@ def build_dataset(qqq_close: pd.Series, macro: pd.DataFrame) -> pd.DataFrame:
         forward_return = qqq_close.shift(-horizon) / qqq_close - 1.0
         df[f"qqq_forward_{horizon}d_return"] = forward_return
         df[f"qqq_forward_{horizon}d_cagr"] = (1.0 + forward_return).pow(TRADING_DAYS_PER_YEAR / horizon) - 1.0
+        df[f"qqq_forward_{horizon}d_end_date"] = pd.Series(qqq_close.index, index=qqq_close.index).shift(-horizon)
     return df
 
 
@@ -270,6 +278,190 @@ def robustness_audit(sample: pd.DataFrame, features: list[str]) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _spearman_pred_actual(pred: np.ndarray, actual: pd.Series) -> float:
+    valid = pd.DataFrame({"pred": pred, "actual": actual.to_numpy()}).dropna()
+    if len(valid) < 12:
+        return np.nan
+    return float(valid["pred"].rank().corr(valid["actual"].rank()))
+
+
+def _purged_walk_forward_splits(valid: pd.DataFrame, horizon: int, *, n_splits: int = 5, test_size: int = 24) -> list[tuple[np.ndarray, np.ndarray]]:
+    target_end_col = f"qqq_forward_{horizon}d_end_date"
+    n = len(valid)
+    first_test_start = max(0, n - n_splits * test_size)
+    splits: list[tuple[np.ndarray, np.ndarray]] = []
+    for fold_start in range(first_test_start, n, test_size):
+        fold_end = min(fold_start + test_size, n)
+        test_idx = np.arange(fold_start, fold_end)
+        if len(test_idx) < max(6, test_size // 2):
+            continue
+        test_start_date = valid.index[fold_start]
+        train_mask = valid[target_end_col] < test_start_date
+        train_idx = np.where(train_mask.to_numpy())[0]
+        if len(train_idx) < 60:
+            continue
+        splits.append((train_idx, test_idx))
+    return splits
+
+
+def ml_importance_audit(
+    sample: pd.DataFrame,
+    features: list[str],
+    *,
+    random_state: int = 7,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    raw_rows: list[dict[str, Any]] = []
+    metric_rows: list[dict[str, Any]] = []
+
+    for horizon in [252, 504]:
+        outcome = f"qqq_forward_{horizon}d_cagr"
+        target_end_col = f"qqq_forward_{horizon}d_end_date"
+        valid = sample[features + [outcome, target_end_col]].dropna().copy()
+        splits = _purged_walk_forward_splits(valid, horizon)
+
+        for fold, (train_idx, test_idx) in enumerate(splits, start=1):
+            train = valid.iloc[train_idx]
+            test = valid.iloc[test_idx]
+            X_train = train[features]
+            y_train = train[outcome]
+            X_test = test[features]
+            y_test = test[outcome]
+
+            ridge = make_pipeline(
+                SimpleImputer(strategy="median"),
+                StandardScaler(),
+                RidgeCV(alphas=np.logspace(-4, 4, 41)),
+            )
+            ridge.fit(X_train, y_train)
+            ridge_pred = ridge.predict(X_test)
+            ridge_model = ridge.named_steps["ridgecv"]
+            for feature, coefficient in zip(features, ridge_model.coef_):
+                raw_rows.append(
+                    {
+                        "horizon_days": horizon,
+                        "fold": fold,
+                        "model": "ridge",
+                        "feature": feature,
+                        "importance": abs(float(coefficient)),
+                        "signed_importance": float(coefficient),
+                    }
+                )
+            metric_rows.append(
+                {
+                    "horizon_days": horizon,
+                    "fold": fold,
+                    "model": "ridge",
+                    "train_start": train.index[0].date(),
+                    "train_end": train.index[-1].date(),
+                    "test_start": test.index[0].date(),
+                    "test_end": test.index[-1].date(),
+                    "train_n": int(len(train)),
+                    "test_n": int(len(test)),
+                    "mae": float(mean_absolute_error(y_test, ridge_pred)),
+                    "r2": float(r2_score(y_test, ridge_pred)),
+                    "spearman_pred_actual": _spearman_pred_actual(ridge_pred, y_test),
+                }
+            )
+
+            forest = make_pipeline(
+                SimpleImputer(strategy="median"),
+                RandomForestRegressor(
+                    n_estimators=400,
+                    max_depth=3,
+                    min_samples_leaf=18,
+                    max_features="sqrt",
+                    random_state=random_state + fold + horizon,
+                    n_jobs=-1,
+                ),
+            )
+            forest.fit(X_train, y_train)
+            forest_pred = forest.predict(X_test)
+            perm = permutation_importance(
+                forest,
+                X_test,
+                y_test,
+                n_repeats=30,
+                random_state=random_state + 100 + fold + horizon,
+                scoring="neg_mean_absolute_error",
+                n_jobs=-1,
+            )
+            for feature, importance in zip(features, perm.importances_mean):
+                raw_rows.append(
+                    {
+                        "horizon_days": horizon,
+                        "fold": fold,
+                        "model": "random_forest_permutation",
+                        "feature": feature,
+                        "importance": float(importance),
+                        "signed_importance": np.nan,
+                    }
+                )
+            metric_rows.append(
+                {
+                    "horizon_days": horizon,
+                    "fold": fold,
+                    "model": "random_forest",
+                    "train_start": train.index[0].date(),
+                    "train_end": train.index[-1].date(),
+                    "test_start": test.index[0].date(),
+                    "test_end": test.index[-1].date(),
+                    "train_n": int(len(train)),
+                    "test_n": int(len(test)),
+                    "mae": float(mean_absolute_error(y_test, forest_pred)),
+                    "r2": float(r2_score(y_test, forest_pred)),
+                    "spearman_pred_actual": _spearman_pred_actual(forest_pred, y_test),
+                }
+            )
+
+    raw = pd.DataFrame(raw_rows)
+    metrics = pd.DataFrame(metric_rows)
+    if raw.empty:
+        return raw, metrics, pd.DataFrame()
+
+    agg = (
+        raw.groupby(["horizon_days", "model", "feature"], as_index=False)
+        .agg(
+            mean_importance=("importance", "mean"),
+            std_importance=("importance", "std"),
+            mean_signed_importance=("signed_importance", "mean"),
+            folds=("importance", "count"),
+        )
+    )
+    combined_rows: list[dict[str, Any]] = []
+    for horizon in [252, 504]:
+        horizon_agg = agg[agg["horizon_days"] == horizon]
+        rf = horizon_agg[horizon_agg["model"] == "random_forest_permutation"].copy()
+        ridge = horizon_agg[horizon_agg["model"] == "ridge"].copy()
+        rf["rf_rank"] = rf["mean_importance"].rank(ascending=False, method="average")
+        ridge["ridge_rank"] = ridge["mean_importance"].rank(ascending=False, method="average")
+        merged = rf[["feature", "mean_importance", "std_importance", "rf_rank"]].merge(
+            ridge[["feature", "mean_importance", "mean_signed_importance", "ridge_rank"]],
+            on="feature",
+            how="outer",
+            suffixes=("_rf", "_ridge"),
+        )
+        for _, row in merged.iterrows():
+            rf_rank = row.get("rf_rank", np.nan)
+            ridge_rank = row.get("ridge_rank", np.nan)
+            combined_rank = float(np.nanmean([rf_rank, ridge_rank]))
+            combined_rows.append(
+                {
+                    "horizon_days": horizon,
+                    "feature": row["feature"],
+                    "definition": FEATURE_DEFINITIONS.get(row["feature"], row["feature"]),
+                    "rf_permutation_mae_importance": row.get("mean_importance_rf", np.nan),
+                    "rf_permutation_mae_importance_std": row.get("std_importance", np.nan),
+                    "ridge_abs_coef": row.get("mean_importance_ridge", np.nan),
+                    "ridge_signed_coef": row.get("mean_signed_importance", np.nan),
+                    "rf_rank": rf_rank,
+                    "ridge_rank": ridge_rank,
+                    "combined_rank": combined_rank,
+                }
+            )
+    combined = pd.DataFrame(combined_rows).sort_values(["horizon_days", "combined_rank", "rf_rank", "ridge_rank"])
+    return raw, metrics, combined
+
+
 def _fmt_pct(value: float) -> str:
     if pd.isna(value):
         return ""
@@ -283,6 +475,8 @@ def write_report(
     feature_audit: pd.DataFrame,
     rule_audit: pd.DataFrame,
     robustness: pd.DataFrame,
+    ml_importance: pd.DataFrame,
+    ml_metrics: pd.DataFrame,
     qqq_path: Path,
     macro_path: Path,
 ) -> None:
@@ -376,6 +570,63 @@ def write_report(
     lines.extend(
         [
             "",
+            "## Purged Walk-Forward ML Importance",
+            "",
+            "- Models: shallow random forest permutation importance and ridge regression standardized coefficients.",
+            "- Split rule: each test fold is in the future, and training rows are excluded if their forward-return window overlaps the test fold.",
+            "- Treat this as a variable screen, not a fitted trading model.",
+            "",
+            "| Feature | Horizon | Combined Rank | RF Permutation Importance | Ridge Signed Coef |",
+            "|---|---:|---:|---:|---:|",
+        ]
+    )
+    if not ml_importance.empty:
+        for _, row in ml_importance.groupby("horizon_days", group_keys=False).head(8).iterrows():
+            lines.append(
+                "| {feature} | {horizon} | {rank:.1f} | {rf:.4f} | {ridge:.4f} |".format(
+                    feature=row["feature"],
+                    horizon=int(row["horizon_days"]),
+                    rank=row["combined_rank"],
+                    rf=row["rf_permutation_mae_importance"],
+                    ridge=row["ridge_signed_coef"],
+                )
+            )
+
+    if not ml_metrics.empty:
+        metric_summary = (
+            ml_metrics.groupby(["horizon_days", "model"], as_index=False)
+            .agg(
+                folds=("fold", "count"),
+                avg_mae=("mae", "mean"),
+                avg_r2=("r2", "mean"),
+                avg_spearman_pred_actual=("spearman_pred_actual", "mean"),
+            )
+            .sort_values(["horizon_days", "model"])
+        )
+        lines.extend(
+            [
+                "",
+                "### ML Fold Metrics",
+                "",
+                "| Horizon | Model | Folds | Avg MAE | Avg R2 | Avg Spearman Pred/Actual |",
+                "|---|---:|---:|---:|---:|---:|",
+            ]
+        )
+        for _, row in metric_summary.iterrows():
+            lines.append(
+                "| {horizon} | {model} | {folds} | {mae:.3f} | {r2:.2f} | {corr:.2f} |".format(
+                    horizon=int(row["horizon_days"]),
+                    model=row["model"],
+                    folds=int(row["folds"]),
+                    mae=row["avg_mae"],
+                    r2=row["avg_r2"],
+                    corr=row["avg_spearman_pred_actual"],
+                )
+            )
+
+    lines.extend(
+        [
+            "",
             "## Files",
             "",
             "- `aligned_daily_dataset.csv`: daily aligned QQQ and macro features",
@@ -383,6 +634,9 @@ def write_report(
             "- `feature_audit.csv`: univariate feature correlations and tercile buckets",
             "- `logical_rule_audit.csv`: fixed simple rule outcomes",
             "- `robustness_audit.csv`: era split and December-only robustness checks",
+            "- `ml_importance_raw.csv`: fold-level ridge and random forest importances",
+            "- `ml_importance.csv`: aggregated ML importance ranking",
+            "- `ml_fold_metrics.csv`: out-of-sample fold metrics",
         ]
     )
     (out_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -409,13 +663,28 @@ def main() -> None:
     feature_audit = univariate_feature_audit(sample, features)
     rule_audit = logical_rule_audit(sample)
     robustness = robustness_audit(sample, features)
+    ml_raw, ml_metrics, ml_importance = ml_importance_audit(sample, features)
 
     dataset.to_csv(out_dir / "aligned_daily_dataset.csv", index_label="date")
     sample.to_csv(out_dir / "month_end_sample.csv", index_label="date")
     feature_audit.to_csv(out_dir / "feature_audit.csv", index=False)
     rule_audit.to_csv(out_dir / "logical_rule_audit.csv", index=False)
     robustness.to_csv(out_dir / "robustness_audit.csv", index=False)
-    write_report(out_dir, dataset, sample, feature_audit, rule_audit, robustness, args.qqq_path, args.macro_path)
+    ml_raw.to_csv(out_dir / "ml_importance_raw.csv", index=False)
+    ml_metrics.to_csv(out_dir / "ml_fold_metrics.csv", index=False)
+    ml_importance.to_csv(out_dir / "ml_importance.csv", index=False)
+    write_report(
+        out_dir,
+        dataset,
+        sample,
+        feature_audit,
+        rule_audit,
+        robustness,
+        ml_importance,
+        ml_metrics,
+        args.qqq_path,
+        args.macro_path,
+    )
 
     print(f"Saved macro forward-return report under: {out_dir}")
     print()
