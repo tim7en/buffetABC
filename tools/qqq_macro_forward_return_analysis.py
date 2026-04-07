@@ -85,7 +85,14 @@ def _pct_change(series: pd.Series, periods: int) -> pd.Series:
     return series / series.shift(periods) - 1.0
 
 
-def build_dataset(qqq_close: pd.Series, macro: pd.DataFrame) -> pd.DataFrame:
+def _smooth_macro(macro: pd.DataFrame, smoothing_days: int) -> pd.DataFrame:
+    if smoothing_days <= 1:
+        return macro
+    return macro.rolling(smoothing_days, min_periods=smoothing_days).mean()
+
+
+def build_dataset(qqq_close: pd.Series, macro: pd.DataFrame, *, macro_smoothing_days: int = 0) -> pd.DataFrame:
+    macro = _smooth_macro(macro, macro_smoothing_days)
     df = pd.DataFrame(index=qqq_close.index)
     df["qqq_adj_close"] = qqq_close
     df["dxy_level"] = macro["dxy"]
@@ -479,6 +486,7 @@ def write_report(
     ml_metrics: pd.DataFrame,
     qqq_path: Path,
     macro_path: Path,
+    macro_smoothing_days: int,
 ) -> None:
     lines = [
         "# QQQ Macro Forward Return Analysis",
@@ -494,6 +502,9 @@ def write_report(
         "- Macro values are forward-filled to QQQ trading days, so signals use the latest value known on or before the observation date.",
         "- Outcomes are QQQ adjusted-close forward CAGRs over 252 and 504 trading days.",
         "- Features use simple levels, 3-month changes, 12-month changes, and yield-curve spreads.",
+        f"- Macro smoothing: `{macro_smoothing_days}` trading-day trailing moving average before feature derivation."
+        if macro_smoothing_days > 1
+        else "- Macro smoothing: none.",
         "",
         "## Strongest Univariate Relationships",
         "",
@@ -647,6 +658,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--qqq-path", type=Path, default=DEFAULT_QQQ_PATH)
     parser.add_argument("--macro-path", type=Path, default=DEFAULT_MACRO_PATH)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
+    parser.add_argument(
+        "--macro-smoothing-days",
+        type=int,
+        default=0,
+        help="Apply this trailing moving-average window to macro levels before deriving features.",
+    )
     return parser.parse_args()
 
 
@@ -657,7 +674,7 @@ def main() -> None:
 
     qqq_close = _load_qqq(args.qqq_path)
     macro = _load_macro(args.macro_path, qqq_close.index)
-    dataset = build_dataset(qqq_close, macro)
+    dataset = build_dataset(qqq_close, macro, macro_smoothing_days=args.macro_smoothing_days)
     sample = month_end_sample(dataset).dropna(subset=["qqq_forward_252d_cagr", "qqq_forward_504d_cagr"])
     features = list(FEATURE_DEFINITIONS)
     feature_audit = univariate_feature_audit(sample, features)
@@ -684,6 +701,7 @@ def main() -> None:
         ml_metrics,
         args.qqq_path,
         args.macro_path,
+        args.macro_smoothing_days,
     )
 
     print(f"Saved macro forward-return report under: {out_dir}")
