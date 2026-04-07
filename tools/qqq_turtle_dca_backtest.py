@@ -213,6 +213,57 @@ def dca_monthly(close: pd.Series, capital: float, label: str) -> pd.Series:
     return pd.Series(equity, index=close.index, name=label)
 
 
+def leveraged_dca_monthly(
+    close: pd.Series,
+    capital: float,
+    leverage: float,
+    borrow_rate: float,
+    slippage_bps: float,
+    commission_bps: float,
+    label: str,
+) -> tuple[pd.Series, pd.Series]:
+    """Monthly DCA into a daily-rebalanced leveraged QQQ sleeve.
+
+    Undeployed capital remains in cash at 0%. Deployed capital earns
+    ``leverage * QQQ daily return`` less borrow cost on leverage above 1x.
+    """
+    months = pd.PeriodIndex(close.index, freq="M").unique()
+    installment = capital / len(months)
+    trading_cost_rate = (slippage_bps + commission_bps) / 10_000.0
+    cash = capital
+    sleeve_equity = 0.0
+    equity: list[float] = []
+    portfolio_leverage: list[float] = []
+    previous_month: pd.Period | None = None
+    previous_price: float | None = None
+
+    for date, price in close.items():
+        current_price = float(price)
+        if previous_price is not None and sleeve_equity > 0.0:
+            day_return = current_price / previous_price - 1.0
+            borrow_cost = max(leverage - 1.0, 0.0) * borrow_rate / 252.0
+            sleeve_equity *= max(0.0, 1.0 + leverage * day_return - borrow_cost)
+
+        month = pd.Period(date, freq="M")
+        if month != previous_month:
+            contribution = min(installment, cash)
+            if contribution > 0.0:
+                trade_cost = contribution * leverage * trading_cost_rate
+                sleeve_equity += max(0.0, contribution - trade_cost)
+                cash -= contribution
+            previous_month = month
+
+        total_equity = cash + sleeve_equity
+        equity.append(total_equity)
+        gross_exposure = sleeve_equity * leverage
+        portfolio_leverage.append(gross_exposure / total_equity if total_equity > 0.0 else 0.0)
+        previous_price = current_price
+
+    equity_series = pd.Series(equity, index=close.index, name=label)
+    leverage_series = pd.Series(portfolio_leverage, index=close.index, name=f"{label} leverage")
+    return equity_series, leverage_series
+
+
 def _volume_confirmed(row: pd.Series, direction: int, cfg: TurtleConfig) -> bool:
     rel_volume = float(row.get("rel_volume", np.nan))
     if not np.isfinite(rel_volume):
@@ -897,14 +948,24 @@ def main() -> None:
     symbol = args.symbol.upper()
     close = daily["close"]
     dca = dca_monthly(close, args.initial_capital, f"DCA Monthly {symbol} 1x")
+    dca_lev, dca_lev_leverage = leveraged_dca_monthly(
+        close,
+        args.initial_capital,
+        leverage=args.max_leverage,
+        borrow_rate=args.borrow_rate,
+        slippage_bps=args.slippage_bps,
+        commission_bps=args.commission_bps,
+        label=f"DCA Monthly {symbol} {args.max_leverage:g}x",
+    )
     buy_hold = buy_and_hold(close, args.initial_capital, f"Buy & Hold {symbol} 1x")
 
-    equity_curves = [buy_hold, dca]
-    leverage_curves: list[pd.Series] = []
+    equity_curves = [buy_hold, dca, dca_lev]
+    leverage_curves: list[pd.Series] = [dca_lev_leverage]
     all_trades: list[dict[str, Any]] = []
     metrics_rows = [
         compute_metrics(buy_hold, buy_hold.name, dca_equity=dca),
         compute_metrics(dca, dca.name, dca_equity=dca),
+        compute_metrics(dca_lev, dca_lev.name, leverage=dca_lev_leverage, dca_equity=dca),
     ]
 
     configs = build_default_configs(args)

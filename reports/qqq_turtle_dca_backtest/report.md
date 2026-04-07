@@ -24,6 +24,7 @@ This is a research backtest, not a promise of future performance.
 
 | Strategy | Final | CAGR | Max DD | Sharpe | vs DCA | Trades |
 |---|---:|---:|---:|---:|---:|---:|
+| DCA Monthly QQQ 3x | $20,596 | 15.6% | -52.4% | 0.57 | 32.9% | 0 |
 | Buy & Hold QQQ 1x | $19,263 | 14.0% | -35.6% | 0.69 | 24.3% | 0 |
 | Turtle ATR Pyramid 3x Cap RVOL Boost | $18,830 | 13.5% | -35.9% | 0.58 | 21.5% | 8 |
 | Turtle Fixed 3x | $17,476 | 11.8% | -41.4% | 0.51 | 12.8% | 8 |
