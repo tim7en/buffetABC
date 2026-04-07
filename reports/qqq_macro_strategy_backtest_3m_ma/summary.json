@@ -1,0 +1,16 @@
+{
+  "qqq_path": "/Users/timursabitov/Development/Python_Projects/buffetABC/cache/cache/cache/QQQ_daily.parquet",
+  "regime_path": "/Users/timursabitov/Development/Python_Projects/buffetABC/reports/qqq_macro_regime_shock_audit_3m_ma/derived_daily_regime_dataset.csv",
+  "start_date": "1999-03-10",
+  "end_date": "2026-04-06",
+  "rows": 6810,
+  "initial_capital": 10000.0,
+  "borrow_rate": 0.055,
+  "short_borrow_rate": 0.02,
+  "trading_cost_bps": 3.0,
+  "latest_close": 588.5,
+  "latest_regime": "neutral",
+  "latest_risk_score_0_100": 40.31249999999999,
+  "latest_major_shock": false,
+  "latest_oil_up_shock": true
+}
