@@ -14,16 +14,16 @@ This is research tooling, not investment advice.
 
 ## Results
 
-| Strategy | Final | XIRR | Max DD | Avg Net | Avg Gross | Max Short | Ruined |
-|---|---:|---:|---:|---:|---:|---:|---|
-| Plain DCA 100% QQQ | $1,707,302 | 17.5% | -39.2% | 100.0% | 100.0% | 0.0% | False |
-| Regime DCA, no short | $827,128 | 11.5% | -27.5% | 68.5% | 68.5% | 0.0% | False |
-| Budget short x3 | $733,137 | 10.4% | -20.5% | 59.9% | 77.1% | 30.0% | False |
-| Budget short x5 | $664,985 | 9.6% | -19.8% | 54.1% | 82.9% | 50.0% | False |
-| Budget short x10 | $476,528 | 6.7% | -23.1% | 39.8% | 97.2% | 100.0% | False |
-| Aggressive reserve short x3 | $135,728 | -6.1% | -53.9% | 15.0% | 122.0% | 225.0% | False |
-| Aggressive reserve short x5 | $42,689 | -24.6% | -78.4% | -20.7% | 157.7% | 375.0% | False |
-| Aggressive reserve short x10 | $11,367 | -66.5% | -97.5% | -109.9% | 246.9% | 750.0% | False |
+| Strategy | Final | XIRR | Max DD | XIRR/DD | Avg Net | Avg Gross | Max Short | Ruined |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Plain DCA 100% QQQ | $1,707,302 | 17.5% | -39.2% | 0.45 | 100.0% | 100.0% | 0.0% | False |
+| Regime DCA, no short | $827,128 | 11.5% | -27.5% | 0.42 | 68.5% | 68.5% | 0.0% | False |
+| Budget short x3 | $733,137 | 10.4% | -20.5% | 0.51 | 59.9% | 77.1% | 30.0% | False |
+| Budget short x5 | $664,985 | 9.6% | -19.8% | 0.48 | 54.1% | 82.9% | 50.0% | False |
+| Budget short x10 | $476,528 | 6.7% | -23.1% | 0.29 | 39.8% | 97.2% | 100.0% | False |
+| Aggressive reserve short x3 | $135,728 | -6.1% | -53.9% | -0.11 | 15.0% | 122.0% | 225.0% | False |
+| Aggressive reserve short x5 | $42,689 | -24.6% | -78.4% | -0.31 | -20.7% | 157.7% | 375.0% | False |
+| Aggressive reserve short x10 | $11,367 | -66.5% | -97.5% | -0.68 | -109.9% | 246.9% | 750.0% | False |
 
 ## Latest Target Exposures
 

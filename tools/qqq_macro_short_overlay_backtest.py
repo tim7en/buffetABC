@@ -272,6 +272,9 @@ def performance_metrics(curves: dict[str, pd.DataFrame], cashflows: dict[str, li
                 "profit_on_contributed": float(equity.iloc[-1] / total_contributed - 1.0) if total_contributed > 0 else np.nan,
                 "xirr": _xirr(cashflows[name]),
                 "max_drawdown": float(drawdown.min()),
+                "xirr_over_abs_max_drawdown": _xirr(cashflows[name]) / abs(float(drawdown.min()))
+                if drawdown.min() < 0.0
+                else np.nan,
                 "annualized_vol_of_account_returns": float(returns.std() * math.sqrt(TRADING_DAYS_PER_YEAR)) if len(returns) > 2 else np.nan,
                 "avg_long_exposure": float(curve["long_exposure"].mean()),
                 "avg_short_exposure": float(curve["short_exposure"].mean()),
@@ -338,12 +341,13 @@ def write_report(
     lines.append("")
     lines.append("## Results")
     lines.append("")
-    lines.append("| Strategy | Final | XIRR | Max DD | Avg Net | Avg Gross | Max Short | Ruined |")
-    lines.append("|---|---:|---:|---:|---:|---:|---:|---|")
+    lines.append("| Strategy | Final | XIRR | Max DD | XIRR/DD | Avg Net | Avg Gross | Max Short | Ruined |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---|")
     for _, row in metrics.iterrows():
         lines.append(
             f"| {row['strategy']} | ${row['final_value']:,.0f} | {row['xirr']:.1%} | {row['max_drawdown']:.1%} | "
-            f"{row['avg_net_exposure']:.1%} | {row['avg_gross_exposure']:.1%} | {row['max_short_exposure']:.1%} | "
+            f"{row['xirr_over_abs_max_drawdown']:.2f} | {row['avg_net_exposure']:.1%} | "
+            f"{row['avg_gross_exposure']:.1%} | {row['max_short_exposure']:.1%} | "
             f"{row['ruined']} |"
         )
     lines.append("")
