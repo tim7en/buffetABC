@@ -1,0 +1,2 @@
+sell_count,buy_count,in_market_days,cash_days,pct_days_in_market,pct_days_in_cash,completed_cash_periods,median_calendar_days_out,avg_calendar_days_out,max_calendar_days_out,median_price_change_while_out,avg_price_change_while_out,open_cash_period
+93,93,4859,1752,0.7349871426410528,0.2650128573589472,92,5.0,27.51086956521739,450.0,0.01144929989451704,0.002514601701365904,True

@@ -1,0 +1,62 @@
+strategy,start_label,date,event,price,regime,deployed_cash,short_equity,short_cash
+GMM corrected risk_off 60L/40Reserve risk_on deploy neutral 100 no short,comparable_2007_05_31,2009-08-12,risk_on_deploy_cash,34.514583587646484,risk_on,10000.0,,
+GMM corrected risk_off 60L/40Reserve risk_on deploy neutral 100 no short,comparable_2007_05_31,2020-05-19,risk_on_deploy_cash,219.09527587890625,risk_on,1200.0,,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2007-08-15,short_entry_channel,39.416202545166016,risk_off,,99.94,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2007-08-31,short_exit_channel,41.9666633605957,risk_off,,,87.19773802994503
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2007-11-09,short_entry_channel,42.9593620300293,risk_off,,386.96541938712704,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2007-12-06,short_exit_channel,44.952693939208984,risk_off,,,440.3759484653761
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2008-01-04,short_entry_channel,41.62800598144531,risk_off,,540.0517228962968,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2008-03-24,short_exit_channel,38.37246322631836,risk_off,,,788.173367026563
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2008-06-24,short_entry_channel,40.320064544677734,risk_off,,1087.5204630063472,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2008-08-06,short_exit_channel,40.16498947143555,risk_off,,,1245.9671720245626
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2008-09-04,short_entry_channel,37.60676956176758,risk_off,,1345.1595917213479,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2009-01-02,short_exit_channel,26.784709930419922,risk_off,,,2090.294191438508
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2009-02-23,short_entry_channel,24.048410415649414,risk_off,,2288.920014923645,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2009-03-17,short_exit_channel,25.317285537719727,risk_off,,,2062.318953317912
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2009-08-12,risk_on_deploy_cash,34.514583587646484,risk_on,10062.318953317912,,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2020-03-09,short_entry_channel,186.54718017578125,risk_off,,99.94,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2020-04-06,short_exit_channel,189.75506591796875,risk_off,,,164.12428821180808
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2020-05-19,risk_on_deploy_cash,219.09527587890625,risk_on,1164.124288211808,,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,comparable_2007_05_31,2026-03-20,short_entry_channel,581.3269653320312,risk_off,,99.94,
+GMM corrected risk_off 60L/30Reserve/10Idle risk_on deploy neutral 100 no short,comparable_2007_05_31,2009-08-12,risk_on_deploy_cash,34.514583587646484,risk_on,10000.0,,
+GMM corrected risk_off 60L/30Reserve/10Idle risk_on deploy neutral 100 no short,comparable_2007_05_31,2020-05-19,risk_on_deploy_cash,219.09527587890625,risk_on,1200.0,,
+GMM corrected risk_off 60L/40Reserve risk_on deploy neutral 100 no short,first_shifted_gmm_regime,2003-04-22,risk_on_deploy_cash,23.138885498046875,risk_on,12400.0,,
+GMM corrected risk_off 60L/40Reserve risk_on deploy neutral 100 no short,first_shifted_gmm_regime,2009-08-12,risk_on_deploy_cash,34.514583587646484,risk_on,10000.0,,
+GMM corrected risk_off 60L/40Reserve risk_on deploy neutral 100 no short,first_shifted_gmm_regime,2020-05-19,risk_on_deploy_cash,219.09527587890625,risk_on,1200.0,,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2000-10-02,short_entry_channel,73.178955078125,risk_off,,99.94,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2001-01-18,short_exit_channel,56.14952850341797,risk_off,,,328.32771120166746
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2001-02-20,short_entry_channel,44.700313568115234,risk_off,,428.07071457494646,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2001-04-18,short_exit_channel,38.42422103881836,risk_off,,,590.167729023593
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2001-06-14,short_entry_channel,35.64046096801758,risk_off,,789.6936283861788,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2001-10-11,short_exit_channel,29.27156639099121,risk_off,,,1384.9670368943657
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2002-01-18,short_entry_channel,32.553009033203125,risk_off,,1683.9560566722291,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2002-03-08,short_exit_channel,32.62051010131836,risk_off,,,1751.5587719757627
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2002-04-11,short_entry_channel,27.837526321411133,risk_off,,1850.4478367125773,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2002-08-16,short_exit_channel,20.835960388183594,risk_off,,,2902.0971161348407
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2002-09-19,short_entry_channel,18.20404624938965,risk_off,,3000.2958578651596,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2002-10-14,short_exit_channel,18.963254928588867,risk_off,,,2720.8576161863148
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2002-12-30,short_entry_channel,20.776914596557617,risk_off,,2919.105101616603,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2003-01-07,short_exit_channel,22.48090171813965,risk_off,,,2558.1648469999154
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2003-02-07,short_entry_channel,20.085189819335938,risk_off,,2656.5699480917156,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2003-03-13,short_exit_channel,21.61203384399414,risk_off,,,2316.727280561675
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2003-04-22,risk_on_deploy_cash,23.138885498046875,risk_on,11716.727280561674,,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2007-08-15,short_entry_channel,39.416202545166016,risk_off,,99.94,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2007-08-31,short_exit_channel,41.9666633605957,risk_off,,,87.19773802994503
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2007-11-09,short_entry_channel,42.9593620300293,risk_off,,386.96541938712704,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2007-12-06,short_exit_channel,44.952693939208984,risk_off,,,440.3759484653761
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2008-01-04,short_entry_channel,41.62800598144531,risk_off,,540.0517228962968,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2008-03-24,short_exit_channel,38.37246322631836,risk_off,,,788.173367026563
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2008-06-24,short_entry_channel,40.320064544677734,risk_off,,1087.5204630063472,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2008-08-06,short_exit_channel,40.16498947143555,risk_off,,,1245.9671720245626
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2008-09-04,short_entry_channel,37.60676956176758,risk_off,,1345.1595917213479,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2009-01-02,short_exit_channel,26.784709930419922,risk_off,,,2090.294191438508
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2009-02-23,short_entry_channel,24.048410415649414,risk_off,,2288.920014923645,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2009-03-17,short_exit_channel,25.317285537719727,risk_off,,,2062.318953317912
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2009-08-12,risk_on_deploy_cash,34.514583587646484,risk_on,10062.318953317912,,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2020-03-09,short_entry_channel,186.54718017578125,risk_off,,99.94,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2020-04-06,short_exit_channel,189.75506591796875,risk_off,,,164.12428821180808
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2020-05-19,risk_on_deploy_cash,219.09527587890625,risk_on,1164.124288211808,,
+GMM corrected risk_off 60L/30Reserve/10Short2x Donchian30_15 risk_on deploy neutral 100,first_shifted_gmm_regime,2026-03-20,short_entry_channel,581.3269653320312,risk_off,,99.94,
+GMM corrected risk_off 60L/30Reserve/10Idle risk_on deploy neutral 100 no short,first_shifted_gmm_regime,2003-04-22,risk_on_deploy_cash,23.138885498046875,risk_on,12400.0,,
+GMM corrected risk_off 60L/30Reserve/10Idle risk_on deploy neutral 100 no short,first_shifted_gmm_regime,2009-08-12,risk_on_deploy_cash,34.514583587646484,risk_on,10000.0,,
+GMM corrected risk_off 60L/30Reserve/10Idle risk_on deploy neutral 100 no short,first_shifted_gmm_regime,2020-05-19,risk_on_deploy_cash,219.09527587890625,risk_on,1200.0,,
