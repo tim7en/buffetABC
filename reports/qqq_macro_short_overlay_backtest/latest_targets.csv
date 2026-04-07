@@ -1,0 +1,9 @@
+strategy,long_exposure,short_exposure,net_exposure,gross_exposure,hedge_active,execution_state
+Plain DCA 100% QQQ,1.0,0.0,1.0,1.0,False,plain_dca
+"Regime DCA, no short",0.25,0.0,0.25,0.25,False,risk_off
+Budget short x3,0.25,0.30000000000000004,-0.050000000000000044,0.55,True,risk_off
+Budget short x5,0.25,0.5,-0.25,0.75,True,risk_off
+Budget short x10,0.25,1.0,-0.75,1.25,True,risk_off
+Aggressive reserve short x3,0.25,2.25,-2.0,2.5,True,risk_off
+Aggressive reserve short x5,0.25,3.75,-3.5,4.0,True,risk_off
+Aggressive reserve short x10,0.25,7.5,-7.25,7.75,True,risk_off
