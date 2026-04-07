@@ -1,0 +1,10 @@
+strategy,current_target_exposure,prior_day_applied_exposure
+Buy & Hold QQQ 1x,1.0,1.0
+Buy & Hold QQQ 2x,2.0,2.0
+SMA200 Long/Cash,0.0,0.0
+SMA200 Long/Short 50%,-0.5,-0.5
+SMA50/200 Trend 2x,0.0,0.0
+Regime Scaled Long Only,1.0,1.0
+Regime + SMA Long/Flat,0.0,0.0
+Regime + SMA Long/Short,0.0,0.0
+Regime Only Long/Short,0.75,0.75
