@@ -1,9 +1,9 @@
 {
-  "current_risk_off_target_probability": 0.1682573598313638,
-  "current_jump_in_target_probability": 0.8024823707379618,
-  "latest_signal_date": "2026-04-06T00:00:00",
+  "current_risk_off_target_probability": 0.13501986065629767,
+  "current_jump_in_target_probability": 0.85691260564946,
+  "latest_signal_date": "2026-04-07T00:00:00",
   "latest_signal": "risk_off_reserve_cash",
   "latest_target_equity_allocation": 0.25,
-  "latest_walkforward_risk_off_probability": 0.1682573598313638,
-  "latest_walkforward_jump_in_probability": 0.8024823707379618
+  "latest_walkforward_risk_off_probability": 0.13501986065629767,
+  "latest_walkforward_jump_in_probability": 0.85691260564946
 }

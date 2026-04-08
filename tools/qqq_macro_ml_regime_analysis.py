@@ -24,6 +24,8 @@ import argparse
 import csv
 import json
 import math
+import subprocess
+import sys
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
@@ -61,6 +63,10 @@ DEFAULT_QQQ_PATH = ROOT / "cache" / "cache" / "cache" / "QQQ_daily.parquet"
 DEFAULT_MACRO_PATH = ROOT / "cache" / "cache" / "macro_daily_1999.parquet"
 DEFAULT_OUT_DIR = ROOT / "reports" / "qqq_macro_ml_regime_analysis"
 DEFAULT_FRED_CACHE_DIR = ROOT / "cache" / "fred"
+DEFAULT_QQQ_DOWNLOAD_SCRIPT = ROOT / "cache" / "download_qqq_daily.py"
+DEFAULT_MACRO_DOWNLOAD_SCRIPT = ROOT / "cache" / "download_daily_macro_data.py"
+DEFAULT_QQQ_REFRESH_START = "1999-03-10"
+DEFAULT_MACRO_REFRESH_START = "1999-01-01"
 TRADING_DAYS_PER_YEAR = 252
 MONTHLY_TRADING_DAYS = 21
 RANDOM_STATE = 42
@@ -246,6 +252,32 @@ def load_qqq(path: Path, start: str | None, end: str | None) -> pd.Series:
     if len(close) < 756:
         raise ValueError(f"Only {len(close)} QQQ rows after filtering; need at least about 3 years.")
     return close
+
+
+def refresh_qqq_cache(path: Path, script_path: Path, start: str, end: str | None) -> None:
+    if not script_path.exists():
+        raise FileNotFoundError(f"Missing QQQ refresh script: {script_path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    command = [sys.executable, str(script_path), "--start", start, "--output", str(path)]
+    if end:
+        command.extend(["--end", end])
+    print(f"Refreshing QQQ daily cache -> {path}")
+    subprocess.run(command, check=True)
+    if not path.exists():
+        raise FileNotFoundError(f"QQQ refresh completed without creating {path}")
+
+
+def refresh_macro_cache(path: Path, script_path: Path, start: str, end: str | None) -> None:
+    if not script_path.exists():
+        raise FileNotFoundError(f"Missing macro refresh script: {script_path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    command = [sys.executable, str(script_path), "--start", start, "--cache-dir", str(path.parent)]
+    if end:
+        command.extend(["--end", end])
+    print(f"Refreshing macro daily cache -> {path}")
+    subprocess.run(command, check=True)
+    if not path.exists():
+        raise FileNotFoundError(f"Macro refresh completed without creating {path}")
 
 
 def load_macro(path: Path, qqq_index: pd.DatetimeIndex, monthly_release_lag_days: int) -> pd.DataFrame:
@@ -1454,9 +1486,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--macro-path", type=Path, default=DEFAULT_MACRO_PATH)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--fred-cache-dir", type=Path, default=DEFAULT_FRED_CACHE_DIR)
+    parser.add_argument("--qqq-download-script", type=Path, default=DEFAULT_QQQ_DOWNLOAD_SCRIPT)
+    parser.add_argument("--macro-download-script", type=Path, default=DEFAULT_MACRO_DOWNLOAD_SCRIPT)
     parser.add_argument("--start", default="1999-03-10")
     parser.add_argument("--end", default=None)
+    parser.add_argument("--refresh-all", action="store_true")
+    parser.add_argument("--refresh-qqq", action="store_true")
+    parser.add_argument("--refresh-macro", action="store_true")
     parser.add_argument("--refresh-fred", action="store_true")
+    parser.add_argument("--qqq-refresh-start", default=DEFAULT_QQQ_REFRESH_START)
+    parser.add_argument("--macro-refresh-start", default=DEFAULT_MACRO_REFRESH_START)
     parser.add_argument("--monthly-release-lag-days", type=int, default=45)
     parser.add_argument("--target-horizon", type=int, default=63)
     parser.add_argument("--test-size", type=float, default=0.30)
@@ -1476,9 +1515,17 @@ def main() -> None:
     plots_dir = args.out_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
+    refresh_qqq = args.refresh_all or args.refresh_qqq
+    refresh_macro = args.refresh_all or args.refresh_macro
+    refresh_fred = args.refresh_all or args.refresh_fred
+    if refresh_qqq:
+        refresh_qqq_cache(args.qqq_path, args.qqq_download_script, args.qqq_refresh_start, args.end)
+    if refresh_macro:
+        refresh_macro_cache(args.macro_path, args.macro_download_script, args.macro_refresh_start, args.end)
+
     qqq = load_qqq(args.qqq_path, args.start, args.end)
     macro = load_macro(args.macro_path, qqq.index, args.monthly_release_lag_days)
-    stress, fred_status = load_stress_proxies(qqq.index, args.fred_cache_dir, args.refresh_fred)
+    stress, fred_status = load_stress_proxies(qqq.index, args.fred_cache_dir, refresh_fred)
     dataset = build_dataset(qqq, macro, stress, args.target_horizon)
     features = available_features(dataset, MODEL_FEATURES, min_non_na=252)
     if len(features) < 6:

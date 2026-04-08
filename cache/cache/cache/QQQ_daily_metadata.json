@@ -1,0 +1,12 @@
+{
+  "downloaded_at_utc": "2026-04-08T12:16:29.172378+00:00",
+  "ticker": "QQQ",
+  "source": "Yahoo Finance chart API",
+  "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/QQQ",
+  "start": "1999-03-10",
+  "end": "2026-04-08",
+  "output_parquet": "D:\\buffetABC\\cache\\cache\\cache\\QQQ_daily.parquet",
+  "rows": 6811,
+  "first_date": "1999-03-10",
+  "last_date": "2026-04-07"
+}

@@ -4,7 +4,7 @@ This is a research audit, not investment advice or a live trading recommendation
 
 ## Method
 
-- Daily aligned sample: `1999-03-10` to `2026-04-06`.
+- Daily aligned sample: `1999-03-10` to `2026-04-07`.
 - Main supervised regime horizon: `63` trading days.
 - CPI and unemployment are lagged by `45` calendar days before forward fill.
 - OLS impact tests use standardized features and Newey-West standard errors on month-end observations.
@@ -23,13 +23,13 @@ This is a research audit, not investment advice or a live trading recommendation
 
 ## Current Snapshot
 
-- As of: `2026-04-06`
-- QQQ adjusted close: `588.50`
+- As of: `2026-04-07`
+- QQQ adjusted close: `588.59`
 - GMM regime: `risk_off`
-- Latent sentiment index: `-2.65`
-- External shock score: `1.13`
-- Logistic current risk-off probability: `16.8%`
-- Logistic current jump-in probability: `80.2%`
+- Latent sentiment index: `-2.22`
+- External shock score: `0.75`
+- Logistic current risk-off probability: `13.5%`
+- Logistic current jump-in probability: `85.7%`
 - Research allocation label: `risk_off_reserve_cash`
 - Research target equity allocation: `25.0%`
 
@@ -59,8 +59,8 @@ This is a research audit, not investment advice or a live trading recommendation
 | forward_return_with_sentiment | qqq_fwd_63d_return | qqq_feedback_score | 0.0011 | 0.9304 | 0.9304 |
 | forward_return_without_sentiment | qqq_fwd_63d_return | external_shock_score | -0.0128 | 0.2145 | 0.3932 |
 | forward_return_without_sentiment | qqq_fwd_63d_return | qqq_feedback_score | -0.0005 | 0.9548 | 0.9548 |
-| sentiment_driver_feedback_and_shocks | latent_sentiment_index | external_shock_score | -0.7051 | 0.0000 | 0.0000 |
-| sentiment_driver_feedback_and_shocks | latent_sentiment_index | qqq_feedback_score | 0.5270 | 0.0000 | 0.0000 |
+| sentiment_driver_feedback_and_shocks | latent_sentiment_index | external_shock_score | -0.7028 | 0.0000 | 0.0000 |
+| sentiment_driver_feedback_and_shocks | latent_sentiment_index | qqq_feedback_score | 0.5280 | 0.0000 | 0.0000 |
 
 ## Holdout ML Validation
 
@@ -77,9 +77,9 @@ This is a research audit, not investment advice or a live trading recommendation
 
 | Strategy | Final | Total Contributed | Profit/Contrib | XIRR | Max DD | Avg Allocation |
 |---|---:|---:|---:|---:|---:|---:|
-| Plain DCA 100% QQQ | $1,704,650 | $237,000 | 619.3% | 17.5% | -39.1% | 100.0% |
-| Static 70/30 DCA | $927,642 | $237,000 | 291.4% | 12.5% | -26.1% | 70.1% |
-| ML Regime DCA Cash Reserve | $859,037 | $237,000 | 262.5% | 11.8% | -18.0% | 62.8% |
+| Plain DCA 100% QQQ | $1,704,911 | $237,000 | 619.4% | 17.5% | -39.1% | 100.0% |
+| Static 70/30 DCA | $927,741 | $237,000 | 291.5% | 12.5% | -26.1% | 70.1% |
+| ML Regime DCA Cash Reserve | $859,069 | $237,000 | 262.5% | 11.8% | -18.0% | 62.8% |
 
 ## Files
 
