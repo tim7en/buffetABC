@@ -205,7 +205,13 @@ def build_walkforward_daily_regimes(dataset: pd.DataFrame, min_train_days: int) 
 
         scaler = StandardScaler()
         x_train = scaler.fit_transform(train[features])
-        gmm = GaussianMixture(n_components=3, covariance_type="full", random_state=regime_analysis.RANDOM_STATE)
+        gmm = GaussianMixture(
+            n_components=3,
+            covariance_type="full",
+            init_params="random",
+            n_init=5,
+            random_state=regime_analysis.RANDOM_STATE,
+        )
         train_labels = gmm.fit_predict(x_train)
         mapping = cluster_mapping(dataset.loc[train.index], train_labels)
 

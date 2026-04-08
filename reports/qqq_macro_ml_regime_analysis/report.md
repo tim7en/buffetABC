@@ -10,6 +10,7 @@ This is a research audit, not investment advice or a live trading recommendation
 - OLS impact tests use standardized features and Newey-West standard errors on month-end observations.
 - OLS impact tests drop high-VIF terms above `20` before significance scoring; the full VIF audit is still saved.
 - ML validation is chronological with purge/embargo of overlapping forward-return windows.
+- Allocation/backtest decisions use walk-forward logistic probabilities and walk-forward GMM regimes; the full-sample GMM remains descriptive only.
 - The latent sentiment variable is a black-box proxy, not an observed sentiment dataset.
 
 ## Data Sources
@@ -25,11 +26,12 @@ This is a research audit, not investment advice or a live trading recommendation
 
 - As of: `2026-04-07`
 - QQQ adjusted close: `588.59`
-- GMM regime: `risk_off`
+- Full-sample descriptive GMM regime: `risk_off`
+- Walk-forward GMM regime used for allocation: `neutral`
 - Latent sentiment index: `-2.22`
 - External shock score: `0.75`
-- Logistic current risk-off probability: `13.5%`
-- Logistic current jump-in probability: `85.7%`
+- Logistic current risk-off probability: `13.4%`
+- Logistic current jump-in probability: `85.8%`
 - Research allocation label: `risk_off_reserve_cash`
 - Research target equity allocation: `25.0%`
 
@@ -67,11 +69,11 @@ This is a research audit, not investment advice or a live trading recommendation
 | Target | Model | Train N | Test N | AUC/R2 | MAE/Brier | Spearman/Recall |
 |---|---|---:|---:|---:|---:|---:|
 | qqq_fwd_63d_return | ridge | 222 | 97 | -1.642 | 0.113 | 0.078 |
-| qqq_fwd_63d_return | random_forest | 222 | 97 | -0.133 | 0.080 | 0.141 |
-| risk_off_target | logistic | 222 | 97 | 0.592 | 0.226 | 0.000 |
-| risk_off_target | random_forest | 222 | 97 | 0.581 | 0.206 | 0.154 |
+| qqq_fwd_63d_return | random_forest | 222 | 97 | -0.153 | 0.081 | 0.121 |
+| risk_off_target | logistic | 222 | 97 | 0.591 | 0.226 | 0.000 |
+| risk_off_target | random_forest | 222 | 97 | 0.574 | 0.204 | 0.192 |
 | jump_in_target | logistic | 222 | 97 | 0.557 | 0.341 | 0.902 |
-| jump_in_target | random_forest | 222 | 97 | 0.617 | 0.238 | 0.244 |
+| jump_in_target | random_forest | 222 | 97 | 0.628 | 0.237 | 0.195 |
 
 ## DCA Backtest
 
@@ -79,7 +81,7 @@ This is a research audit, not investment advice or a live trading recommendation
 |---|---:|---:|---:|---:|---:|---:|
 | Plain DCA 100% QQQ | $1,704,911 | $237,000 | 619.4% | 17.5% | -39.1% | 100.0% |
 | Static 70/30 DCA | $927,741 | $237,000 | 291.5% | 12.5% | -26.1% | 70.1% |
-| ML Regime DCA Cash Reserve | $859,069 | $237,000 | 262.5% | 11.8% | -18.0% | 62.8% |
+| ML Regime DCA Cash Reserve | $829,745 | $237,000 | 250.1% | 11.5% | -16.1% | 59.6% |
 
 ## Files
 

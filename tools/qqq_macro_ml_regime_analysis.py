@@ -95,7 +95,6 @@ MONTHLY_MACRO_RENAMES = {
 
 MODEL_FEATURES = [
     "latent_sentiment_index",
-    "sentiment_black_box_pc1",
     "external_shock_score",
     "qqq_feedback_score",
     "qqq_21d_return",
@@ -739,27 +738,17 @@ def classify_gmm_regimes(df: pd.DataFrame, features: list[str], random_state: in
 
     scaler = StandardScaler()
     x_scaled = scaler.fit_transform(valid[use_features])
-    gmm = GaussianMixture(n_components=3, covariance_type="full", random_state=random_state)
+    gmm = GaussianMixture(
+        n_components=3,
+        covariance_type="full",
+        init_params="random",
+        n_init=5,
+        random_state=random_state,
+    )
     labels = gmm.fit_predict(x_scaled)
     probabilities = gmm.predict_proba(x_scaled)
 
-    score_frame = pd.DataFrame({"cluster": labels}, index=valid.index)
-    score_frame["latent_sentiment_index"] = out.loc[valid.index, "latent_sentiment_index"]
-    score_frame["external_shock_score"] = out.loc[valid.index, "external_shock_score"]
-    score_frame["qqq_63d_return"] = out.loc[valid.index, "qqq_63d_return"]
-    score_frame["vix_level"] = out.loc[valid.index, "vix_level"]
-    cluster_score = (
-        score_frame.groupby("cluster")["latent_sentiment_index"].mean()
-        + score_frame.groupby("cluster")["qqq_63d_return"].mean().fillna(0.0)
-        - score_frame.groupby("cluster")["external_shock_score"].mean().fillna(0.0)
-        - _safe_zscore(score_frame.groupby("cluster")["vix_level"].mean()).fillna(0.0)
-    )
-    sorted_clusters = list(cluster_score.sort_values().index)
-    cluster_to_regime = {
-        sorted_clusters[0]: "risk_off",
-        sorted_clusters[1]: "neutral",
-        sorted_clusters[2]: "risk_on",
-    }
+    cluster_to_regime = _gmm_cluster_to_regime(out.loc[valid.index], labels)
 
     out["gmm_regime"] = "unknown"
     out.loc[valid.index, "gmm_regime"] = pd.Series(labels, index=valid.index).map(cluster_to_regime)
@@ -781,6 +770,78 @@ def classify_gmm_regimes(df: pd.DataFrame, features: list[str], random_state: in
         )
     summary = pd.DataFrame(summary_rows).sort_values("avg_latent_sentiment")
     return out, summary
+
+
+def _gmm_cluster_to_regime(frame: pd.DataFrame, labels: np.ndarray) -> dict[int, str]:
+    score_frame = pd.DataFrame({"cluster": labels}, index=frame.index)
+    score_frame["latent_sentiment_index"] = frame["latent_sentiment_index"]
+    score_frame["external_shock_score"] = frame["external_shock_score"]
+    score_frame["qqq_63d_return"] = frame["qqq_63d_return"]
+    score_frame["vix_level"] = frame["vix_level"]
+    cluster_score = (
+        score_frame.groupby("cluster")["latent_sentiment_index"].mean()
+        + score_frame.groupby("cluster")["qqq_63d_return"].mean().fillna(0.0)
+        - score_frame.groupby("cluster")["external_shock_score"].mean().fillna(0.0)
+        - _safe_zscore(score_frame.groupby("cluster")["vix_level"].mean()).fillna(0.0)
+    )
+    sorted_clusters = list(cluster_score.sort_values().index)
+    return {
+        sorted_clusters[0]: "risk_off",
+        sorted_clusters[1]: "neutral",
+        sorted_clusters[2]: "risk_on",
+    }
+
+
+def build_walkforward_gmm_regimes(
+    sample: pd.DataFrame,
+    features: list[str],
+    min_train_periods: int,
+    random_state: int,
+) -> pd.DataFrame:
+    out = pd.DataFrame(index=sample.index)
+    out["gmm_regime"] = "unknown"
+    out["gmm_train_n"] = np.nan
+    out["gmm_train_start"] = pd.NaT
+    out["gmm_train_end"] = pd.NaT
+    for regime in ["risk_off", "neutral", "risk_on"]:
+        out[f"gmm_prob_{regime}"] = np.nan
+
+    use_features = available_features(sample, features, min_non_na=min_train_periods)
+    if len(use_features) < 4:
+        return out
+
+    for i, date in enumerate(sample.index):
+        train = sample.iloc[:i].copy()
+        train = train.replace([np.inf, -np.inf], np.nan).dropna(subset=use_features)
+        if len(train) < min_train_periods:
+            continue
+
+        current = sample.loc[[date], use_features].replace([np.inf, -np.inf], np.nan)
+        if current.isna().any(axis=None):
+            continue
+
+        scaler = StandardScaler()
+        x_train = scaler.fit_transform(train[use_features])
+        gmm = GaussianMixture(
+            n_components=3,
+            covariance_type="full",
+            init_params="random",
+            n_init=5,
+            random_state=random_state,
+        )
+        train_labels = gmm.fit_predict(x_train)
+        mapping = _gmm_cluster_to_regime(train, train_labels)
+
+        current_proba = gmm.predict_proba(scaler.transform(current[use_features]))[0]
+        current_label = int(gmm.predict(scaler.transform(current[use_features]))[0])
+        out.loc[date, "gmm_regime"] = mapping[current_label]
+        out.loc[date, "gmm_train_n"] = int(len(train))
+        out.loc[date, "gmm_train_start"] = train.index.min()
+        out.loc[date, "gmm_train_end"] = train.index.max()
+        for cluster, regime in mapping.items():
+            out.loc[date, f"gmm_prob_{regime}"] = current_proba[cluster]
+
+    return out
 
 
 def shock_return_tests(sample: pd.DataFrame, target_horizon: int) -> pd.DataFrame:
@@ -1030,6 +1091,7 @@ def build_allocation_signal(
     sample: pd.DataFrame,
     risk_off_prob: pd.Series,
     jump_in_prob: pd.Series,
+    gmm_regime_signal: pd.Series | None,
     risk_off_threshold: float,
     jump_in_threshold: float,
 ) -> pd.DataFrame:
@@ -1037,7 +1099,11 @@ def build_allocation_signal(
     signals["risk_off_probability"] = risk_off_prob
     signals["jump_in_probability"] = jump_in_prob
     signals["latent_sentiment_index"] = sample["latent_sentiment_index"]
-    signals["gmm_regime"] = sample.get("gmm_regime", pd.Series("unknown", index=sample.index))
+    signals["full_sample_gmm_regime"] = sample.get("gmm_regime", pd.Series("unknown", index=sample.index))
+    if gmm_regime_signal is None:
+        signals["gmm_regime"] = "unknown"
+    else:
+        signals["gmm_regime"] = gmm_regime_signal.reindex(sample.index).fillna("unknown").astype(str)
     risk_off = (
         (signals["risk_off_probability"] >= risk_off_threshold)
         | (signals["latent_sentiment_index"] <= -1.0)
@@ -1355,6 +1421,7 @@ def write_report(
     lines.append("- OLS impact tests use standardized features and Newey-West standard errors on month-end observations.")
     lines.append("- OLS impact tests drop high-VIF terms above `20` before significance scoring; the full VIF audit is still saved.")
     lines.append("- ML validation is chronological with purge/embargo of overlapping forward-return windows.")
+    lines.append("- Allocation/backtest decisions use walk-forward logistic probabilities and walk-forward GMM regimes; the full-sample GMM remains descriptive only.")
     lines.append("- The latent sentiment variable is a black-box proxy, not an observed sentiment dataset.")
     lines.append("")
     lines.append("## Data Sources")
@@ -1368,7 +1435,8 @@ def write_report(
     lines.append("")
     lines.append(f"- As of: `{dataset.index[-1].date()}`")
     lines.append(f"- QQQ adjusted close: `{fmt_num(latest.get('qqq_close'), 2)}`")
-    lines.append(f"- GMM regime: `{latest.get('gmm_regime', 'unknown')}`")
+    lines.append(f"- Full-sample descriptive GMM regime: `{latest.get('gmm_regime', 'unknown')}`")
+    lines.append(f"- Walk-forward GMM regime used for allocation: `{current_signal.get('latest_walkforward_gmm_regime', 'unknown')}`")
     lines.append(f"- Latent sentiment index: `{fmt_num(latest.get('latent_sentiment_index'), 2)}`")
     lines.append(f"- External shock score: `{fmt_num(latest.get('external_shock_score'), 2)}`")
     lines.append(f"- Logistic current risk-off probability: `{fmt_pct(current_signal.get('current_risk_off_target_probability'))}`")
@@ -1533,6 +1601,8 @@ def main() -> None:
 
     dataset, gmm_summary = classify_gmm_regimes(dataset, available_features(dataset, GMM_FEATURES, 756), args.random_state)
     sample = month_end_sample(dataset)
+    walkforward_gmm = build_walkforward_gmm_regimes(sample, GMM_FEATURES, args.min_train_months, args.random_state)
+    sample = sample.join(walkforward_gmm.add_prefix("wf_"))
     sample_features = available_features(sample, features, min_non_na=60)
     ols_features, ols_feature_filter = select_vif_filtered_features(sample, sample_features)
 
@@ -1552,7 +1622,12 @@ def main() -> None:
         sample, sample_features, "jump_in_target", args.target_horizon, args.min_train_months, args.random_state
     )
     allocation_signals = build_allocation_signal(
-        sample, risk_off_prob, jump_in_prob, args.risk_off_threshold, args.jump_in_threshold
+        sample,
+        risk_off_prob,
+        jump_in_prob,
+        sample.get("wf_gmm_regime"),
+        args.risk_off_threshold,
+        args.jump_in_threshold,
     )
     valid_signal_start = allocation_signals["target_equity_allocation"].first_valid_index()
     if valid_signal_start is None:
@@ -1601,6 +1676,8 @@ def main() -> None:
         current_signal["latest_target_equity_allocation"] = float(latest_signal["target_equity_allocation"])
         current_signal["latest_walkforward_risk_off_probability"] = float(latest_signal["risk_off_probability"])
         current_signal["latest_walkforward_jump_in_probability"] = float(latest_signal["jump_in_probability"])
+        current_signal["latest_walkforward_gmm_regime"] = str(latest_signal.get("gmm_regime", "unknown"))
+        current_signal["latest_full_sample_gmm_regime"] = str(latest_signal.get("full_sample_gmm_regime", "unknown"))
 
     dataset.to_csv(args.out_dir / "aligned_daily_dataset.csv", index_label="date")
     sample.to_csv(args.out_dir / "month_end_model_sample.csv", index_label="date")
