@@ -76,6 +76,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min-train-days", type=int, default=756)
     parser.add_argument("--initial-capital", type=float, default=10_000.0)
     parser.add_argument("--monthly-contribution", type=float, default=1_000.0)
+    parser.add_argument("--weekly-contribution", type=float, default=None)
+    parser.add_argument("--contribution-frequency", choices=["monthly", "weekly", "trading_days"], default="monthly")
+    parser.add_argument("--trading-day-interval", type=int, default=3)
     parser.add_argument("--trading-cost-bps", type=float, default=3.0)
     parser.add_argument("--borrow-rate", type=float, default=0.055)
     return parser.parse_args()
@@ -123,6 +126,39 @@ def load_dataset(path: Path) -> pd.DataFrame:
 def first_trading_day_per_month(index: pd.DatetimeIndex) -> list[pd.Timestamp]:
     order = pd.Series(index, index=index)
     return [pd.Timestamp(day) for day in order.groupby(index.to_period("M")).first().tolist()]
+
+
+def contribution_bucket(index_position: int, date: pd.Timestamp, frequency: str, trading_day_interval: int) -> Any:
+    if frequency == "monthly":
+        return date.to_period("M")
+    if frequency == "weekly":
+        return date.to_period("W-FRI")
+    if frequency == "trading_days":
+        if trading_day_interval <= 0:
+            raise ValueError(f"Trading-day interval must be positive, got {trading_day_interval}")
+        return index_position // trading_day_interval
+    raise ValueError(f"Unsupported contribution frequency: {frequency}")
+
+
+def resolve_periodic_contribution(args: argparse.Namespace) -> float:
+    if args.contribution_frequency == "weekly":
+        if args.weekly_contribution is not None:
+            return float(args.weekly_contribution)
+        return float(args.monthly_contribution) * 12.0 / 52.0
+    if args.contribution_frequency == "trading_days":
+        events_per_year = 252.0 / float(args.trading_day_interval)
+        return float(args.monthly_contribution) * 12.0 / events_per_year
+    return float(args.monthly_contribution)
+
+
+def total_external_from_cashflows(cashflows: list[tuple[pd.Timestamp, float]]) -> float:
+    return float(-sum(amount for _, amount in cashflows if amount < 0.0))
+
+
+def contribution_frequency_label(args: argparse.Namespace) -> str:
+    if args.contribution_frequency == "trading_days":
+        return f"every_{args.trading_day_interval}_trading_days"
+    return args.contribution_frequency
 
 
 def cluster_mapping(train: pd.DataFrame, labels: np.ndarray) -> dict[int, str]:
@@ -258,7 +294,9 @@ def simulate_plain_dca(
     *,
     strategy: str,
     initial_capital: float,
-    monthly_contribution: float,
+    periodic_contribution: float,
+    contribution_frequency: str,
+    trading_day_interval: int,
     trading_cost_bps: float,
 ) -> StrategyResult:
     cost_rate = trading_cost_bps / 10_000.0
@@ -266,7 +304,7 @@ def simulate_plain_dca(
     cash = float(initial_capital)
     curves: list[dict[str, Any]] = []
     cashflows: list[tuple[pd.Timestamp, float]] = [(close.index[0], -float(initial_capital))]
-    previous_month = close.index[0].to_period("M")
+    previous_period = contribution_bucket(0, close.index[0], contribution_frequency, trading_day_interval)
 
     initial_trade = cash / (1.0 + cost_rate)
     cash -= initial_trade * (1.0 + cost_rate)
@@ -274,13 +312,13 @@ def simulate_plain_dca(
 
     for i, (date, price) in enumerate(close.items()):
         if i > 0:
-            month = date.to_period("M")
-            if month != previous_month:
-                contribution = float(monthly_contribution)
+            period = contribution_bucket(i, date, contribution_frequency, trading_day_interval)
+            if period != previous_period:
+                contribution = float(periodic_contribution)
                 cashflows.append((date, -contribution))
                 buy_value = contribution / (1.0 + cost_rate)
                 shares += buy_value / float(price)
-                previous_month = month
+                previous_period = period
         total_value = cash + shares * float(price)
         curves.append(
             {
@@ -295,7 +333,7 @@ def simulate_plain_dca(
         )
 
     curve_df = pd.DataFrame(curves).set_index("date")
-    total_external = float(initial_capital + monthly_contribution * (curve_df.index.to_period("M").nunique() - 1))
+    total_external = total_external_from_cashflows(cashflows)
     return StrategyResult(
         strategy=strategy,
         curves=curve_df,
@@ -329,7 +367,9 @@ def simulate_regime_leverage(
     strategy: str,
     risk_on_leverage: float,
     initial_capital: float,
-    monthly_contribution: float,
+    periodic_contribution: float,
+    contribution_frequency: str,
+    trading_day_interval: int,
     trading_cost_bps: float,
     borrow_rate: float,
 ) -> StrategyResult:
@@ -363,7 +403,7 @@ def simulate_regime_leverage(
 
     previous_price = float(price.iloc[0])
     previous_regime = first_regime
-    previous_month = price.index[0].to_period("M")
+    previous_period = contribution_bucket(0, price.index[0], contribution_frequency, trading_day_interval)
 
     for i, (date, px) in enumerate(price.items()):
         px = float(px)
@@ -376,11 +416,10 @@ def simulate_regime_leverage(
             exposure_equity = max(0.0, equity_before * (1.0 + current_leverage * day_return - daily_borrow))
 
         account_before_actions = exposure_equity + reserve_cash
-        month = date.to_period("M")
-        if i > 0 and month != previous_month:
-            contribution = float(monthly_contribution)
+        period = contribution_bucket(i, date, contribution_frequency, trading_day_interval)
+        if i > 0 and period != previous_period:
+            contribution = float(periodic_contribution)
             cashflows.append((date, -contribution))
-            total_external += contribution
             if regime == "risk_off":
                 reserve_cash += contribution
                 reserve_contributions += contribution
@@ -388,7 +427,7 @@ def simulate_regime_leverage(
                 contribution_cost = contribution * target_leverage_for_regime(regime, risk_on_leverage) * cost_rate
                 transaction_costs += contribution_cost
                 exposure_equity += max(0.0, contribution - contribution_cost)
-            previous_month = month
+            previous_period = period
 
         new_leverage = target_leverage_for_regime(regime, risk_on_leverage)
         if regime != previous_regime:
@@ -471,6 +510,7 @@ def simulate_regime_leverage(
 
     curve_df = pd.DataFrame(curves).set_index("date")
     month_signals = curve_df["regime_signal"].groupby(curve_df.index.to_period("M")).first()
+    total_external = total_external_from_cashflows(cashflows)
     return StrategyResult(
         strategy=strategy,
         curves=curve_df,
@@ -544,6 +584,7 @@ def main() -> None:
     args = parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
     maybe_run_analysis(args)
+    periodic_contribution = resolve_periodic_contribution(args)
 
     dataset = load_dataset(args.dataset_path)
     if args.end:
@@ -580,7 +621,9 @@ def main() -> None:
             window_close,
             strategy="plain_dca",
             initial_capital=args.initial_capital,
-            monthly_contribution=args.monthly_contribution,
+            periodic_contribution=periodic_contribution,
+            contribution_frequency=args.contribution_frequency,
+            trading_day_interval=args.trading_day_interval,
             trading_cost_bps=args.trading_cost_bps,
         )
         append_window(curve_frames, plain.curves, window)
@@ -594,7 +637,9 @@ def main() -> None:
                 strategy=strategy,
                 risk_on_leverage=float(leverage),
                 initial_capital=args.initial_capital,
-                monthly_contribution=args.monthly_contribution,
+                periodic_contribution=periodic_contribution,
+                contribution_frequency=args.contribution_frequency,
+                trading_day_interval=args.trading_day_interval,
                 trading_cost_bps=args.trading_cost_bps,
                 borrow_rate=args.borrow_rate,
             )
@@ -606,6 +651,9 @@ def main() -> None:
             metrics_rows.append(metrics_row(window, result, plain_final))
 
     metrics = pd.DataFrame(metrics_rows)
+    metrics["contribution_frequency"] = contribution_frequency_label(args)
+    metrics["periodic_contribution"] = periodic_contribution
+    metrics["trading_day_interval"] = args.trading_day_interval if args.contribution_frequency == "trading_days" else np.nan
     curves = pd.concat(curve_frames, ignore_index=True) if curve_frames else pd.DataFrame()
     events = pd.concat(event_frames, ignore_index=True) if event_frames else pd.DataFrame()
 
@@ -614,6 +662,10 @@ def main() -> None:
     events.to_csv(args.out_dir / "walkforward_gmm_riskon_leverage_events.csv", index=False)
 
     print(f"Wrote walk-forward daily GMM files to {args.out_dir}")
+    print(
+        "Contribution cadence: "
+        f"{contribution_frequency_label(args)} at ${periodic_contribution:,.2f} per contribution event"
+    )
     latest = walkforward_daily.dropna(subset=["wf_gmm_regime"]).iloc[-1]
     print(
         "Latest walk-forward daily regime: "
