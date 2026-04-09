@@ -62,6 +62,7 @@ HEDGE_FEATURES = regime_analysis.MODEL_FEATURES + [
     "is_turn_of_quarter_month",
     "month_sin",
     "month_cos",
+    "hedge_vol_ratio",
 ]
 
 
@@ -134,15 +135,41 @@ def add_hedge_targets(dataset: pd.DataFrame, tail_fraction: float) -> pd.DataFra
         df["qqq_fwd_42d_end_date"] = pd.Series(close.index, index=close.index).shift(-42)
     df["qqq_fwd_21d_path_cvar20"] = forward_path_cvar(close, 21, tail_fraction)
     df["qqq_fwd_42d_path_cvar20"] = forward_path_cvar(close, 42, tail_fraction)
+
+    # --- Vol-adjusted hedge targets ---
+    # Scale fixed pain thresholds by the ratio of trailing realized vol to its
+    # expanding median.  In low-vol regimes a smaller absolute move is unusual
+    # and should trigger hedging; in high-vol regimes the bar rises because big
+    # moves are routine.  Clamp the ratio to [0.5, 2.0] to avoid extreme
+    # distortion at the tails.
+    daily_return = close.pct_change()
+    trailing_vol = daily_return.rolling(63, min_periods=63).std() * math.sqrt(252)
+    expanding_median_vol = trailing_vol.expanding(min_periods=252).median()
+    vol_ratio = (trailing_vol / expanding_median_vol.replace(0.0, np.nan)).clip(0.5, 2.0)
+    # Fallback to 1.0 (fixed thresholds) where vol history is insufficient
+    vol_ratio = vol_ratio.fillna(1.0)
+
+    # Base thresholds (unchanged from v1 when vol_ratio == 1.0)
+    strong_min_base = -0.10
+    strong_cvar_base = -0.075
+    light_min_base = -0.08
+    light_cvar_base = -0.055
+
+    strong_min_thresh = strong_min_base * vol_ratio
+    strong_cvar_thresh = strong_cvar_base * vol_ratio
+    light_min_thresh = light_min_base * vol_ratio
+    light_cvar_thresh = light_cvar_base * vol_ratio
+
+    df["hedge_vol_ratio"] = vol_ratio
     df["hedge_strong_target"] = (
-        (df["qqq_fwd_21d_min_return"] <= -0.10)
-        | (df["qqq_fwd_21d_path_cvar20"] <= -0.075)
+        (df["qqq_fwd_21d_min_return"] <= strong_min_thresh)
+        | (df["qqq_fwd_21d_path_cvar20"] <= strong_cvar_thresh)
     ).astype(float)
     df.loc[df["qqq_fwd_21d_min_return"].isna(), "hedge_strong_target"] = np.nan
     df["hedge_light_target"] = (
         (df["hedge_strong_target"] == 1.0)
-        | (df["qqq_fwd_42d_min_return"] <= -0.08)
-        | (df["qqq_fwd_42d_path_cvar20"] <= -0.055)
+        | (df["qqq_fwd_42d_min_return"] <= light_min_thresh)
+        | (df["qqq_fwd_42d_path_cvar20"] <= light_cvar_thresh)
     ).astype(float)
     df.loc[df["qqq_fwd_42d_min_return"].isna(), "hedge_light_target"] = np.nan
     df["is_quarter_end_month"] = df.index.month.isin([3, 6, 9, 12]).astype(float)
@@ -860,8 +887,8 @@ def write_report(
         row = target_summary.iloc[0]
         lines.extend(
             [
-                f"- `hedge_strong_target`: next 21d min return <= -10% or 21d path-CVaR20 <= -7.5%; event rate `{row['hedge_strong_rate'] * 100:.1f}%`.",
-                f"- `hedge_light_target`: strong target or next 42d min return <= -8% or 42d path-CVaR20 <= -5.5%; event rate `{row['hedge_light_rate'] * 100:.1f}%`.",
+                f"- `hedge_strong_target`: next 21d min return <= -10%×vol_ratio or 21d path-CVaR20 <= -7.5%×vol_ratio (vol-adjusted); event rate `{row['hedge_strong_rate'] * 100:.1f}%`.",
+                f"- `hedge_light_target`: strong target or next 42d min return <= -8%×vol_ratio or 42d path-CVaR20 <= -5.5%×vol_ratio (vol-adjusted); event rate `{row['hedge_light_rate'] * 100:.1f}%`.",
                 f"- Average next 21d min return = `{row['avg_21d_min_return'] * 100:.1f}%`; average next 42d path-CVaR20 = `{row['avg_42d_path_cvar20'] * 100:.1f}%`.",
             ]
         )

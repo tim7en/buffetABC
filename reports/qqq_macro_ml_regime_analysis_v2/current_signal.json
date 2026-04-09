@@ -1,0 +1,16 @@
+{
+  "current_risk_off_target_probability": 0.32569730536419866,
+  "current_jump_in_target_probability": 0.7691278472175928,
+  "latest_signal_date": "2026-04-07T00:00:00",
+  "latest_signal": "risk_off_reserve_cash",
+  "latest_target_equity_allocation": 0.25,
+  "latest_walkforward_risk_off_probability": 0.32569730536419866,
+  "latest_walkforward_jump_in_probability": 0.7691278472175928,
+  "latest_walkforward_gmm_regime": "risk_on",
+  "latest_full_sample_gmm_regime": "risk_off",
+  "latest_macro_cycle": "expansion",
+  "latest_macro_cycle_confidence": "medium",
+  "latest_macro_cycle_expansion_score": 4.0,
+  "latest_macro_cycle_late_cycle_score": 3.0,
+  "latest_macro_cycle_contraction_score": 0.0
+}
