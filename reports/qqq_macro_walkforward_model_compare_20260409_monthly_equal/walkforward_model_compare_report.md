@@ -30,10 +30,10 @@
 
 | Strategy | Final Value | XIRR | TWR CAGR | Max DD | Final / Contributed |
 |---|---:|---:|---:|---:|---:|
-| walkforward_logistic_riskon_3x_prob_regime_dca | $1,605,812 | 31.8% | 32.7% | -69.8% | 52.65x |
-| walkforward_logistic_riskon_2x_prob_regime_dca | $886,670 | 27.0% | 27.8% | -52.0% | 29.07x |
-| walkforward_gmm_riskon_3x_keep_long_riskoff_reserve_dca | $583,501 | 23.7% | 24.6% | -58.0% | 19.13x |
-| walkforward_gmm_riskon_2x_keep_long_riskoff_reserve_dca | $518,780 | 22.7% | 23.5% | -40.3% | 17.01x |
+| walkforward_logistic_riskon_3x_prob_regime_dca | $1,424,117 | 30.8% | 31.8% | -69.8% | 46.69x |
+| walkforward_logistic_riskon_2x_prob_regime_dca | $841,171 | 26.6% | 27.4% | -52.0% | 27.58x |
+| walkforward_gmm_riskon_3x_keep_long_riskoff_reserve_dca | $714,422 | 25.3% | 26.2% | -51.8% | 23.42x |
+| walkforward_gmm_riskon_2x_keep_long_riskoff_reserve_dca | $568,130 | 23.5% | 24.3% | -40.7% | 18.63x |
 | plain_dca | $375,575 | 20.2% | 20.9% | -34.8% | 12.31x |
-| walkforward_random_forest_riskon_2x_prob_regime_dca | $369,190 | 20.1% | 21.0% | -46.9% | 12.10x |
-| walkforward_random_forest_riskon_3x_prob_regime_dca | $306,727 | 18.6% | 19.8% | -62.8% | 10.06x |
+| walkforward_random_forest_riskon_2x_prob_regime_dca | $334,550 | 19.3% | 20.2% | -46.9% | 10.97x |
+| walkforward_random_forest_riskon_3x_prob_regime_dca | $258,982 | 17.3% | 18.5% | -62.8% | 8.49x |

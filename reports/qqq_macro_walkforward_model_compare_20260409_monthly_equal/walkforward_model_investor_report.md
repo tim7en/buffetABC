@@ -10,13 +10,13 @@
 
 | Strategy | Final Value | XIRR | TWR CAGR | Max DD |
 |---|---:|---:|---:|---:|
-| walkforward_logistic_riskon_3x_prob_regime_dca | $1,605,812 | 31.8% | 32.7% | -69.8% |
-| walkforward_logistic_riskon_2x_prob_regime_dca | $886,670 | 27.0% | 27.8% | -52.0% |
-| walkforward_gmm_riskon_3x_keep_long_riskoff_reserve_dca | $583,501 | 23.7% | 24.6% | -58.0% |
-| walkforward_gmm_riskon_2x_keep_long_riskoff_reserve_dca | $518,780 | 22.7% | 23.5% | -40.3% |
+| walkforward_logistic_riskon_3x_prob_regime_dca | $1,424,117 | 30.8% | 31.8% | -69.8% |
+| walkforward_logistic_riskon_2x_prob_regime_dca | $841,171 | 26.6% | 27.4% | -52.0% |
+| walkforward_gmm_riskon_3x_keep_long_riskoff_reserve_dca | $714,422 | 25.3% | 26.2% | -51.8% |
+| walkforward_gmm_riskon_2x_keep_long_riskoff_reserve_dca | $568,130 | 23.5% | 24.3% | -40.7% |
 | plain_dca | $375,575 | 20.2% | 20.9% | -34.8% |
-| walkforward_random_forest_riskon_2x_prob_regime_dca | $369,190 | 20.1% | 21.0% | -46.9% |
-| walkforward_random_forest_riskon_3x_prob_regime_dca | $306,727 | 18.6% | 19.8% | -62.8% |
+| walkforward_random_forest_riskon_2x_prob_regime_dca | $334,550 | 19.3% | 20.2% | -46.9% |
+| walkforward_random_forest_riskon_3x_prob_regime_dca | $258,982 | 17.3% | 18.5% | -62.8% |
 
 ## Model Validation
 
@@ -24,72 +24,96 @@ These scores come from a purged chronological train/test split on month-end samp
 
 | Target | Model | AUC | Average Precision | Brier | Balanced Accuracy @ 50% |
 |---|---|---:|---:|---:|---:|
-| Jump-in | Logistic | 0.524 | 0.457 | 0.362 | 0.523 |
-| Jump-in | Random Forest | 0.616 | 0.528 | 0.239 | 0.504 |
-| Risk-off | Logistic | 0.512 | 0.267 | 0.521 | 0.545 |
-| Risk-off | Random Forest | 0.616 | 0.359 | 0.199 | 0.522 |
+| Jump-in | Logistic | 0.518 | 0.466 | 0.326 | 0.573 |
+| Jump-in | Random Forest | 0.583 | 0.504 | 0.246 | 0.519 |
+| Risk-off | Logistic | 0.542 | 0.285 | 0.520 | 0.550 |
+| Risk-off | Random Forest | 0.593 | 0.360 | 0.210 | 0.557 |
 
 ## Threshold Check
 
-- The current logistic 3x setting (`risk_off=0.45`, `jump_in=0.55`) finished at `$1,605,812` with `-69.8%` max drawdown.
-- The best nearby 3x threshold in the local grid finished at `$2,180,733` with `-69.8%` max drawdown.
+- The current logistic 3x setting (`risk_off=0.45`, `jump_in=0.55`) finished at `$1,424,117` with `-69.8%` max drawdown.
+- The best nearby 3x threshold in the local grid finished at `$1,645,899` with `-69.8%` max drawdown.
 - That does not eliminate model-selection risk, but it suggests the current result is not coming from an obviously fragile one-cell threshold choice.
 
 ## What Drives The Logistic Model
 
 The logistic model gives direction: a positive coefficient means a higher reading increases the odds of the event, while a negative coefficient means it lowers the odds. Random forest importance only tells us how useful a feature was, not which direction it pushes.
 
+## What Drives Forward QQQ Returns
+
+| Ridge features linked to stronger returns | Coef |
+|---|---:|
+| QQQ 65-day trend level | 0.554 |
+| VIX level | 0.151 |
+| Yield curve 10Y-2Y | 0.103 |
+| Shiller CAPE | 0.058 |
+| Latent sentiment | 0.010 |
+
+| Ridge features linked to weaker returns | Coef |
+|---|---:|
+| QQQ 222-day trend level | -0.535 |
+| High-yield spread | -0.194 |
+| QQQ vs 200-day trend | -0.147 |
+| 10Y-3M curve | -0.088 |
+| Wilshire / GDP valuation proxy | -0.079 |
+
+| Strongest random forest return features | Importance |
+|---|---:|
+| Inflation YoY | 0.0019 |
+| VIX level | 0.0017 |
+| Shiller CAPE | 0.0006 |
+| QQQ 1-month realized volatility | 0.0002 |
+| Unemployment rate | 0.0002 |
+
 ### Risk-off
 
 | Logistic coefficients pushing odds higher | Coef |
 |---|---:|
-| 10Y Treasury yield level | 1.788 |
-| High-yield spread | 1.110 |
-| High-yield spread 3-month change | 1.098 |
-| QQQ 222-day trend level | 1.022 |
-| 10Y-3M curve | 0.628 |
+| 10Y Treasury yield level | 1.882 |
+| High-yield spread 3-month change | 1.371 |
+| High-yield spread | 1.197 |
+| QQQ 222-day trend level | 1.103 |
+| 10Y-3M curve | 0.862 |
 
 | Logistic coefficients pushing odds lower | Coef |
 |---|---:|
-| VIX level | -1.471 |
-| Market cap to GDP 1-year drift | -0.871 |
-| Latent sentiment | -0.707 |
-| Financial conditions 3-month change | -0.621 |
-| US dollar 3-month return | -0.179 |
+| VIX level | -1.753 |
+| Latent sentiment | -0.909 |
+| QQQ 1-year drawdown | -0.781 |
+| External shock score | -0.520 |
+| QQQ 65-day trend level | -0.212 |
 
 | Strongest random forest features | Importance |
 |---|---:|
-| Market cap to GDP 1-year drift | 0.0462 |
-| Shiller CAPE | 0.0296 |
-| Inflation YoY | 0.0260 |
-| Inflation 3-month change | 0.0165 |
-| QQQ 1-month realized volatility | 0.0157 |
+| Shiller CAPE | 0.0282 |
+| Inflation YoY | 0.0171 |
+| Inflation 3-month change | 0.0139 |
+| High-yield spread 3-month change | 0.0111 |
+| Unemployment rate | 0.0102 |
 
 ### Jump-in
 
 | Logistic coefficients pushing odds higher | Coef |
 |---|---:|
-| VIX level | 2.176 |
-| Market cap to GDP | 1.258 |
-| qqq volume | 0.465 |
-| QQQ 1-year drawdown | 0.345 |
-| High-yield spread | 0.109 |
+| VIX level | 2.133 |
+| QQQ 1-year drawdown | 0.824 |
+| QQQ 65-day trend level | 0.759 |
 
 | Logistic coefficients pushing odds lower | Coef |
 |---|---:|
-| QQQ 222-day trend level | -1.168 |
-| 10Y Treasury yield level | -0.837 |
-| High-yield spread 3-month change | -0.834 |
-| QQQ feedback | -0.624 |
-| QQQ 1-month realized volatility | -0.447 |
+| QQQ 222-day trend level | -0.899 |
+| High-yield spread 3-month change | -0.809 |
+| 10Y-3M curve | -0.638 |
+| Financial conditions level | -0.583 |
+| QQQ 1-month realized volatility | -0.579 |
 
 | Strongest random forest features | Importance |
 |---|---:|
-| QQQ vs 200-day trend | 0.0291 |
-| Inflation YoY | 0.0225 |
-| VIX level | 0.0223 |
-| QQQ 1-year drawdown | 0.0159 |
-| Financial conditions level | 0.0151 |
+| QQQ vs 200-day trend | 0.0361 |
+| VIX level | 0.0252 |
+| QQQ 1-year drawdown | 0.0182 |
+| Inflation YoY | 0.0181 |
+| Financial conditions level | 0.0147 |
 
 ## Practical Take
 
@@ -101,6 +125,7 @@ The logistic model gives direction: a positive coefficient means a higher readin
 
 - `walkforward_model_validation_metrics.csv`: purged validation scores
 - `walkforward_model_feature_importance.csv`: raw model feature weights and permutation importance
+- `walkforward_feature_importance_compare_returns.png`: forward-return feature comparison chart
 - `walkforward_feature_importance_compare_risk_off.png`: risk-off feature comparison chart
 - `walkforward_feature_importance_compare_jump_in.png`: jump-in feature comparison chart
 - `walkforward_logistic_regimes_full_common_window.png`: logistic regime chart on QQQ
