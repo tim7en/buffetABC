@@ -3,7 +3,7 @@
 ## Scope
 
 - Dataset used: `reports\qqq_macro_ml_regime_analysis_20260409_feature_refresh\aligned_daily_dataset.csv`
-- Regime models compared: `Logistic, Ensemble Blend, Random Forest, Ensemble Majority`
+- Regime models compared: `Logistic, Random Forest, Ensemble Majority, Ensemble Blend`
 - Common strategy start: `2014-11-03`
 - Contribution cadence: `monthly` at `$100.00` per event.
 
@@ -19,15 +19,15 @@
 - GMM first refit: `2009-08-03`
 - GMM last refit: `2026-04-01`
 - GMM refit count: `201`
-- Ensemble Blend first monthly prediction: `1999-03-31`
+- Ensemble Blend first monthly prediction: `2014-10-31`
 - Ensemble Blend last monthly prediction: `2026-04-09`
-- Ensemble Blend prediction count: `326`
-- Logistic first monthly prediction: `2014-10-31`
-- Logistic last monthly prediction: `2026-04-09`
-- Logistic prediction count: `139`
+- Ensemble Blend prediction count: `139`
 - Ensemble Majority first monthly prediction: `2014-10-31`
 - Ensemble Majority last monthly prediction: `2026-04-09`
 - Ensemble Majority prediction count: `139`
+- Logistic first monthly prediction: `2014-10-31`
+- Logistic last monthly prediction: `2026-04-09`
+- Logistic prediction count: `139`
 - Random Forest first monthly prediction: `2014-10-31`
 - Random Forest last monthly prediction: `2026-04-09`
 - Random Forest prediction count: `139`
