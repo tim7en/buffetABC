@@ -1,0 +1,20 @@
+{
+  "analysis_dir": "D:\\buffetABC\\reports\\qqq_macro_ml_regime_analysis",
+  "compare_dir": "D:\\buffetABC\\reports\\qqq_macro_walkforward_model_compare_20260409_monthly_equal",
+  "common_start": "2009-03-02",
+  "initial_capital": 10000.0,
+  "monthly_contribution": 100.0,
+  "trading_cost_bps": 3.0,
+  "borrow_rate": 0.055,
+  "allocation_map": {
+    "risk_on": 1.0,
+    "neutral": 0.7,
+    "risk_off": 0.25
+  },
+  "notes": [
+    "1x macro-aware strategies use fixed 25/70/100 target allocations for risk-off, neutral, and risk-on.",
+    "2x strategies use existing reserve-and-deploy leverage logic with daily lagged signals.",
+    "Consensus regime is risk-off if any core model is risk-off, risk-on only if logistic and GMM both agree on risk-on, otherwise neutral.",
+    "Quarter-end diagnostics are descriptive and not used as a trading input in this package."
+  ]
+}
