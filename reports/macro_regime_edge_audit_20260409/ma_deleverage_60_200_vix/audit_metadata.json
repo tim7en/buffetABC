@@ -1,0 +1,26 @@
+{
+  "common_start": "2009-03-02",
+  "initial_capital": 10000.0,
+  "monthly_contribution": 100.0,
+  "trading_cost_bps": 3.0,
+  "borrow_rate": 0.055,
+  "short_window": 60,
+  "long_window": 200,
+  "risk_on_levels": [
+    2,
+    3,
+    5
+  ],
+  "include_vix": true,
+  "vix_thresholds": [
+    20.0,
+    25.0,
+    30.0
+  ],
+  "notes": [
+    "Consensus regime is built from the existing audited logistic + GMM combination.",
+    "Trend override uses lagged daily 60d/200d state only.",
+    "VIX filter, when enabled, is also lagged by one trading day.",
+    "The MA rule is an overlay on top of the existing reserve/deploy leverage logic."
+  ]
+}
