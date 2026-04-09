@@ -8,6 +8,7 @@ Series:
 - WTI: FRED WTI Cushing crude oil spot price
 - CPI: FRED CPIAUCSL with derived month-over-month and year-over-year inflation
 - UNRATE: FRED civilian unemployment rate
+- Market Cap to GDP: FRED World Bank annual listed domestic companies market cap as % of GDP
 - Shiller CAPE: Multpl monthly Shiller PE / CAPE table
 """
 
@@ -69,6 +70,12 @@ FRED_SERIES = {
         "name": "Unemployment Rate",
         "units": "percent, seasonally adjusted",
         "combined_col": "unemployment_rate_pct",
+    },
+    "MARKET_CAP_TO_GDP": {
+        "series_id": "DDDM01USA156NWDB",
+        "name": "Market Capitalization of Listed Domestic Companies for United States",
+        "units": "percent of GDP",
+        "combined_col": "market_cap_to_gdp_pct",
     },
 }
 
@@ -349,8 +356,9 @@ def main() -> None:
         "notes": [
             "Combined table uses an outer join on date and does not forward-fill missing observations.",
             "Rows with no values in any combined data column are dropped from the combined table.",
-            "Treasury yields, CPI inflation, and unemployment are percent; WTI is USD per barrel; gold is USD per ounce.",
+            "Treasury yields, CPI inflation, unemployment, and market cap to GDP are percent; WTI is USD per barrel; gold is USD per ounce.",
             "CPI and unemployment are monthly FRED observations and are not forward-filled.",
+            "Market cap to GDP comes from the World Bank via FRED and is annual, so it moves slowly and updates with a long publication lag.",
             "CPI month-over-month and year-over-year inflation percentages are computed from CPIAUCSL.",
             "Shiller CAPE is scraped from Multpl's monthly table and kept on its stated observation date.",
             "Gold uses Yahoo Finance GC=F front-month futures, which is a practical proxy rather than a point-in-time spot fix.",

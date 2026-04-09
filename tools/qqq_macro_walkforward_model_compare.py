@@ -66,6 +66,8 @@ FEATURE_LABELS = {
     "wti_63d_return": "Oil 3-month return",
     "cape_level": "Shiller CAPE",
     "cape_63d_change": "Shiller CAPE 3-month change",
+    "market_cap_to_gdp_level": "Market cap to GDP",
+    "market_cap_to_gdp_252d_drift": "Market cap to GDP 1-year drift",
     "cpi_yoy_pct": "Inflation YoY",
     "cpi_yoy_3m_change_pp": "Inflation 3-month change",
     "unemployment_rate_pct": "Unemployment rate",

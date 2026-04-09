@@ -96,6 +96,7 @@ MONTHLY_MACRO_RENAMES = {
 
 SPARSE_NO_LAG_MACRO_RENAMES = {
     "shiller_cape_ratio": "cape",
+    "market_cap_to_gdp_pct": "market_cap_to_gdp",
 }
 
 MODEL_FEATURES = [
@@ -118,6 +119,8 @@ MODEL_FEATURES = [
     "wti_63d_return",
     "cape_level",
     "cape_63d_change",
+    "market_cap_to_gdp_level",
+    "market_cap_to_gdp_252d_drift",
     "cpi_yoy_pct",
     "cpi_yoy_3m_change_pp",
     "unemployment_rate_pct",
@@ -146,6 +149,8 @@ GMM_FEATURES = [
     "curve_10y2y_level",
     "wti_63d_return",
     "cape_level",
+    "market_cap_to_gdp_level",
+    "market_cap_to_gdp_252d_drift",
     "cpi_yoy_pct",
     "unemployment_rate_pct",
     "vix_level",
@@ -511,6 +516,9 @@ def build_dataset(
     df["cape_21d_change"] = macro["cape"].diff(21)
     df["cape_63d_change"] = macro["cape"].diff(63)
     df["cape_252d_change"] = macro["cape"].diff(252)
+    df["market_cap_to_gdp_level"] = macro["market_cap_to_gdp"]
+    df["market_cap_to_gdp_252d_drift"] = macro["market_cap_to_gdp"].diff(252)
+    df["market_cap_to_gdp_756d_drift"] = macro["market_cap_to_gdp"].diff(756)
 
     for tenor in ["us2y", "us10y", "us30y"]:
         df[f"{tenor}_level"] = macro[tenor]
@@ -1508,6 +1516,8 @@ def write_report(
     lines.append(f"- External shock score: `{fmt_num(latest.get('external_shock_score'), 2)}`")
     lines.append(f"- Gold price proxy: `{fmt_num(latest.get('gold_level'), 2)}`")
     lines.append(f"- Shiller CAPE ratio: `{fmt_num(latest.get('cape_level'), 2)}`")
+    lines.append(f"- Market cap to GDP: `{fmt_num(latest.get('market_cap_to_gdp_level'), 2)}`")
+    lines.append(f"- Market cap to GDP 1Y drift: `{fmt_num(latest.get('market_cap_to_gdp_252d_drift'), 2)}`")
     lines.append(f"- Logistic current risk-off probability: `{fmt_pct(current_signal.get('current_risk_off_target_probability'))}`")
     lines.append(f"- Logistic current jump-in probability: `{fmt_pct(current_signal.get('current_jump_in_target_probability'))}`")
     lines.append(f"- Research allocation label: `{current_signal.get('latest_signal', 'unknown')}`")
@@ -1611,6 +1621,7 @@ def write_report(
     lines.append("- Significance is historical association, not proof of causality.")
     lines.append("- FRED monthly macro data is not true point-in-time ALFRED vintage data; the release lag is a conservative approximation.")
     lines.append("- Shiller CAPE comes from the downloadable Multpl table rather than a point-in-time vintage database.")
+    lines.append("- Market cap to GDP comes from the World Bank via FRED and is annual, so it acts as a slow valuation anchor rather than a timely macro release.")
     lines.append("- Gold uses Yahoo Finance front-month futures, which is a liquid proxy but not a perfect spot series.")
     lines.append("- The black-box sentiment proxy is intentionally transparent enough to audit, but it is still a proxy.")
     lines.append("- DCA results depend on contribution timing, cash yield assumption, transaction cost, and thresholds.")

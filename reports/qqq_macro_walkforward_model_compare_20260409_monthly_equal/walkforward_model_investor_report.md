@@ -46,7 +46,7 @@ The logistic model gives direction: a positive coefficient means a higher readin
 | 10Y Treasury yield level | 1.807 |
 | High-yield spread 3-month change | 1.330 |
 | High-yield spread | 1.238 |
-| qqq sma222 | 1.160 |
+| QQQ 222-day trend level | 1.160 |
 | 10Y-3M curve | 0.868 |
 
 | Logistic coefficients pushing odds lower | Coef |
@@ -71,12 +71,12 @@ The logistic model gives direction: a positive coefficient means a higher readin
 |---|---:|
 | VIX level | 2.220 |
 | QQQ 1-year drawdown | 0.646 |
-| qqq sma65 | 0.630 |
+| QQQ 65-day trend level | 0.630 |
 | Latent sentiment | 0.214 |
 
 | Logistic coefficients pushing odds lower | Coef |
 |---|---:|
-| qqq sma222 | -0.949 |
+| QQQ 222-day trend level | -0.949 |
 | High-yield spread 3-month change | -0.926 |
 | Financial conditions level | -0.625 |
 | Unemployment rate | -0.612 |
