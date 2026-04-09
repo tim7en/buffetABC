@@ -99,7 +99,10 @@ MODEL_FEATURES = [
     "qqq_feedback_score",
     "qqq_21d_return",
     "qqq_63d_return",
+    "qqq_sma65",
+    "qqq_sma222",
     "qqq_vs_sma200",
+    "qqq_volume",
     "qqq_realized_vol_21d",
     "qqq_drawdown_252d",
     "dxy_63d_return",
@@ -124,7 +127,10 @@ GMM_FEATURES = [
     "latent_sentiment_index",
     "external_shock_score",
     "qqq_63d_return",
+    "qqq_sma65",
+    "qqq_sma222",
     "qqq_vs_sma200",
+    "qqq_volume",
     "qqq_realized_vol_21d",
     "dxy_63d_return",
     "us10y_63d_change_pp",
@@ -231,7 +237,7 @@ def _align_sparse_release_lag(series: pd.Series, index: pd.DatetimeIndex, lag_da
     return released.reindex(released.index.union(index)).sort_index().ffill().reindex(index)
 
 
-def load_qqq(path: Path, start: str | None, end: str | None) -> pd.Series:
+def load_qqq(path: Path, start: str | None, end: str | None) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Missing QQQ parquet: {path}")
     raw = pd.read_parquet(path).copy()
@@ -242,15 +248,25 @@ def load_qqq(path: Path, start: str | None, end: str | None) -> pd.Series:
     else:
         raise ValueError("QQQ parquet must contain 'date' or 'time'.")
     close_col = "adj_c" if "adj_c" in raw.columns else "c"
-    close = pd.Series(pd.to_numeric(raw[close_col], errors="coerce").to_numpy(), index=index, name="qqq_close")
-    close = close[~close.index.duplicated(keep="last")].sort_index().dropna()
+    volume_col = "v" if "v" in raw.columns else "volume"
+    if volume_col not in raw.columns:
+        raise ValueError("QQQ parquet must contain 'v' or 'volume'.")
+    qqq = pd.DataFrame(
+        {
+            "qqq_close": pd.to_numeric(raw[close_col], errors="coerce").to_numpy(),
+            "qqq_volume": pd.to_numeric(raw[volume_col], errors="coerce").to_numpy(),
+        },
+        index=index,
+    )
+    qqq = qqq[~qqq.index.duplicated(keep="last")].sort_index()
+    qqq = qqq.dropna(subset=["qqq_close"])
     if start:
-        close = close[close.index >= pd.Timestamp(start)]
+        qqq = qqq[qqq.index >= pd.Timestamp(start)]
     if end:
-        close = close[close.index <= pd.Timestamp(end)]
-    if len(close) < 756:
-        raise ValueError(f"Only {len(close)} QQQ rows after filtering; need at least about 3 years.")
-    return close
+        qqq = qqq[qqq.index <= pd.Timestamp(end)]
+    if len(qqq) < 756:
+        raise ValueError(f"Only {len(qqq)} QQQ rows after filtering; need at least about 3 years.")
+    return qqq
 
 
 def refresh_qqq_cache(path: Path, script_path: Path, start: str, end: str | None) -> None:
@@ -415,16 +431,18 @@ def add_black_box_pca(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def build_dataset(
-    qqq_close: pd.Series,
+    qqq_data: pd.DataFrame,
     macro: pd.DataFrame,
     stress: pd.DataFrame,
     target_horizon: int,
 ) -> pd.DataFrame:
-    close = qqq_close.astype(float)
+    close = pd.to_numeric(qqq_data["qqq_close"], errors="coerce").astype(float)
+    volume = pd.to_numeric(qqq_data["qqq_volume"], errors="coerce").astype(float).reindex(close.index)
     daily_return = close.pct_change()
     df = pd.DataFrame(index=close.index)
     df.index.name = "date"
     df["qqq_close"] = close
+    df["qqq_volume"] = volume
     df["qqq_1d_return"] = daily_return
     df["qqq_21d_return"] = _pct_change(close, 21)
     df["qqq_63d_return"] = _pct_change(close, 63)
@@ -433,7 +451,9 @@ def build_dataset(
     df["qqq_realized_vol_21d"] = daily_return.rolling(21, min_periods=21).std() * math.sqrt(TRADING_DAYS_PER_YEAR)
     df["qqq_realized_vol_63d"] = daily_return.rolling(63, min_periods=63).std() * math.sqrt(TRADING_DAYS_PER_YEAR)
     df["qqq_sma50"] = close.rolling(50, min_periods=50).mean()
+    df["qqq_sma65"] = close.rolling(65, min_periods=65).mean()
     df["qqq_sma200"] = close.rolling(200, min_periods=200).mean()
+    df["qqq_sma222"] = close.rolling(222, min_periods=222).mean()
     df["qqq_vs_sma200"] = close / df["qqq_sma200"] - 1.0
     df["qqq_drawdown_252d"] = close / close.rolling(252, min_periods=63).max() - 1.0
 
@@ -1592,6 +1612,7 @@ def main() -> None:
         refresh_macro_cache(args.macro_path, args.macro_download_script, args.macro_refresh_start, args.end)
 
     qqq = load_qqq(args.qqq_path, args.start, args.end)
+    qqq_close = qqq["qqq_close"].copy()
     macro = load_macro(args.macro_path, qqq.index, args.monthly_release_lag_days)
     stress, fred_status = load_stress_proxies(qqq.index, args.fred_cache_dir, refresh_fred)
     dataset = build_dataset(qqq, macro, stress, args.target_horizon)
@@ -1638,7 +1659,7 @@ def main() -> None:
     half_cash_target = pd.Series(0.70, index=regime_target.index, name="Static 70/30 DCA")
     results = [
         simulate_dca(
-            qqq,
+            qqq_close,
             plain_target,
             name="Plain DCA 100% QQQ",
             start_date=pd.Timestamp(valid_signal_start),
@@ -1647,7 +1668,7 @@ def main() -> None:
             trading_cost_bps=args.trading_cost_bps,
         ),
         simulate_dca(
-            qqq,
+            qqq_close,
             half_cash_target,
             name="Static 70/30 DCA",
             start_date=pd.Timestamp(valid_signal_start),
@@ -1656,7 +1677,7 @@ def main() -> None:
             trading_cost_bps=args.trading_cost_bps,
         ),
         simulate_dca(
-            qqq,
+            qqq_close,
             regime_target,
             name="ML Regime DCA Cash Reserve",
             start_date=pd.Timestamp(valid_signal_start),
