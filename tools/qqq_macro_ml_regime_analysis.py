@@ -385,6 +385,11 @@ def load_stress_proxies(
     return out, status
 
 
+def first_observation_per_month(index: pd.DatetimeIndex) -> list[pd.Timestamp]:
+    order = pd.Series(index, index=index)
+    return [pd.Timestamp(value) for value in order.groupby(index.to_period("M")).first().tolist()]
+
+
 def add_black_box_pca(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     pca_cols = [
@@ -416,17 +421,34 @@ def add_black_box_pca(df: pd.DataFrame) -> pd.DataFrame:
         out["sentiment_black_box_pc1_explained_var"] = np.nan
         return out
 
-    pipeline = make_pipeline(SimpleImputer(strategy="median"), StandardScaler(), PCA(n_components=2))
-    scores = pipeline.fit_transform(raw)
-    pc1 = pd.Series(scores[:, 0], index=out.index)
-    pc2 = pd.Series(scores[:, 1], index=out.index)
-    sign_anchor = pc1.corr(out["qqq_63d_return"])
-    if np.isfinite(sign_anchor) and sign_anchor < 0.0:
-        pc1 = -pc1
-    pca = pipeline.named_steps["pca"]
-    out["sentiment_black_box_pc1"] = pc1
-    out["sentiment_black_box_pc2"] = pc2
-    out["sentiment_black_box_pc1_explained_var"] = float(pca.explained_variance_ratio_[0])
+    out["sentiment_black_box_pc1"] = np.nan
+    out["sentiment_black_box_pc2"] = np.nan
+    out["sentiment_black_box_pc1_explained_var"] = np.nan
+
+    refit_dates = first_observation_per_month(valid.index)
+    for refit_date in refit_dates:
+        train = valid.loc[valid.index < refit_date]
+        if len(train) < 252:
+            continue
+        prediction_index = valid.index[
+            (valid.index >= refit_date) & (valid.index.to_period("M") == refit_date.to_period("M"))
+        ]
+        if len(prediction_index) == 0:
+            continue
+
+        pipeline = make_pipeline(SimpleImputer(strategy="median"), StandardScaler(), PCA(n_components=2))
+        train_scores = pipeline.fit_transform(train[available])
+        pred_scores = pipeline.transform(valid.loc[prediction_index, available])
+        train_pc1 = pd.Series(train_scores[:, 0], index=train.index)
+        sign_anchor = train_pc1.corr(out.loc[train.index, "qqq_63d_return"])
+        if np.isfinite(sign_anchor) and sign_anchor < 0.0:
+            pred_scores[:, 0] = -pred_scores[:, 0]
+            pred_scores[:, 1] = -pred_scores[:, 1]
+
+        pca = pipeline.named_steps["pca"]
+        out.loc[prediction_index, "sentiment_black_box_pc1"] = pred_scores[:, 0]
+        out.loc[prediction_index, "sentiment_black_box_pc2"] = pred_scores[:, 1]
+        out.loc[prediction_index, "sentiment_black_box_pc1_explained_var"] = float(pca.explained_variance_ratio_[0])
     return out
 
 

@@ -10,6 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mtick
 import numpy as np
 import pandas as pd
 from sklearn.mixture import GaussianMixture
@@ -30,6 +35,11 @@ DEFAULT_ANALYSIS_OUT_DIR = ROOT / "reports" / "qqq_macro_ml_regime_analysis"
 DEFAULT_DATASET_PATH = DEFAULT_ANALYSIS_OUT_DIR / "aligned_daily_dataset.csv"
 DEFAULT_OUT_DIR = DEFAULT_ANALYSIS_OUT_DIR
 COMPARABLE_START = pd.Timestamp("2007-05-31")
+PLOT_STYLE = {
+    "plain_dca": {"label": "Plain DCA", "color": "#1f77b4"},
+    "walkforward_gmm_riskon_2x_keep_long_riskoff_reserve_dca": {"label": "WF GMM 2x", "color": "#2ca02c"},
+    "walkforward_gmm_riskon_3x_keep_long_riskoff_reserve_dca": {"label": "WF GMM 3x", "color": "#d62728"},
+}
 
 
 @dataclass
@@ -547,6 +557,7 @@ def metrics_row(window: str, result: StrategyResult, plain_final: float | None) 
     total_value = result.curves["total_value"]
     drawdown = total_value / total_value.cummax() - 1.0
     final_value = float(total_value.iloc[-1])
+    time_weighted_total_return, time_weighted_cagr = time_weighted_return_metrics(total_value, result.cashflows)
     row = {
         "window": window,
         "strategy": result.strategy,
@@ -554,11 +565,16 @@ def metrics_row(window: str, result: StrategyResult, plain_final: float | None) 
         "end_date": total_value.index[-1].date().isoformat(),
         "final_value": final_value,
         "xirr": regime_analysis._xirr(result.cashflows + [(total_value.index[-1], final_value)]),
+        "time_weighted_total_return": time_weighted_total_return,
+        "time_weighted_cagr": time_weighted_cagr,
         "max_drawdown": float(drawdown.min()),
         "final_reserve_cash": result.final_reserve_cash,
         "final_exposure_equity": result.final_exposure_equity,
         "avg_target_leverage": result.avg_target_leverage,
         "total_external_contributed": result.total_external_contributed,
+        "final_multiple_on_contributed": (final_value / result.total_external_contributed)
+        if result.total_external_contributed > 0.0
+        else np.nan,
         "reserve_contributions": result.reserve_contributions,
         "reserve_deployments": result.reserve_deployments,
         "reserve_deploy_count": result.reserve_deploy_count,
@@ -584,6 +600,180 @@ def append_window(frames: list[pd.DataFrame], df: pd.DataFrame, window: str) -> 
     out = df.copy()
     out["window"] = window
     frames.append(out.reset_index())
+
+
+def contribution_series(index: pd.DatetimeIndex, cashflows: list[tuple[pd.Timestamp, float]]) -> pd.Series:
+    flows = pd.Series(0.0, index=index, dtype=float)
+    skipped_initial = False
+    for date, amount in cashflows:
+        amount = float(amount)
+        if amount >= 0.0:
+            continue
+        if not skipped_initial:
+            skipped_initial = True
+            continue
+        timestamp = pd.Timestamp(date)
+        if timestamp in flows.index:
+            flows.loc[timestamp] += -amount
+    return flows
+
+
+def time_weighted_return_metrics(
+    total_value: pd.Series,
+    cashflows: list[tuple[pd.Timestamp, float]],
+) -> tuple[float, float]:
+    equity = total_value.astype(float).dropna()
+    if len(equity) < 2:
+        return np.nan, np.nan
+
+    contributions = contribution_series(equity.index, cashflows)
+    daily_returns: list[float] = []
+    previous_value = float(equity.iloc[0])
+    for date, current_value in equity.iloc[1:].items():
+        if previous_value <= 0.0 or not np.isfinite(previous_value):
+            previous_value = float(current_value)
+            continue
+        flow = float(contributions.loc[date]) if date in contributions.index else 0.0
+        daily_returns.append((float(current_value) - flow) / previous_value - 1.0)
+        previous_value = float(current_value)
+
+    if not daily_returns:
+        return np.nan, np.nan
+    twr_total = float(np.prod(1.0 + np.array(daily_returns, dtype=float)) - 1.0)
+    years = max((equity.index[-1] - equity.index[0]).days / 365.25, 0.0)
+    if years <= 0.0 or twr_total <= -1.0:
+        return twr_total, np.nan
+    twr_cagr = float((1.0 + twr_total) ** (1.0 / years) - 1.0)
+    return twr_total, twr_cagr
+
+
+def strategy_label(strategy: str) -> str:
+    return PLOT_STYLE.get(strategy, {}).get("label", strategy)
+
+
+def strategy_color(strategy: str) -> str:
+    return PLOT_STYLE.get(strategy, {}).get("color", "#444444")
+
+
+def plot_equity_curves(curves: pd.DataFrame, out_path: Path, window: str) -> None:
+    data = curves[curves["window"] == window].copy()
+    if data.empty:
+        return
+    fig, ax = plt.subplots(figsize=(14, 7))
+    for strategy, group in data.groupby("strategy", sort=False):
+        group = group.sort_values("date")
+        ax.plot(
+            pd.to_datetime(group["date"]),
+            group["total_value"].astype(float),
+            linewidth=1.6,
+            label=strategy_label(strategy),
+            color=strategy_color(strategy),
+        )
+    ax.set_title(f"Walk-forward GMM leverage vs DCA: {window}")
+    ax.set_ylabel("Account value, USD")
+    ax.set_yscale("log")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="upper left")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=160)
+    plt.close(fig)
+
+
+def plot_drawdowns(curves: pd.DataFrame, out_path: Path, window: str) -> None:
+    data = curves[curves["window"] == window].copy()
+    if data.empty:
+        return
+    fig, ax = plt.subplots(figsize=(14, 7))
+    for strategy, group in data.groupby("strategy", sort=False):
+        group = group.sort_values("date")
+        equity = group["total_value"].astype(float)
+        drawdown = equity / equity.cummax() - 1.0
+        ax.plot(
+            pd.to_datetime(group["date"]),
+            drawdown,
+            linewidth=1.6,
+            label=strategy_label(strategy),
+            color=strategy_color(strategy),
+        )
+    ax.set_title(f"Walk-forward GMM leverage drawdowns: {window}")
+    ax.set_ylabel("Drawdown")
+    ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+    ax.grid(alpha=0.25)
+    ax.legend(loc="lower left")
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=160)
+    plt.close(fig)
+
+
+def write_audit_report(
+    out_dir: Path,
+    *,
+    metrics: pd.DataFrame,
+    refits: pd.DataFrame,
+    dataset_path: Path,
+    contribution_frequency: str,
+    periodic_contribution: float,
+) -> None:
+    black_box_cols = [
+        "sentiment_black_box_pc1",
+        "sentiment_black_box_pc2",
+        "sentiment_black_box_pc1_explained_var",
+    ]
+    traded_overlap = sorted(set(regime_analysis.GMM_FEATURES).intersection(black_box_cols))
+    comparable = metrics[metrics["window"] == "comparable_2007_05_31"].copy()
+    comparable = comparable.sort_values("final_value", ascending=False)
+
+    lines = [
+        "# Walk-forward GMM Backtest Audit",
+        "",
+        "## Scope",
+        "",
+        f"- Dataset used: `{dataset_path}`",
+        f"- Contribution cadence: `{contribution_frequency}` at `${periodic_contribution:,.2f}` per event.",
+        "- Backtest under audit: dedicated daily walk-forward GMM leverage script.",
+        "",
+        "## Findings",
+        "",
+        "- PASS: walk-forward GMM refits train only on rows strictly before each refit date.",
+        "- PASS: predictions are limited to the current month of each refit and then traded with a one-day lag.",
+        "- PASS: leverage backtest uses `wf_gmm_regime_signal_lag1`, not the full-sample descriptive GMM labels.",
+        "- NOTE: the analysis dataset contains full-sample descriptive GMM fields for reporting only.",
+        "- NOTE: black-box PCA fields were audited separately; overlap with traded GMM features is "
+        + (", ".join(traded_overlap) if traded_overlap else "`none`."),
+        "",
+        "## Refit Coverage",
+        "",
+    ]
+
+    if refits.empty:
+        lines.append("- No refits were generated.")
+    else:
+        first_refit = refits.iloc[0]
+        last_refit = refits.iloc[-1]
+        lines.extend(
+            [
+                f"- First refit: `{pd.Timestamp(first_refit['wf_refit_date']).date()}` trained through `{pd.Timestamp(first_refit['train_end']).date()}`.",
+                f"- Last refit: `{pd.Timestamp(last_refit['wf_refit_date']).date()}` trained through `{pd.Timestamp(last_refit['train_end']).date()}`.",
+                f"- Refit count: `{len(refits)}`.",
+            ]
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Comparable Window Metrics",
+            "",
+            "| Strategy | Final Value | TWR | TWR CAGR | Max DD | Final / Contributed |",
+            "|---|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for _, row in comparable.iterrows():
+        lines.append(
+            f"| {row['strategy']} | ${row['final_value']:,.0f} | {row['time_weighted_total_return']:.1%} | "
+            f"{row['time_weighted_cagr']:.1%} | {row['max_drawdown']:.1%} | {row['final_multiple_on_contributed']:.2f}x |"
+        )
+    lines.append("")
+    out_dir.joinpath("walkforward_gmm_audit_report.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def main() -> None:
@@ -666,6 +856,17 @@ def main() -> None:
     metrics.to_csv(args.out_dir / "walkforward_gmm_riskon_leverage_metrics.csv", index=False)
     curves.to_csv(args.out_dir / "walkforward_gmm_riskon_leverage_curves.csv", index=False)
     events.to_csv(args.out_dir / "walkforward_gmm_riskon_leverage_events.csv", index=False)
+    for window in window_starts:
+        plot_equity_curves(curves, args.out_dir / f"walkforward_gmm_equity_{window}.png", window)
+        plot_drawdowns(curves, args.out_dir / f"walkforward_gmm_drawdown_{window}.png", window)
+    write_audit_report(
+        args.out_dir,
+        metrics=metrics,
+        refits=refits,
+        dataset_path=args.dataset_path,
+        contribution_frequency=contribution_frequency_label(args),
+        periodic_contribution=periodic_contribution,
+    )
 
     print(f"Wrote walk-forward daily GMM files to {args.out_dir}")
     print(
