@@ -7106,3 +7106,8 @@ date,value,series_id,label,name,units
 2026-03-26,96.18,DCOILWTICO,WTI,"WTI Crude Oil Spot Price, Cushing, OK",USD per barrel
 2026-03-27,101.26,DCOILWTICO,WTI,"WTI Crude Oil Spot Price, Cushing, OK",USD per barrel
 2026-03-30,104.69,DCOILWTICO,WTI,"WTI Crude Oil Spot Price, Cushing, OK",USD per barrel
+2026-03-31,102.86,DCOILWTICO,WTI,"WTI Crude Oil Spot Price, Cushing, OK",USD per barrel
+2026-04-01,101.9,DCOILWTICO,WTI,"WTI Crude Oil Spot Price, Cushing, OK",USD per barrel
+2026-04-02,113.23,DCOILWTICO,WTI,"WTI Crude Oil Spot Price, Cushing, OK",USD per barrel
+2026-04-03,,DCOILWTICO,WTI,"WTI Crude Oil Spot Price, Cushing, OK",USD per barrel
+2026-04-06,114.01,DCOILWTICO,WTI,"WTI Crude Oil Spot Price, Cushing, OK",USD per barrel

@@ -15,7 +15,7 @@ the analysis reproducible and harder to fool with obvious look-ahead mistakes:
 The "sentiment" variable is intentionally treated as a latent black box. We do
 not claim to observe sentiment directly; instead we test a transparent proxy
 driven by QQQ feedback, volatility/credit/financial-condition shocks, dollar,
-rates, oil, CPI, and unemployment.
+rates, oil, gold, valuation, CPI, and unemployment.
 """
 
 from __future__ import annotations
@@ -80,6 +80,7 @@ FRED_STRESS_SERIES = {
 
 DAILY_MACRO_RENAMES = {
     "dxy_close": "dxy",
+    "gold_usd_per_oz": "gold",
     "us_2y_yield": "us2y",
     "us_10y_yield": "us10y",
     "us_30y_yield": "us30y",
@@ -91,6 +92,10 @@ MONTHLY_MACRO_RENAMES = {
     "cpi_mom_pct": "cpi_mom_pct",
     "cpi_yoy_pct": "cpi_yoy_pct",
     "unemployment_rate_pct": "unemployment_rate_pct",
+}
+
+SPARSE_NO_LAG_MACRO_RENAMES = {
+    "shiller_cape_ratio": "cape",
 }
 
 MODEL_FEATURES = [
@@ -106,10 +111,13 @@ MODEL_FEATURES = [
     "qqq_realized_vol_21d",
     "qqq_drawdown_252d",
     "dxy_63d_return",
+    "gold_63d_return",
     "us10y_level",
     "us10y_63d_change_pp",
     "curve_10y2y_level",
     "wti_63d_return",
+    "cape_level",
+    "cape_63d_change",
     "cpi_yoy_pct",
     "cpi_yoy_3m_change_pp",
     "unemployment_rate_pct",
@@ -133,9 +141,11 @@ GMM_FEATURES = [
     "qqq_volume",
     "qqq_realized_vol_21d",
     "dxy_63d_return",
+    "gold_63d_return",
     "us10y_63d_change_pp",
     "curve_10y2y_level",
     "wti_63d_return",
+    "cape_level",
     "cpi_yoy_pct",
     "unemployment_rate_pct",
     "vix_level",
@@ -317,6 +327,12 @@ def load_macro(path: Path, qqq_index: pd.DatetimeIndex, monthly_release_lag_days
         else:
             out[dest] = np.nan
 
+    for source, dest in SPARSE_NO_LAG_MACRO_RENAMES.items():
+        if source in raw.columns:
+            out[dest] = _align_daily(raw[source], qqq_index)
+        else:
+            out[dest] = np.nan
+
     return out
 
 
@@ -487,6 +503,14 @@ def build_dataset(
     df["wti_21d_return"] = _pct_change(macro["wti"], 21)
     df["wti_63d_return"] = _pct_change(macro["wti"], 63)
     df["wti_252d_return"] = _pct_change(macro["wti"], 252)
+    df["gold_level"] = macro["gold"]
+    df["gold_21d_return"] = _pct_change(macro["gold"], 21)
+    df["gold_63d_return"] = _pct_change(macro["gold"], 63)
+    df["gold_252d_return"] = _pct_change(macro["gold"], 252)
+    df["cape_level"] = macro["cape"]
+    df["cape_21d_change"] = macro["cape"].diff(21)
+    df["cape_63d_change"] = macro["cape"].diff(63)
+    df["cape_252d_change"] = macro["cape"].diff(252)
 
     for tenor in ["us2y", "us10y", "us30y"]:
         df[f"{tenor}_level"] = macro[tenor]
@@ -1460,6 +1484,7 @@ def write_report(
     lines.append(f"- Daily aligned sample: `{dataset.index.min().date()}` to `{dataset.index.max().date()}`.")
     lines.append(f"- Main supervised regime horizon: `{target_horizon}` trading days.")
     lines.append(f"- CPI and unemployment are lagged by `{args.monthly_release_lag_days}` calendar days before forward fill.")
+    lines.append("- Shiller CAPE is treated as available on its stated observation date from the downloaded monthly table.")
     lines.append("- OLS impact tests use standardized features and Newey-West standard errors on month-end observations.")
     lines.append("- OLS impact tests drop high-VIF terms above `20` before significance scoring; the full VIF audit is still saved.")
     lines.append("- ML validation is chronological with purge/embargo of overlapping forward-return windows.")
@@ -1481,6 +1506,8 @@ def write_report(
     lines.append(f"- Walk-forward GMM regime used for allocation: `{current_signal.get('latest_walkforward_gmm_regime', 'unknown')}`")
     lines.append(f"- Latent sentiment index: `{fmt_num(latest.get('latent_sentiment_index'), 2)}`")
     lines.append(f"- External shock score: `{fmt_num(latest.get('external_shock_score'), 2)}`")
+    lines.append(f"- Gold price proxy: `{fmt_num(latest.get('gold_level'), 2)}`")
+    lines.append(f"- Shiller CAPE ratio: `{fmt_num(latest.get('cape_level'), 2)}`")
     lines.append(f"- Logistic current risk-off probability: `{fmt_pct(current_signal.get('current_risk_off_target_probability'))}`")
     lines.append(f"- Logistic current jump-in probability: `{fmt_pct(current_signal.get('current_jump_in_target_probability'))}`")
     lines.append(f"- Research allocation label: `{current_signal.get('latest_signal', 'unknown')}`")
@@ -1583,6 +1610,8 @@ def write_report(
     lines.append("")
     lines.append("- Significance is historical association, not proof of causality.")
     lines.append("- FRED monthly macro data is not true point-in-time ALFRED vintage data; the release lag is a conservative approximation.")
+    lines.append("- Shiller CAPE comes from the downloadable Multpl table rather than a point-in-time vintage database.")
+    lines.append("- Gold uses Yahoo Finance front-month futures, which is a liquid proxy but not a perfect spot series.")
     lines.append("- The black-box sentiment proxy is intentionally transparent enough to audit, but it is still a proxy.")
     lines.append("- DCA results depend on contribution timing, cash yield assumption, transaction cost, and thresholds.")
     lines.append("- Treat allocation labels as hypotheses for review, not as automatic execution instructions.")

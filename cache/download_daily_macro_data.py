@@ -3,10 +3,12 @@
 
 Series:
 - DXY: Yahoo Finance chart data for DX-Y.NYB (ICE U.S. Dollar Index)
+- Gold: Yahoo Finance chart data for GC=F (COMEX front-month gold futures)
 - US2Y/US10Y/US30Y: FRED Treasury constant maturity yields
 - WTI: FRED WTI Cushing crude oil spot price
 - CPI: FRED CPIAUCSL with derived month-over-month and year-over-year inflation
 - UNRATE: FRED civilian unemployment rate
+- Shiller CAPE: Multpl monthly Shiller PE / CAPE table
 """
 
 from __future__ import annotations
@@ -71,8 +73,12 @@ FRED_SERIES = {
 }
 
 DXY_TICKER = "DX-Y.NYB"
+DXY_LABEL = "DXY"
+GOLD_TICKER = "GC=F"
+GOLD_LABEL = "GOLD"
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
-YAHOO_CHART_URL = f"https://query1.finance.yahoo.com/v8/finance/chart/{DXY_TICKER}"
+YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+MULTPL_SHILLER_CAPE_URL = "https://www.multpl.com/shiller-pe/table/by-month"
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; daily-macro-data-downloader/1.0)",
@@ -154,14 +160,20 @@ def fetch_fred_series(
     return df[output_cols].reset_index(drop=True)
 
 
-def fetch_dxy(session: requests.Session, start_date: date, end_date: date) -> pd.DataFrame:
+def fetch_yahoo_chart(
+    session: requests.Session,
+    ticker: str,
+    label: str,
+    start_date: date,
+    end_date: date,
+) -> pd.DataFrame:
     start_dt = datetime(start_date.year, start_date.month, start_date.day, tzinfo=timezone.utc)
     # Yahoo's period2 is exclusive, so request the day after the inclusive end date.
     yahoo_end = end_date + timedelta(days=1)
     end_dt = datetime(yahoo_end.year, yahoo_end.month, yahoo_end.day, tzinfo=timezone.utc)
     text = request_text(
         session,
-        YAHOO_CHART_URL,
+        YAHOO_CHART_URL.format(ticker=ticker),
         {
             "period1": int(start_dt.timestamp()),
             "period2": int(end_dt.timestamp()),
@@ -173,10 +185,10 @@ def fetch_dxy(session: requests.Session, start_date: date, end_date: date) -> pd
     payload = json.loads(text)
     chart = payload.get("chart", {})
     if chart.get("error"):
-        raise RuntimeError(f"Yahoo chart error for {DXY_TICKER}: {chart['error']}")
+        raise RuntimeError(f"Yahoo chart error for {ticker}: {chart['error']}")
     result = (chart.get("result") or [None])[0]
     if not result:
-        raise RuntimeError(f"Yahoo chart returned no data for {DXY_TICKER}")
+        raise RuntimeError(f"Yahoo chart returned no data for {ticker}")
 
     timestamps = result.get("timestamp") or []
     indicators = result.get("indicators") or {}
@@ -189,8 +201,8 @@ def fetch_dxy(session: requests.Session, start_date: date, end_date: date) -> pd
         df[col] = values if values is not None else pd.NA
     df["adj_close"] = adjclose if adjclose is not None else pd.NA
     df["date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.date
-    df["ticker"] = DXY_TICKER
-    df["label"] = "DXY"
+    df["ticker"] = ticker
+    df["label"] = label
     df["source"] = "Yahoo Finance chart API"
     df = df[(df["date"] >= start_date) & (df["date"] <= end_date)].copy()
     for col in ["open", "high", "low", "close", "adj_close", "volume"]:
@@ -199,6 +211,35 @@ def fetch_dxy(session: requests.Session, start_date: date, end_date: date) -> pd
     return df[
         ["date", "open", "high", "low", "close", "adj_close", "volume", "ticker", "label", "source"]
     ].reset_index(drop=True)
+
+
+def fetch_dxy(session: requests.Session, start_date: date, end_date: date) -> pd.DataFrame:
+    return fetch_yahoo_chart(session, DXY_TICKER, DXY_LABEL, start_date, end_date)
+
+
+def fetch_gold(session: requests.Session, start_date: date, end_date: date) -> pd.DataFrame:
+    return fetch_yahoo_chart(session, GOLD_TICKER, GOLD_LABEL, start_date, end_date)
+
+
+def fetch_shiller_cape(session: requests.Session, start_date: date, end_date: date) -> pd.DataFrame:
+    html = request_text(session, MULTPL_SHILLER_CAPE_URL, {})
+    tables = pd.read_html(StringIO(html))
+    if not tables:
+        raise RuntimeError("Multpl CAPE page returned no HTML tables.")
+    table = tables[0].copy()
+    if "Date" not in table.columns or "Value" not in table.columns:
+        raise RuntimeError(f"Unexpected Multpl CAPE table columns: {list(table.columns)}")
+
+    table = table.rename(columns={"Date": "date", "Value": "value"})
+    table["date"] = pd.to_datetime(table["date"], errors="coerce").dt.date
+    table["value"] = pd.to_numeric(table["value"], errors="coerce")
+    table = table.dropna(subset=["date", "value"]).sort_values("date").drop_duplicates(subset=["date"], keep="last")
+    table = table[(table["date"] >= start_date) & (table["date"] <= end_date)].copy()
+    table["series_id"] = "SHILLER_CAPE_MULTPL"
+    table["label"] = "SHILLER_CAPE"
+    table["name"] = "Shiller CAPE Ratio"
+    table["units"] = "ratio"
+    return table[["date", "value", "series_id", "label", "name", "units"]].reset_index(drop=True)
 
 
 def save_table(df: pd.DataFrame, path_without_ext: str) -> None:
@@ -227,16 +268,46 @@ def main() -> None:
     dxy = fetch_dxy(session, start_date, end_date)
     save_table(dxy, os.path.join(args.cache_dir, "DXY_daily"))
     print_range("DXY", dxy, "close")
+    gold = fetch_gold(session, start_date, end_date)
+    save_table(gold, os.path.join(args.cache_dir, "GOLD_daily"))
+    print_range("GOLD", gold, "close")
+    shiller_cape = fetch_shiller_cape(session, start_date, end_date)
+    save_table(shiller_cape, os.path.join(args.cache_dir, "SHILLER_CAPE_monthly"))
+    print_range("SHILLER_CAPE", shiller_cape, "value")
 
     combined = dxy[["date", "close"]].rename(columns={"close": "dxy_close"})
+    combined = combined.merge(
+        gold[["date", "close"]].rename(columns={"close": "gold_usd_per_oz"}),
+        on="date",
+        how="outer",
+    )
+    combined = combined.merge(
+        shiller_cape[["date", "value"]].rename(columns={"value": "shiller_cape_ratio"}),
+        on="date",
+        how="outer",
+    )
     series_metadata: dict[str, Any] = {
-        "DXY": {
+        DXY_LABEL: {
             "ticker": DXY_TICKER,
             "source": "Yahoo Finance chart API",
-            "source_url": YAHOO_CHART_URL,
+            "source_url": YAHOO_CHART_URL.format(ticker=DXY_TICKER),
             "combined_col": "dxy_close",
             "units": "index level",
-        }
+        },
+        GOLD_LABEL: {
+            "ticker": GOLD_TICKER,
+            "source": "Yahoo Finance chart API",
+            "source_url": YAHOO_CHART_URL.format(ticker=GOLD_TICKER),
+            "combined_col": "gold_usd_per_oz",
+            "units": "USD per ounce",
+        },
+        "SHILLER_CAPE": {
+            "series_id": "SHILLER_CAPE_MULTPL",
+            "source": "Multpl",
+            "source_url": MULTPL_SHILLER_CAPE_URL,
+            "combined_col": "shiller_cape_ratio",
+            "units": "ratio",
+        },
     }
 
     for label, config in FRED_SERIES.items():
@@ -258,7 +329,7 @@ def main() -> None:
         }
 
     combined = combined.sort_values("date").reset_index(drop=True)
-    value_columns = ["dxy_close"]
+    value_columns = ["dxy_close", "gold_usd_per_oz", "shiller_cape_ratio"]
     for config in FRED_SERIES.values():
         value_columns.append(config["combined_col"])
         value_columns.extend((config.get("derived_combined_cols") or {}).values())
@@ -278,9 +349,11 @@ def main() -> None:
         "notes": [
             "Combined table uses an outer join on date and does not forward-fill missing observations.",
             "Rows with no values in any combined data column are dropped from the combined table.",
-            "Treasury yields, CPI inflation, and unemployment are percent; WTI is USD per barrel.",
+            "Treasury yields, CPI inflation, and unemployment are percent; WTI is USD per barrel; gold is USD per ounce.",
             "CPI and unemployment are monthly FRED observations and are not forward-filled.",
             "CPI month-over-month and year-over-year inflation percentages are computed from CPIAUCSL.",
+            "Shiller CAPE is scraped from Multpl's monthly table and kept on its stated observation date.",
+            "Gold uses Yahoo Finance GC=F front-month futures, which is a practical proxy rather than a point-in-time spot fix.",
         ],
     }
     with open(os.path.join(args.cache_dir, "macro_daily_1999_metadata.json"), "w", encoding="utf-8") as fh:

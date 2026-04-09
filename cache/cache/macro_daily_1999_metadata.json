@@ -1,10 +1,10 @@
 {
-  "downloaded_at_utc": "2026-04-08T12:16:33.515494+00:00",
+  "downloaded_at_utc": "2026-04-09T10:29:20.761869+00:00",
   "start": "1999-01-01",
-  "end": "2026-04-08",
+  "end": "2026-04-09",
   "files": {
-    "combined_csv": "D:\\buffetABC\\cache\\cache\\macro_daily_1999.csv",
-    "combined_parquet": "D:\\buffetABC\\cache\\cache\\macro_daily_1999.parquet"
+    "combined_csv": "cache\\cache\\macro_daily_1999.csv",
+    "combined_parquet": "cache\\cache\\macro_daily_1999.parquet"
   },
   "series": {
     "DXY": {
@@ -13,6 +13,20 @@
       "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB",
       "combined_col": "dxy_close",
       "units": "index level"
+    },
+    "GOLD": {
+      "ticker": "GC=F",
+      "source": "Yahoo Finance chart API",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/GC=F",
+      "combined_col": "gold_usd_per_oz",
+      "units": "USD per ounce"
+    },
+    "SHILLER_CAPE": {
+      "series_id": "SHILLER_CAPE_MULTPL",
+      "source": "Multpl",
+      "source_url": "https://www.multpl.com/shiller-pe/table/by-month",
+      "combined_col": "shiller_cape_ratio",
+      "units": "ratio"
     },
     "US2Y": {
       "series_id": "DGS2",
@@ -71,8 +85,10 @@
   "notes": [
     "Combined table uses an outer join on date and does not forward-fill missing observations.",
     "Rows with no values in any combined data column are dropped from the combined table.",
-    "Treasury yields, CPI inflation, and unemployment are percent; WTI is USD per barrel.",
+    "Treasury yields, CPI inflation, and unemployment are percent; WTI is USD per barrel; gold is USD per ounce.",
     "CPI and unemployment are monthly FRED observations and are not forward-filled.",
-    "CPI month-over-month and year-over-year inflation percentages are computed from CPIAUCSL."
+    "CPI month-over-month and year-over-year inflation percentages are computed from CPIAUCSL.",
+    "Shiller CAPE is scraped from Multpl's monthly table and kept on its stated observation date.",
+    "Gold uses Yahoo Finance GC=F front-month futures, which is a practical proxy rather than a point-in-time spot fix."
   ]
 }

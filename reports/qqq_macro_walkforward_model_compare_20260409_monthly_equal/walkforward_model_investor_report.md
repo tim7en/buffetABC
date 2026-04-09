@@ -10,13 +10,13 @@
 
 | Strategy | Final Value | XIRR | TWR CAGR | Max DD |
 |---|---:|---:|---:|---:|
-| walkforward_logistic_riskon_3x_prob_regime_dca | $2,067,666 | 33.5% | 34.4% | -69.8% |
-| walkforward_logistic_riskon_2x_prob_regime_dca | $1,039,309 | 28.0% | 28.6% | -52.0% |
-| walkforward_gmm_riskon_2x_keep_long_riskoff_reserve_dca | $378,785 | 20.0% | 20.4% | -61.0% |
-| plain_dca | $344,251 | 19.3% | 19.6% | -34.7% |
-| walkforward_random_forest_riskon_2x_prob_regime_dca | $343,603 | 19.3% | 19.7% | -46.9% |
-| walkforward_gmm_riskon_3x_keep_long_riskoff_reserve_dca | $309,287 | 18.4% | 18.9% | -77.6% |
-| walkforward_random_forest_riskon_3x_prob_regime_dca | $286,325 | 17.8% | 18.5% | -62.8% |
+| walkforward_logistic_riskon_3x_prob_regime_dca | $1,605,812 | 31.8% | 32.7% | -69.8% |
+| walkforward_logistic_riskon_2x_prob_regime_dca | $886,670 | 27.0% | 27.8% | -52.0% |
+| walkforward_gmm_riskon_3x_keep_long_riskoff_reserve_dca | $583,501 | 23.7% | 24.6% | -58.0% |
+| walkforward_gmm_riskon_2x_keep_long_riskoff_reserve_dca | $518,780 | 22.7% | 23.5% | -40.3% |
+| plain_dca | $375,575 | 20.2% | 20.9% | -34.8% |
+| walkforward_random_forest_riskon_2x_prob_regime_dca | $369,190 | 20.1% | 21.0% | -46.9% |
+| walkforward_random_forest_riskon_3x_prob_regime_dca | $306,727 | 18.6% | 19.8% | -62.8% |
 
 ## Model Validation
 
@@ -24,15 +24,15 @@ These scores come from a purged chronological train/test split on month-end samp
 
 | Target | Model | AUC | Average Precision | Brier | Balanced Accuracy @ 50% |
 |---|---|---:|---:|---:|---:|
-| Jump-in | Logistic | 0.558 | 0.462 | 0.340 | 0.541 |
-| Jump-in | Random Forest | 0.628 | 0.540 | 0.237 | 0.535 |
-| Risk-off | Logistic | 0.592 | 0.378 | 0.226 | 0.500 |
-| Risk-off | Random Forest | 0.574 | 0.336 | 0.204 | 0.547 |
+| Jump-in | Logistic | 0.518 | 0.479 | 0.338 | 0.554 |
+| Jump-in | Random Forest | 0.615 | 0.531 | 0.242 | 0.525 |
+| Risk-off | Logistic | 0.541 | 0.282 | 0.522 | 0.569 |
+| Risk-off | Random Forest | 0.603 | 0.376 | 0.205 | 0.564 |
 
 ## Threshold Check
 
-- The current logistic 3x setting (`risk_off=0.45`, `jump_in=0.55`) finished at `$2,067,666` with `-69.8%` max drawdown.
-- The best nearby 3x threshold in the local grid finished at `$2,539,633` with `-69.8%` max drawdown.
+- The current logistic 3x setting (`risk_off=0.45`, `jump_in=0.55`) finished at `$1,605,812` with `-69.8%` max drawdown.
+- The best nearby 3x threshold in the local grid finished at `$2,180,733` with `-69.8%` max drawdown.
 - That does not eliminate model-selection risk, but it suggests the current result is not coming from an obviously fragile one-cell threshold choice.
 
 ## What Drives The Logistic Model
@@ -43,53 +43,52 @@ The logistic model gives direction: a positive coefficient means a higher readin
 
 | Logistic coefficients pushing odds higher | Coef |
 |---|---:|
-| High-yield spread 3-month change | 1.293 |
-| High-yield spread | 1.234 |
-| 10Y Treasury yield level | 1.052 |
-| Financial conditions level | 0.811 |
-| QQQ 1-month realized volatility | 0.739 |
+| 10Y Treasury yield level | 1.807 |
+| High-yield spread 3-month change | 1.330 |
+| High-yield spread | 1.238 |
+| qqq sma222 | 1.160 |
+| 10Y-3M curve | 0.868 |
 
 | Logistic coefficients pushing odds lower | Coef |
 |---|---:|
-| VIX level | -2.128 |
-| QQQ 1-year drawdown | -0.960 |
-| Latent sentiment | -0.656 |
-| External shock score | -0.547 |
-| US dollar 3-month return | -0.115 |
+| VIX level | -1.753 |
+| Latent sentiment | -0.961 |
+| QQQ 1-year drawdown | -0.932 |
+| US dollar 3-month return | -0.167 |
+| Inflation 3-month change | -0.039 |
 
 | Strongest random forest features | Importance |
 |---|---:|
-| Inflation YoY | 0.0242 |
-| Unemployment rate | 0.0162 |
-| Inflation 3-month change | 0.0159 |
-| 10Y yield 3-month change | 0.0069 |
-| Latent sentiment | 0.0050 |
+| Inflation YoY | 0.0303 |
+| Shiller CAPE | 0.0253 |
+| Inflation 3-month change | 0.0245 |
+| Unemployment rate | 0.0164 |
+| Latent sentiment | 0.0131 |
 
 ### Jump-in
 
 | Logistic coefficients pushing odds higher | Coef |
 |---|---:|
-| VIX level | 2.311 |
-| QQQ 1-year drawdown | 0.687 |
-| Yield curve 10Y-2Y | 0.396 |
-| External shock score | 0.111 |
-| US dollar 3-month return | 0.069 |
+| VIX level | 2.220 |
+| QQQ 1-year drawdown | 0.646 |
+| qqq sma65 | 0.630 |
+| Latent sentiment | 0.214 |
 
 | Logistic coefficients pushing odds lower | Coef |
 |---|---:|
-| High-yield spread 3-month change | -0.867 |
-| Financial conditions level | -0.778 |
-| 10Y-3M curve | -0.645 |
-| QQQ 1-month realized volatility | -0.612 |
-| Unemployment rate | -0.432 |
+| qqq sma222 | -0.949 |
+| High-yield spread 3-month change | -0.926 |
+| Financial conditions level | -0.625 |
+| Unemployment rate | -0.612 |
+| 10Y Treasury yield level | -0.609 |
 
 | Strongest random forest features | Importance |
 |---|---:|
-| VIX level | 0.0259 |
-| QQQ vs 200-day trend | 0.0231 |
-| Inflation YoY | 0.0209 |
-| QQQ 1-year drawdown | 0.0209 |
-| QQQ 1-month return | 0.0164 |
+| QQQ vs 200-day trend | 0.0323 |
+| Inflation YoY | 0.0291 |
+| QQQ 1-year drawdown | 0.0194 |
+| VIX level | 0.0164 |
+| QQQ 1-month return | 0.0132 |
 
 ## Practical Take
 
