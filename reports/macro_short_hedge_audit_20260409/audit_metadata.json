@@ -1,0 +1,18 @@
+{
+  "analysis_dir": "D:\\buffetABC\\reports\\qqq_macro_ml_regime_analysis",
+  "compare_dir": "D:\\buffetABC\\reports\\qqq_macro_walkforward_model_compare_20260409_monthly_equal",
+  "common_start": "2008-02-01",
+  "initial_capital": 10000.0,
+  "monthly_contribution": 100.0,
+  "trading_cost_bps": 3.0,
+  "borrow_rate": 0.055,
+  "hedge_light_threshold": 0.45,
+  "hedge_strong_threshold": 0.5,
+  "hedge_light_beta": 0.6,
+  "hedge_strong_beta": 0.3,
+  "notes": [
+    "Hedge model never flips fully net short; it reduces net beta to 0.6 or 0.3 only.",
+    "Base-beta baselines are evaluated at 1x, 2x, 3x, and 5x to show what the hedge adds relative to the same risk appetite.",
+    "Consensus hedge state requires agreement for the strongest hedge and uses a lighter hedge when any core model signals elevated risk."
+  ]
+}
