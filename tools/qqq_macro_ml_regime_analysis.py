@@ -81,6 +81,7 @@ FRED_STRESS_SERIES = {
 DAILY_MACRO_RENAMES = {
     "dxy_close": "dxy",
     "gold_usd_per_oz": "gold",
+    "wilshire_total_market_index": "wilshire",
     "us_2y_yield": "us2y",
     "us_10y_yield": "us10y",
     "us_30y_yield": "us30y",
@@ -94,9 +95,16 @@ MONTHLY_MACRO_RENAMES = {
     "unemployment_rate_pct": "unemployment_rate_pct",
 }
 
-SPARSE_NO_LAG_MACRO_RENAMES = {
+QUARTERLY_MACRO_RENAMES = {
+    "us_nominal_gdp_saar_bil": "nominal_gdp",
+}
+
+MARKET_BASED_MONTHLY_MACRO_RENAMES = {
     "shiller_cape_ratio": "cape",
-    "market_cap_to_gdp_pct": "market_cap_to_gdp",
+}
+
+ANNUAL_MACRO_RENAMES = {
+    "market_cap_to_gdp_pct": "market_cap_to_gdp_anchor",
 }
 
 MODEL_FEATURES = [
@@ -119,8 +127,8 @@ MODEL_FEATURES = [
     "wti_63d_return",
     "cape_level",
     "cape_63d_change",
-    "market_cap_to_gdp_level",
-    "market_cap_to_gdp_252d_drift",
+    "buffett_indicator_proxy_level",
+    "buffett_indicator_proxy_252d_drift",
     "cpi_yoy_pct",
     "cpi_yoy_3m_change_pp",
     "unemployment_rate_pct",
@@ -149,14 +157,54 @@ GMM_FEATURES = [
     "curve_10y2y_level",
     "wti_63d_return",
     "cape_level",
-    "market_cap_to_gdp_level",
-    "market_cap_to_gdp_252d_drift",
+    "buffett_indicator_proxy_level",
+    "buffett_indicator_proxy_252d_drift",
     "cpi_yoy_pct",
     "unemployment_rate_pct",
     "vix_level",
     "hy_oas_level",
     "nfci_level",
 ]
+
+FEATURE_LABELS = {
+    "latent_sentiment_index": "Latent sentiment",
+    "external_shock_score": "External shock score",
+    "qqq_feedback_score": "QQQ feedback score",
+    "qqq_21d_return": "QQQ 1-month return",
+    "qqq_63d_return": "QQQ 3-month return",
+    "qqq_sma65": "QQQ 65-day trend level",
+    "qqq_sma222": "QQQ 222-day trend level",
+    "qqq_vs_sma200": "QQQ vs 200-day trend",
+    "qqq_volume": "QQQ volume",
+    "qqq_realized_vol_21d": "QQQ 1-month realized volatility",
+    "qqq_drawdown_252d": "QQQ 1-year drawdown",
+    "dxy_63d_return": "US dollar 3-month return",
+    "gold_63d_return": "Gold 3-month return",
+    "us10y_level": "10Y Treasury yield level",
+    "us10y_63d_change_pp": "10Y yield 3-month change",
+    "curve_10y2y_level": "Yield curve 10Y-2Y",
+    "wti_63d_return": "Oil 3-month return",
+    "cape_level": "Shiller CAPE",
+    "cape_63d_change": "Shiller CAPE 3-month change",
+    "buffett_indicator_proxy_level": "Wilshire / GDP valuation proxy",
+    "buffett_indicator_proxy_252d_drift": "Wilshire / GDP 1-year drift",
+    "cpi_yoy_pct": "Inflation YoY",
+    "cpi_yoy_3m_change_pp": "Inflation 3-month change",
+    "unemployment_rate_pct": "Unemployment rate",
+    "unemployment_6m_change_pp": "Unemployment 6-month change",
+    "vix_level": "VIX level",
+    "vix_21d_change": "VIX 1-month change",
+    "hy_oas_level": "High-yield spread",
+    "hy_oas_63d_change_pp": "High-yield spread 3-month change",
+    "nfci_level": "Financial conditions level",
+    "nfci_63d_change": "Financial conditions 3-month change",
+    "t10y3m_level": "10Y-3M curve",
+    "wilshire_level": "Wilshire total-market index",
+    "nominal_gdp_level": "Nominal GDP",
+    "market_cap_to_gdp_anchor_level": "Official market cap to GDP anchor",
+    "buffett_indicator_proxy_rolling_z": "Wilshire / GDP rolling z-score",
+    "cape_rolling_z": "Shiller CAPE rolling z-score",
+}
 
 
 @dataclass
@@ -310,7 +358,13 @@ def refresh_macro_cache(path: Path, script_path: Path, start: str, end: str | No
         raise FileNotFoundError(f"Macro refresh completed without creating {path}")
 
 
-def load_macro(path: Path, qqq_index: pd.DatetimeIndex, monthly_release_lag_days: int) -> pd.DataFrame:
+def load_macro(
+    path: Path,
+    qqq_index: pd.DatetimeIndex,
+    monthly_release_lag_days: int,
+    quarterly_release_lag_days: int,
+    annual_release_lag_days: int,
+) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Missing macro parquet: {path}")
     raw = pd.read_parquet(path).copy()
@@ -332,9 +386,21 @@ def load_macro(path: Path, qqq_index: pd.DatetimeIndex, monthly_release_lag_days
         else:
             out[dest] = np.nan
 
-    for source, dest in SPARSE_NO_LAG_MACRO_RENAMES.items():
+    for source, dest in QUARTERLY_MACRO_RENAMES.items():
+        if source in raw.columns:
+            out[dest] = _align_sparse_release_lag(raw[source], qqq_index, quarterly_release_lag_days)
+        else:
+            out[dest] = np.nan
+
+    for source, dest in MARKET_BASED_MONTHLY_MACRO_RENAMES.items():
         if source in raw.columns:
             out[dest] = _align_daily(raw[source], qqq_index)
+        else:
+            out[dest] = np.nan
+
+    for source, dest in ANNUAL_MACRO_RENAMES.items():
+        if source in raw.columns:
+            out[dest] = _align_sparse_release_lag(raw[source], qqq_index, annual_release_lag_days)
         else:
             out[dest] = np.nan
 
@@ -512,13 +578,22 @@ def build_dataset(
     df["gold_21d_return"] = _pct_change(macro["gold"], 21)
     df["gold_63d_return"] = _pct_change(macro["gold"], 63)
     df["gold_252d_return"] = _pct_change(macro["gold"], 252)
+    df["wilshire_level"] = macro["wilshire"]
+    df["wilshire_63d_return"] = _pct_change(macro["wilshire"], 63)
+    df["wilshire_252d_return"] = _pct_change(macro["wilshire"], 252)
+    df["nominal_gdp_level"] = macro["nominal_gdp"]
     df["cape_level"] = macro["cape"]
     df["cape_21d_change"] = macro["cape"].diff(21)
     df["cape_63d_change"] = macro["cape"].diff(63)
     df["cape_252d_change"] = macro["cape"].diff(252)
-    df["market_cap_to_gdp_level"] = macro["market_cap_to_gdp"]
-    df["market_cap_to_gdp_252d_drift"] = macro["market_cap_to_gdp"].diff(252)
-    df["market_cap_to_gdp_756d_drift"] = macro["market_cap_to_gdp"].diff(756)
+    df["market_cap_to_gdp_anchor_level"] = macro["market_cap_to_gdp_anchor"]
+    df["market_cap_to_gdp_anchor_252d_drift"] = macro["market_cap_to_gdp_anchor"].diff(252)
+    df["wilshire_to_gdp_raw"] = macro["wilshire"] / macro["nominal_gdp"]
+    df["buffett_indicator_proxy_level"] = df["wilshire_to_gdp_raw"]
+    df["buffett_indicator_proxy_63d_change"] = df["wilshire_to_gdp_raw"].diff(63)
+    df["buffett_indicator_proxy_252d_drift"] = df["wilshire_to_gdp_raw"].diff(252)
+    df["buffett_indicator_proxy_rolling_z"] = _rolling_zscore(df["wilshire_to_gdp_raw"], window=756, min_periods=252)
+    df["cape_rolling_z"] = _rolling_zscore(df["cape_level"], window=756, min_periods=252)
 
     for tenor in ["us2y", "us10y", "us30y"]:
         df[f"{tenor}_level"] = macro[tenor]
@@ -618,6 +693,352 @@ def month_end_sample(df: pd.DataFrame) -> pd.DataFrame:
 
 def available_features(df: pd.DataFrame, features: list[str], min_non_na: int = 60) -> list[str]:
     return [feature for feature in features if feature in df.columns and df[feature].notna().sum() >= min_non_na]
+
+
+def feature_label(feature: str) -> str:
+    return FEATURE_LABELS.get(feature, feature.replace("_", " ").title())
+
+
+def variable_source(variable: str) -> str:
+    if variable.startswith("qqq_"):
+        return "QQQ daily parquet"
+    if variable.startswith("dxy_"):
+        return "Yahoo DXY"
+    if variable.startswith("gold_"):
+        return "Yahoo GC=F gold futures"
+    if variable.startswith("wilshire_") or variable.startswith("buffett_indicator_proxy"):
+        return "Yahoo Wilshire total-market proxy + FRED GDP"
+    if variable.startswith("nominal_gdp_"):
+        return "FRED GDP"
+    if variable.startswith("cape_"):
+        return "Multpl Shiller CAPE"
+    if variable.startswith("market_cap_to_gdp_anchor"):
+        return "World Bank / FRED market cap to GDP"
+    if variable.startswith(("us2y_", "us10y_", "us30y_", "curve_")):
+        return "FRED Treasury yields"
+    if variable.startswith("wti_"):
+        return "FRED WTI"
+    if variable.startswith("cpi_"):
+        return "FRED CPI"
+    if variable.startswith("unemployment_"):
+        return "FRED UNRATE"
+    if variable.startswith("vix_"):
+        return "FRED VIXCLS"
+    if variable.startswith("hy_oas_"):
+        return "FRED BAMLH0A0HYM2"
+    if variable.startswith("nfci_"):
+        return "FRED NFCI"
+    if variable.startswith("t10y3m_"):
+        return "FRED T10Y3M"
+    if variable in {"latent_sentiment_index", "external_shock_score", "qqq_feedback_score"}:
+        return "Composite from aligned market and macro features"
+    return "Derived analysis feature"
+
+
+def variable_frequency(variable: str) -> str:
+    if variable.startswith(("dxy_", "gold_", "wilshire_", "us2y_", "us10y_", "us30y_", "curve_", "wti_", "vix_", "hy_oas_", "nfci_", "t10y3m_", "qqq_")):
+        return "daily"
+    if variable.startswith(("cpi_", "unemployment_", "cape_")):
+        return "monthly input aligned to daily"
+    if variable.startswith("nominal_gdp_") or variable.startswith("buffett_indicator_proxy"):
+        return "quarterly input aligned to daily"
+    if variable.startswith("market_cap_to_gdp_anchor"):
+        return "annual input aligned to daily"
+    if variable in {"latent_sentiment_index", "external_shock_score", "qqq_feedback_score"}:
+        return "daily composite"
+    return "derived daily"
+
+
+def variable_timing(variable: str) -> str:
+    if variable.startswith(("cpi_", "unemployment_")):
+        return "lagged monthly release, then forward-filled on trading days"
+    if variable.startswith("nominal_gdp_") or variable.startswith("buffett_indicator_proxy"):
+        return "lagged quarterly GDP release, then forward-filled on trading days"
+    if variable.startswith("market_cap_to_gdp_anchor"):
+        return "lagged annual release, then forward-filled on trading days"
+    if variable.startswith("cape_"):
+        return "market-based monthly observation forward-filled on trading days"
+    if variable in {"latent_sentiment_index", "external_shock_score", "qqq_feedback_score"}:
+        return "same-day composite from lag-safe inputs"
+    return "same-day daily market observation"
+
+
+def variable_formula(variable: str) -> str:
+    if variable.endswith("_level"):
+        return "level"
+    if variable.endswith("_return"):
+        return "percent return"
+    if variable.endswith("_change") or variable.endswith("_change_pp"):
+        return "change over lookback window"
+    if variable.endswith("_drift"):
+        return "trend / drift over lookback window"
+    if variable.endswith("_rolling_z"):
+        return "rolling z-score"
+    if variable.endswith("_score"):
+        return "composite score"
+    if variable.endswith("_index"):
+        return "composite index"
+    if variable.endswith("_vol_21d"):
+        return "realized volatility"
+    if variable.endswith("_drawdown_252d"):
+        return "drawdown"
+    return "derived feature"
+
+
+def variable_role(variable: str) -> str:
+    if variable in {"wilshire_level", "nominal_gdp_level", "market_cap_to_gdp_anchor_level"}:
+        return "base reference series"
+    if variable in {"latent_sentiment_index", "external_shock_score", "qqq_feedback_score"}:
+        return "composite model input"
+    if variable in MODEL_FEATURES or variable in GMM_FEATURES:
+        return "model feature"
+    return "diagnostic feature"
+
+
+def build_variable_inventory(dataset: pd.DataFrame) -> pd.DataFrame:
+    cycle_features = [
+        "buffett_indicator_proxy_rolling_z",
+        "cape_rolling_z",
+        "curve_10y2y_level",
+        "cpi_yoy_pct",
+        "cpi_yoy_3m_change_pp",
+        "unemployment_rate_pct",
+        "unemployment_6m_change_pp",
+        "nfci_level",
+        "hy_oas_level",
+        "vix_level",
+        "qqq_vs_sma200",
+        "qqq_drawdown_252d",
+        "latent_sentiment_index",
+    ]
+    ordered_variables = [
+        "qqq_close",
+        "qqq_volume",
+        "dxy_level",
+        "gold_level",
+        "wilshire_level",
+        "nominal_gdp_level",
+        "market_cap_to_gdp_anchor_level",
+        "us2y_level",
+        "us10y_level",
+        "us30y_level",
+        "wti_level",
+        "cape_level",
+        "cpi_yoy_pct",
+        "cpi_mom_pct",
+        "unemployment_rate_pct",
+        "vix_level",
+        "hy_oas_level",
+        "nfci_level",
+        "t10y3m_level",
+        *MODEL_FEATURES,
+        "buffett_indicator_proxy_63d_change",
+        "buffett_indicator_proxy_rolling_z",
+        "cape_rolling_z",
+        "market_cap_to_gdp_anchor_252d_drift",
+    ]
+    seen: set[str] = set()
+    rows: list[dict[str, Any]] = []
+    for variable in ordered_variables:
+        if variable in seen or variable not in dataset.columns:
+            continue
+        seen.add(variable)
+        series = pd.to_numeric(dataset[variable], errors="coerce") if dataset[variable].dtype != object else dataset[variable]
+        non_null = series.notna().sum() if hasattr(series, "notna") else dataset[variable].notna().sum()
+        if hasattr(series, "dropna") and non_null > 0:
+            valid = dataset.index[dataset[variable].notna()]
+            first_valid = valid.min()
+            last_valid = valid.max()
+        else:
+            first_valid = pd.NaT
+            last_valid = pd.NaT
+        rows.append(
+            {
+                "variable": variable,
+                "label": feature_label(variable),
+                "role": variable_role(variable),
+                "source": variable_source(variable),
+                "input_frequency": variable_frequency(variable),
+                "availability_treatment": variable_timing(variable),
+                "construction": variable_formula(variable),
+                "used_in_supervised_models": variable in MODEL_FEATURES,
+                "used_in_gmm": variable in GMM_FEATURES,
+                "used_in_cycle_classifier": variable in cycle_features,
+                "non_null_observations": int(non_null),
+                "first_valid_date": first_valid,
+                "last_valid_date": last_valid,
+            }
+        )
+    inventory = pd.DataFrame(rows)
+    if inventory.empty:
+        return inventory
+    return inventory.sort_values(["role", "input_frequency", "variable"]).reset_index(drop=True)
+
+
+def write_variable_inventory(out_dir: Path, inventory: pd.DataFrame) -> None:
+    inventory.to_csv(out_dir / "analysis_variable_inventory.csv", index=False)
+    lines = [
+        "# Analysis Variable Inventory",
+        "",
+        "| Variable | Label | Role | Source | Input Frequency | Availability Treatment | Supervised | GMM | Cycle |",
+        "|---|---|---|---|---|---|---:|---:|---:|",
+    ]
+    for _, row in inventory.iterrows():
+        lines.append(
+            f"| {row['variable']} | {row['label']} | {row['role']} | {row['source']} | "
+            f"{row['input_frequency']} | {row['availability_treatment']} | "
+            f"{'Y' if row['used_in_supervised_models'] else ''} | {'Y' if row['used_in_gmm'] else ''} | "
+            f"{'Y' if row['used_in_cycle_classifier'] else ''} |"
+        )
+    out_dir.joinpath("analysis_variable_inventory.md").write_text("\n".join(lines), encoding="utf-8")
+
+
+def classify_macro_cycle(df: pd.DataFrame) -> pd.DataFrame:
+    out = pd.DataFrame(index=df.index)
+    required_inputs = [
+        "unemployment_6m_change_pp",
+        "nfci_level",
+        "hy_oas_level",
+        "vix_level",
+        "curve_10y2y_level",
+        "latent_sentiment_index",
+        "buffett_indicator_proxy_rolling_z",
+        "cape_rolling_z",
+    ]
+    expansion_score = pd.concat(
+        [
+            (df["unemployment_6m_change_pp"] <= 0.0).astype(float),
+            (df["nfci_level"] < 0.0).astype(float),
+            (df["hy_oas_level"] < 4.0).astype(float),
+            (df["vix_level"] < 20.0).astype(float),
+            (df["curve_10y2y_level"] > 0.50).astype(float),
+            (df["latent_sentiment_index"] > 0.0).astype(float),
+            (df["qqq_vs_sma200"] > 0.0).astype(float),
+            (df["cpi_yoy_3m_change_pp"] <= 0.0).astype(float),
+        ],
+        axis=1,
+    ).sum(axis=1, min_count=1)
+    late_cycle_score = pd.concat(
+        [
+            (df["buffett_indicator_proxy_rolling_z"] >= 1.0).astype(float),
+            (df["cape_rolling_z"] >= 1.0).astype(float),
+            (df["curve_10y2y_level"] <= 0.50).astype(float),
+            (df["cpi_yoy_pct"] >= 3.0).astype(float),
+            (df["cpi_yoy_3m_change_pp"] >= 0.0).astype(float),
+            (df["unemployment_rate_pct"] <= 4.8).astype(float),
+            (df["latent_sentiment_index"] > -0.25).astype(float),
+        ],
+        axis=1,
+    ).sum(axis=1, min_count=1)
+    contraction_score = pd.concat(
+        [
+            (df["unemployment_6m_change_pp"] >= 0.25).astype(float),
+            (df["nfci_level"] >= 0.25).astype(float),
+            (df["hy_oas_level"] >= 5.0).astype(float),
+            (df["vix_level"] >= 25.0).astype(float),
+            (df["qqq_drawdown_252d"] <= -0.15).astype(float),
+            (df["curve_10y2y_level"] < 0.0).astype(float),
+        ],
+        axis=1,
+    ).sum(axis=1, min_count=1)
+
+    score_frame = pd.DataFrame(
+        {
+            "expansion_score": expansion_score,
+            "late_cycle_score": late_cycle_score,
+            "contraction_score": contraction_score,
+        },
+        index=df.index,
+    )
+    top_label = score_frame.idxmax(axis=1).str.replace("_score", "", regex=False)
+    top_score = score_frame.max(axis=1)
+    second_score = score_frame.apply(lambda row: row.nlargest(2).iloc[-1] if row.notna().sum() >= 2 else np.nan, axis=1)
+    score_margin = top_score - second_score
+
+    label = pd.Series("transition", index=df.index, dtype=object)
+    label.loc[top_score < 3.0] = "transition"
+    label.loc[(top_label == "contraction") & (top_score >= 3.0) & (score_margin >= 1.0)] = "contraction"
+    label.loc[(top_label == "late_cycle") & (top_score >= 4.0) & (score_margin >= 0.0)] = "late_cycle"
+    label.loc[(top_label == "expansion") & (top_score >= 4.0) & (score_margin >= 0.0)] = "expansion"
+    insufficient = df[required_inputs].notna().sum(axis=1) < 6
+    label.loc[score_frame.isna().all(axis=1) | insufficient] = "unknown"
+
+    out = score_frame
+    out["macro_cycle"] = label
+    out["top_score"] = top_score
+    out["score_margin"] = score_margin
+    out["confidence"] = np.where(
+        label.eq("unknown"),
+        "low",
+        np.where(score_margin >= 2.0, "high", np.where(score_margin >= 1.0, "medium", "low")),
+    )
+    return out
+
+
+def build_current_environment_summary(
+    dataset: pd.DataFrame,
+    cycle_state: pd.DataFrame,
+    current_signal: dict[str, Any],
+) -> pd.DataFrame:
+    latest = dataset.iloc[-1]
+    latest_cycle = cycle_state.iloc[-1] if not cycle_state.empty else pd.Series(dtype=object)
+    combined_regime = "unknown"
+    latest_signal_label = str(current_signal.get("latest_signal", "unknown"))
+    if latest_signal_label == "risk_off_reserve_cash":
+        combined_regime = "risk_off"
+    elif latest_signal_label == "jump_in_full_allocation":
+        combined_regime = "risk_on"
+    elif latest_signal_label != "unknown":
+        combined_regime = "neutral"
+    summary = pd.DataFrame(
+        [
+            {
+                "as_of": dataset.index[-1],
+                "qqq_close": latest.get("qqq_close"),
+                "macro_cycle": latest_cycle.get("macro_cycle"),
+                "macro_cycle_confidence": latest_cycle.get("confidence"),
+                "expansion_score": latest_cycle.get("expansion_score"),
+                "late_cycle_score": latest_cycle.get("late_cycle_score"),
+                "contraction_score": latest_cycle.get("contraction_score"),
+                "buffett_indicator_proxy_level": latest.get("buffett_indicator_proxy_level"),
+                "buffett_indicator_proxy_rolling_z": latest.get("buffett_indicator_proxy_rolling_z"),
+                "cape_level": latest.get("cape_level"),
+                "cape_rolling_z": latest.get("cape_rolling_z"),
+                "latent_sentiment_index": latest.get("latent_sentiment_index"),
+                "external_shock_score": latest.get("external_shock_score"),
+                "walkforward_gmm_regime": current_signal.get("latest_walkforward_gmm_regime"),
+                "logistic_risk_off_probability": current_signal.get("latest_walkforward_risk_off_probability"),
+                "logistic_jump_in_probability": current_signal.get("latest_walkforward_jump_in_probability"),
+                "combined_market_regime": combined_regime,
+                "allocation_signal": latest_signal_label,
+                "target_equity_allocation": current_signal.get("latest_target_equity_allocation"),
+            }
+        ]
+    )
+    return summary
+
+
+def write_current_environment_report(out_dir: Path, summary: pd.DataFrame) -> None:
+    if summary.empty:
+        return
+    row = summary.iloc[0]
+    lines = [
+        "# Current Market Environment",
+        "",
+        f"- As of `{pd.Timestamp(row['as_of']).date()}` the macro-cycle classifier reads `{row['macro_cycle']}` with `{row['macro_cycle_confidence']}` confidence.",
+        f"- Expansion / late-cycle / contraction scores are `{row['expansion_score']:.0f}` / `{row['late_cycle_score']:.0f}` / `{row['contraction_score']:.0f}`.",
+        f"- The valuation backdrop remains `{feature_label('buffett_indicator_proxy_level')}` = `{fmt_num(row['buffett_indicator_proxy_level'], 4)}` and rolling z-score = `{fmt_num(row['buffett_indicator_proxy_rolling_z'], 2)}`.",
+        f"- Shiller CAPE is `{fmt_num(row['cape_level'], 2)}` with rolling z-score `{fmt_num(row['cape_rolling_z'], 2)}`.",
+        f"- The walk-forward model regime is `{row['combined_market_regime']}` with GMM = `{row['walkforward_gmm_regime']}`, risk-off probability = `{fmt_pct(row['logistic_risk_off_probability'])}`, jump-in probability = `{fmt_pct(row['logistic_jump_in_probability'])}`, and target equity allocation = `{fmt_pct(row['target_equity_allocation'])}`.",
+        "",
+        "## Interpretation",
+        "",
+        "- `expansion` means growth-sensitive, low-stress conditions with improving trend and easing inflation pressure.",
+        "- `late_cycle` means rich valuation, flatter curve, and sticky inflation even if price trend is still healthy.",
+        "- `contraction` means rising stress, weaker trend, and deteriorating growth or labor conditions.",
+        "- `transition` means the macro scoreboard is mixed and the cycle call should be treated with caution.",
+    ]
+    out_dir.joinpath("current_market_environment.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def newey_west_ols(y: pd.Series, x: pd.DataFrame, lags: int) -> pd.DataFrame:
@@ -1020,6 +1441,18 @@ def evaluate_models(
                     "spearman_pred_actual": _safe_spearman(pred, y_test),
                 }
             )
+            if model_name == "ridge":
+                reg = model.named_steps["ridgecv"]
+                for feature, coef in zip(features, reg.coef_):
+                    importance_rows.append(
+                        {
+                            "target": return_target,
+                            "model": model_name,
+                            "feature": feature,
+                            "importance_mean": float(coef),
+                            "importance_std": np.nan,
+                        }
+                    )
             if model_name == "random_forest":
                 perm = permutation_importance(
                     model,
@@ -1492,6 +1925,8 @@ def write_report(
     lines.append(f"- Daily aligned sample: `{dataset.index.min().date()}` to `{dataset.index.max().date()}`.")
     lines.append(f"- Main supervised regime horizon: `{target_horizon}` trading days.")
     lines.append(f"- CPI and unemployment are lagged by `{args.monthly_release_lag_days}` calendar days before forward fill.")
+    lines.append(f"- Nominal GDP is lagged by `{args.quarterly_release_lag_days}` calendar days before forward fill.")
+    lines.append(f"- The annual market-cap-to-GDP anchor is lagged by `{args.annual_release_lag_days}` calendar days before forward fill.")
     lines.append("- Shiller CAPE is treated as available on its stated observation date from the downloaded monthly table.")
     lines.append("- OLS impact tests use standardized features and Newey-West standard errors on month-end observations.")
     lines.append("- OLS impact tests drop high-VIF terms above `20` before significance scoring; the full VIF audit is still saved.")
@@ -1512,12 +1947,16 @@ def write_report(
     lines.append(f"- QQQ adjusted close: `{fmt_num(latest.get('qqq_close'), 2)}`")
     lines.append(f"- Full-sample descriptive GMM regime: `{latest.get('gmm_regime', 'unknown')}`")
     lines.append(f"- Walk-forward GMM regime used for allocation: `{current_signal.get('latest_walkforward_gmm_regime', 'unknown')}`")
+    lines.append(f"- Macro cycle classifier: `{current_signal.get('latest_macro_cycle', 'unknown')}` ({current_signal.get('latest_macro_cycle_confidence', 'low')} confidence)")
     lines.append(f"- Latent sentiment index: `{fmt_num(latest.get('latent_sentiment_index'), 2)}`")
     lines.append(f"- External shock score: `{fmt_num(latest.get('external_shock_score'), 2)}`")
+    lines.append(f"- Wilshire total-market proxy: `{fmt_num(latest.get('wilshire_level'), 2)}`")
+    lines.append(f"- Nominal GDP (lagged SAAR): `{fmt_num(latest.get('nominal_gdp_level'), 2)}`")
+    lines.append(f"- Wilshire / GDP valuation proxy: `{fmt_num(latest.get('buffett_indicator_proxy_level'), 4)}`")
+    lines.append(f"- Wilshire / GDP rolling z-score: `{fmt_num(latest.get('buffett_indicator_proxy_rolling_z'), 2)}`")
     lines.append(f"- Gold price proxy: `{fmt_num(latest.get('gold_level'), 2)}`")
     lines.append(f"- Shiller CAPE ratio: `{fmt_num(latest.get('cape_level'), 2)}`")
-    lines.append(f"- Market cap to GDP: `{fmt_num(latest.get('market_cap_to_gdp_level'), 2)}`")
-    lines.append(f"- Market cap to GDP 1Y drift: `{fmt_num(latest.get('market_cap_to_gdp_252d_drift'), 2)}`")
+    lines.append(f"- Official market cap to GDP anchor: `{fmt_num(latest.get('market_cap_to_gdp_anchor_level'), 2)}`")
     lines.append(f"- Logistic current risk-off probability: `{fmt_pct(current_signal.get('current_risk_off_target_probability'))}`")
     lines.append(f"- Logistic current jump-in probability: `{fmt_pct(current_signal.get('current_jump_in_target_probability'))}`")
     lines.append(f"- Research allocation label: `{current_signal.get('latest_signal', 'unknown')}`")
@@ -1611,6 +2050,11 @@ def write_report(
         "dca_backtest_metrics.csv",
         "dca_equity_curves.csv",
         "dca_allocations.csv",
+        "analysis_variable_inventory.csv",
+        "analysis_variable_inventory.md",
+        "macro_cycle_daily.csv",
+        "current_market_environment.csv",
+        "current_market_environment.md",
         "current_signal.json",
         "plots/",
     ]:
@@ -1620,8 +2064,10 @@ def write_report(
     lines.append("")
     lines.append("- Significance is historical association, not proof of causality.")
     lines.append("- FRED monthly macro data is not true point-in-time ALFRED vintage data; the release lag is a conservative approximation.")
+    lines.append("- FRED GDP is quarterly and the timing lag is still an approximation rather than a full point-in-time vintage release history.")
     lines.append("- Shiller CAPE comes from the downloadable Multpl table rather than a point-in-time vintage database.")
-    lines.append("- Market cap to GDP comes from the World Bank via FRED and is annual, so it acts as a slow valuation anchor rather than a timely macro release.")
+    lines.append("- The Wilshire / GDP valuation feature is a timely proxy for the Buffett indicator, not a direct total-market-cap series.")
+    lines.append("- The official market cap to GDP series comes from the World Bank via FRED and is annual, so it is kept as a slow anchor rather than a live timing feature.")
     lines.append("- Gold uses Yahoo Finance front-month futures, which is a liquid proxy but not a perfect spot series.")
     lines.append("- The black-box sentiment proxy is intentionally transparent enough to audit, but it is still a proxy.")
     lines.append("- DCA results depend on contribution timing, cash yield assumption, transaction cost, and thresholds.")
@@ -1647,6 +2093,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--qqq-refresh-start", default=DEFAULT_QQQ_REFRESH_START)
     parser.add_argument("--macro-refresh-start", default=DEFAULT_MACRO_REFRESH_START)
     parser.add_argument("--monthly-release-lag-days", type=int, default=45)
+    parser.add_argument("--quarterly-release-lag-days", type=int, default=45)
+    parser.add_argument("--annual-release-lag-days", type=int, default=365)
     parser.add_argument("--target-horizon", type=int, default=63)
     parser.add_argument("--test-size", type=float, default=0.30)
     parser.add_argument("--min-train-months", type=int, default=96)
@@ -1675,7 +2123,13 @@ def main() -> None:
 
     qqq = load_qqq(args.qqq_path, args.start, args.end)
     qqq_close = qqq["qqq_close"].copy()
-    macro = load_macro(args.macro_path, qqq.index, args.monthly_release_lag_days)
+    macro = load_macro(
+        args.macro_path,
+        qqq.index,
+        args.monthly_release_lag_days,
+        args.quarterly_release_lag_days,
+        args.annual_release_lag_days,
+    )
     stress, fred_status = load_stress_proxies(qqq.index, args.fred_cache_dir, refresh_fred)
     dataset = build_dataset(qqq, macro, stress, args.target_horizon)
     features = available_features(dataset, MODEL_FEATURES, min_non_na=252)
@@ -1697,6 +2151,8 @@ def main() -> None:
     model_metrics, feature_importance, current_signal = evaluate_models(
         sample, sample_features, args.target_horizon, args.test_size, args.random_state
     )
+    variable_inventory = build_variable_inventory(dataset)
+    cycle_state = classify_macro_cycle(dataset)
 
     risk_off_prob = walkforward_signal_probabilities(
         sample, sample_features, "risk_off_target", args.target_horizon, args.min_train_months, args.random_state
@@ -1761,6 +2217,14 @@ def main() -> None:
         current_signal["latest_walkforward_jump_in_probability"] = float(latest_signal["jump_in_probability"])
         current_signal["latest_walkforward_gmm_regime"] = str(latest_signal.get("gmm_regime", "unknown"))
         current_signal["latest_full_sample_gmm_regime"] = str(latest_signal.get("full_sample_gmm_regime", "unknown"))
+    if not cycle_state.empty:
+        latest_cycle = cycle_state.iloc[-1]
+        current_signal["latest_macro_cycle"] = str(latest_cycle.get("macro_cycle", "unknown"))
+        current_signal["latest_macro_cycle_confidence"] = str(latest_cycle.get("confidence", "low"))
+        current_signal["latest_macro_cycle_expansion_score"] = float(latest_cycle.get("expansion_score", np.nan))
+        current_signal["latest_macro_cycle_late_cycle_score"] = float(latest_cycle.get("late_cycle_score", np.nan))
+        current_signal["latest_macro_cycle_contraction_score"] = float(latest_cycle.get("contraction_score", np.nan))
+    current_environment = build_current_environment_summary(dataset, cycle_state, current_signal)
 
     dataset.to_csv(args.out_dir / "aligned_daily_dataset.csv", index_label="date")
     sample.to_csv(args.out_dir / "month_end_model_sample.csv", index_label="date")
@@ -1777,11 +2241,16 @@ def main() -> None:
     dca_table.to_csv(args.out_dir / "dca_backtest_metrics.csv", index=False)
     equity_curves.to_csv(args.out_dir / "dca_equity_curves.csv", index_label="date")
     allocations.to_csv(args.out_dir / "dca_allocations.csv", index_label="date")
+    cycle_state.to_csv(args.out_dir / "macro_cycle_daily.csv", index_label="date")
+    current_environment.to_csv(args.out_dir / "current_market_environment.csv", index=False)
+    write_variable_inventory(args.out_dir, variable_inventory)
+    write_current_environment_report(args.out_dir, current_environment)
     (args.out_dir / "current_signal.json").write_text(json.dumps(current_signal, indent=2, default=_json_default), encoding="utf-8")
 
     plot_heatmap(corr, plots_dir / "feature_correlation_heatmap.png", "Spearman feature interrelationship heatmap")
     plot_coefficients(impact, plots_dir / "ols_impact_63d.png", 63)
     plot_coefficients(impact, plots_dir / "ols_impact_252d.png", 252)
+    plot_feature_importance(feature_importance, plots_dir / "feature_importance_return_target.png", f"qqq_fwd_{args.target_horizon}d_return")
     plot_feature_importance(feature_importance, plots_dir / "feature_importance_risk_off.png", "risk_off_target")
     plot_feature_importance(feature_importance, plots_dir / "feature_importance_jump_in.png", "jump_in_target")
     plot_sentiment(dataset, plots_dir / "latent_sentiment_and_shocks.png")

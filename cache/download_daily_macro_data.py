@@ -4,7 +4,9 @@
 Series:
 - DXY: Yahoo Finance chart data for DX-Y.NYB (ICE U.S. Dollar Index)
 - Gold: Yahoo Finance chart data for GC=F (COMEX front-month gold futures)
+- Wilshire total-market proxy: Yahoo Finance chart data for ^FTW5000 or ^W5000
 - US2Y/US10Y/US30Y: FRED Treasury constant maturity yields
+- Nominal GDP: FRED quarterly U.S. gross domestic product, current dollars
 - WTI: FRED WTI Cushing crude oil spot price
 - CPI: FRED CPIAUCSL with derived month-over-month and year-over-year inflation
 - UNRATE: FRED civilian unemployment rate
@@ -21,6 +23,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 from typing import Any
+from urllib.parse import quote
 
 import pandas as pd
 import requests
@@ -54,6 +57,12 @@ FRED_SERIES = {
         "units": "USD per barrel",
         "combined_col": "wti_usd_per_bbl",
     },
+    "NOMINAL_GDP": {
+        "series_id": "GDP",
+        "name": "Gross Domestic Product",
+        "units": "billions of current dollars, seasonally adjusted annual rate",
+        "combined_col": "us_nominal_gdp_saar_bil",
+    },
     "CPI": {
         "series_id": "CPIAUCSL",
         "name": "Consumer Price Index for All Urban Consumers: All Items in U.S. City Average",
@@ -83,6 +92,8 @@ DXY_TICKER = "DX-Y.NYB"
 DXY_LABEL = "DXY"
 GOLD_TICKER = "GC=F"
 GOLD_LABEL = "GOLD"
+WILSHIRE_TICKERS = ["^FTW5000", "^W5000"]
+WILSHIRE_LABEL = "WILSHIRE_TOTAL_MARKET"
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
 MULTPL_SHILLER_CAPE_URL = "https://www.multpl.com/shiller-pe/table/by-month"
@@ -180,7 +191,7 @@ def fetch_yahoo_chart(
     end_dt = datetime(yahoo_end.year, yahoo_end.month, yahoo_end.day, tzinfo=timezone.utc)
     text = request_text(
         session,
-        YAHOO_CHART_URL.format(ticker=ticker),
+        YAHOO_CHART_URL.format(ticker=quote(ticker, safe="")),
         {
             "period1": int(start_dt.timestamp()),
             "period2": int(end_dt.timestamp()),
@@ -199,12 +210,12 @@ def fetch_yahoo_chart(
 
     timestamps = result.get("timestamp") or []
     indicators = result.get("indicators") or {}
-    quote = (indicators.get("quote") or [{}])[0]
+    quote_data = (indicators.get("quote") or [{}])[0]
     adjclose = (indicators.get("adjclose") or [{}])[0].get("adjclose")
 
     df = pd.DataFrame({"timestamp": timestamps})
     for col in ["open", "high", "low", "close", "volume"]:
-        values = quote.get(col)
+        values = quote_data.get(col)
         df[col] = values if values is not None else pd.NA
     df["adj_close"] = adjclose if adjclose is not None else pd.NA
     df["date"] = pd.to_datetime(df["timestamp"], unit="s", utc=True).dt.date
@@ -226,6 +237,19 @@ def fetch_dxy(session: requests.Session, start_date: date, end_date: date) -> pd
 
 def fetch_gold(session: requests.Session, start_date: date, end_date: date) -> pd.DataFrame:
     return fetch_yahoo_chart(session, GOLD_TICKER, GOLD_LABEL, start_date, end_date)
+
+
+def fetch_wilshire_total_market(session: requests.Session, start_date: date, end_date: date) -> pd.DataFrame:
+    last_error: Exception | None = None
+    for ticker in WILSHIRE_TICKERS:
+        try:
+            df = fetch_yahoo_chart(session, ticker, WILSHIRE_LABEL, start_date, end_date)
+            df["ticker"] = ticker
+            return df
+        except Exception as exc:
+            last_error = exc
+            print(f"  Wilshire fallback `{ticker}` failed: {exc}")
+    raise RuntimeError(f"Unable to download Wilshire total-market proxy from Yahoo: {last_error}") from last_error
 
 
 def fetch_shiller_cape(session: requests.Session, start_date: date, end_date: date) -> pd.DataFrame:
@@ -278,6 +302,9 @@ def main() -> None:
     gold = fetch_gold(session, start_date, end_date)
     save_table(gold, os.path.join(args.cache_dir, "GOLD_daily"))
     print_range("GOLD", gold, "close")
+    wilshire = fetch_wilshire_total_market(session, start_date, end_date)
+    save_table(wilshire, os.path.join(args.cache_dir, "WILSHIRE_TOTAL_MARKET_daily"))
+    print_range("WILSHIRE_TOTAL_MARKET", wilshire, "close")
     shiller_cape = fetch_shiller_cape(session, start_date, end_date)
     save_table(shiller_cape, os.path.join(args.cache_dir, "SHILLER_CAPE_monthly"))
     print_range("SHILLER_CAPE", shiller_cape, "value")
@@ -285,6 +312,11 @@ def main() -> None:
     combined = dxy[["date", "close"]].rename(columns={"close": "dxy_close"})
     combined = combined.merge(
         gold[["date", "close"]].rename(columns={"close": "gold_usd_per_oz"}),
+        on="date",
+        how="outer",
+    )
+    combined = combined.merge(
+        wilshire[["date", "close"]].rename(columns={"close": "wilshire_total_market_index"}),
         on="date",
         how="outer",
     )
@@ -304,9 +336,19 @@ def main() -> None:
         GOLD_LABEL: {
             "ticker": GOLD_TICKER,
             "source": "Yahoo Finance chart API",
-            "source_url": YAHOO_CHART_URL.format(ticker=GOLD_TICKER),
+            "source_url": YAHOO_CHART_URL.format(ticker=quote(GOLD_TICKER, safe="")),
             "combined_col": "gold_usd_per_oz",
             "units": "USD per ounce",
+        },
+        WILSHIRE_LABEL: {
+            "ticker_candidates": WILSHIRE_TICKERS,
+            "ticker_used": wilshire["ticker"].iloc[-1] if not wilshire.empty else None,
+            "source": "Yahoo Finance chart API",
+            "source_url": YAHOO_CHART_URL.format(
+                ticker=quote((wilshire["ticker"].iloc[-1] if not wilshire.empty else WILSHIRE_TICKERS[0]), safe="")
+            ),
+            "combined_col": "wilshire_total_market_index",
+            "units": "index level",
         },
         "SHILLER_CAPE": {
             "series_id": "SHILLER_CAPE_MULTPL",
@@ -336,7 +378,7 @@ def main() -> None:
         }
 
     combined = combined.sort_values("date").reset_index(drop=True)
-    value_columns = ["dxy_close", "gold_usd_per_oz", "shiller_cape_ratio"]
+    value_columns = ["dxy_close", "gold_usd_per_oz", "wilshire_total_market_index", "shiller_cape_ratio"]
     for config in FRED_SERIES.values():
         value_columns.append(config["combined_col"])
         value_columns.extend((config.get("derived_combined_cols") or {}).values())
@@ -358,10 +400,12 @@ def main() -> None:
             "Rows with no values in any combined data column are dropped from the combined table.",
             "Treasury yields, CPI inflation, unemployment, and market cap to GDP are percent; WTI is USD per barrel; gold is USD per ounce.",
             "CPI and unemployment are monthly FRED observations and are not forward-filled.",
+            "Nominal GDP is quarterly FRED GDP in current-dollar SAAR terms and is not forward-filled in the raw combined table.",
             "Market cap to GDP comes from the World Bank via FRED and is annual, so it moves slowly and updates with a long publication lag.",
             "CPI month-over-month and year-over-year inflation percentages are computed from CPIAUCSL.",
             "Shiller CAPE is scraped from Multpl's monthly table and kept on its stated observation date.",
             "Gold uses Yahoo Finance GC=F front-month futures, which is a practical proxy rather than a point-in-time spot fix.",
+            "Wilshire uses Yahoo Finance ^FTW5000 with ^W5000 fallback as a practical broad-U.S.-equity proxy.",
         ],
     }
     with open(os.path.join(args.cache_dir, "macro_daily_1999_metadata.json"), "w", encoding="utf-8") as fh:

@@ -7,6 +7,8 @@ This is a research audit, not investment advice or a live trading recommendation
 - Daily aligned sample: `1999-03-10` to `2026-04-07`.
 - Main supervised regime horizon: `63` trading days.
 - CPI and unemployment are lagged by `45` calendar days before forward fill.
+- Nominal GDP is lagged by `45` calendar days before forward fill.
+- The annual market-cap-to-GDP anchor is lagged by `365` calendar days before forward fill.
 - Shiller CAPE is treated as available on its stated observation date from the downloaded monthly table.
 - OLS impact tests use standardized features and Newey-West standard errors on month-end observations.
 - OLS impact tests drop high-VIF terms above `20` before significance scoring; the full VIF audit is still saved.
@@ -29,14 +31,18 @@ This is a research audit, not investment advice or a live trading recommendation
 - QQQ adjusted close: `588.59`
 - Full-sample descriptive GMM regime: `risk_on`
 - Walk-forward GMM regime used for allocation: `risk_off`
+- Macro cycle classifier: `expansion` (medium confidence)
 - Latent sentiment index: `-2.49`
 - External shock score: `0.93`
+- Wilshire total-market proxy: `66276.08`
+- Nominal GDP (lagged SAAR): `31442.48`
+- Wilshire / GDP valuation proxy: `2.1079`
+- Wilshire / GDP rolling z-score: `1.08`
 - Gold price proxy: `4657.10`
 - Shiller CAPE ratio: `39.20`
-- Market cap to GDP: `194.89`
-- Market cap to GDP 1Y drift: `0.00`
-- Logistic current risk-off probability: `18.1%`
-- Logistic current jump-in probability: `72.4%`
+- Official market cap to GDP anchor: `194.89`
+- Logistic current risk-off probability: `21.2%`
+- Logistic current jump-in probability: `79.2%`
 - Research allocation label: `risk_off_reserve_cash`
 - Research target equity allocation: `25.0%`
 
@@ -44,18 +50,18 @@ This is a research audit, not investment advice or a live trading recommendation
 
 | Horizon | Feature | Coef pp / 1 sd | p-value | q-value |
 |---:|---|---:|---:|---:|
-| 252 | cape_level | -28.68 | 0.0000 | 0.0000 |
-| 126 | cape_level | -15.95 | 0.0000 | 0.0000 |
-| 252 | vix_level | 13.05 | 0.0003 | 0.0037 |
-| 252 | qqq_sma222 | 11.58 | 0.0009 | 0.0069 |
-| 252 | nfci_level | -10.41 | 0.0017 | 0.0069 |
-| 252 | qqq_vs_sma200 | -10.39 | 0.0217 | 0.0523 |
-| 126 | market_cap_to_gdp_level | 9.58 | 0.0042 | 0.0303 |
-| 63 | cape_level | -9.01 | 0.0000 | 0.0001 |
-| 252 | unemployment_rate_pct | -8.98 | 0.0016 | 0.0069 |
-| 126 | vix_level | 7.80 | 0.0017 | 0.0166 |
-| 252 | t10y3m_level | -6.88 | 0.0015 | 0.0069 |
-| 63 | market_cap_to_gdp_level | 6.26 | 0.0106 | 0.0514 |
+| 252 | cape_level | -30.92 | 0.0000 | 0.0000 |
+| 126 | cape_level | -17.58 | 0.0000 | 0.0000 |
+| 252 | vix_level | 15.86 | 0.0000 | 0.0000 |
+| 252 | nfci_level | -13.59 | 0.0000 | 0.0000 |
+| 252 | qqq_sma222 | 13.04 | 0.0000 | 0.0000 |
+| 252 | unemployment_rate_pct | -11.55 | 0.0003 | 0.0015 |
+| 126 | vix_level | 10.75 | 0.0001 | 0.0011 |
+| 63 | cape_level | -9.84 | 0.0000 | 0.0000 |
+| 252 | qqq_vs_sma200 | -9.25 | 0.0418 | 0.0780 |
+| 252 | t10y3m_level | -9.05 | 0.0001 | 0.0008 |
+| 126 | nfci_level | -8.95 | 0.0002 | 0.0011 |
+| 126 | qqq_sma222 | 7.41 | 0.0000 | 0.0006 |
 
 ## Sentiment Black-Box Tests
 
@@ -73,12 +79,12 @@ This is a research audit, not investment advice or a live trading recommendation
 
 | Target | Model | Train N | Test N | AUC/R2 | MAE/Brier | Spearman/Recall |
 |---|---|---:|---:|---:|---:|---:|
-| qqq_fwd_63d_return | ridge | 222 | 97 | -24.239 | 0.350 | 0.133 |
-| qqq_fwd_63d_return | random_forest | 222 | 97 | -0.034 | 0.078 | 0.134 |
-| risk_off_target | logistic | 222 | 97 | 0.512 | 0.521 | 0.808 |
-| risk_off_target | random_forest | 222 | 97 | 0.616 | 0.199 | 0.115 |
-| jump_in_target | logistic | 222 | 97 | 0.524 | 0.362 | 0.171 |
-| jump_in_target | random_forest | 222 | 97 | 0.616 | 0.239 | 0.098 |
+| qqq_fwd_63d_return | ridge | 222 | 97 | -12.321 | 0.249 | 0.136 |
+| qqq_fwd_63d_return | random_forest | 222 | 97 | -0.250 | 0.084 | 0.038 |
+| risk_off_target | logistic | 222 | 97 | 0.542 | 0.520 | 0.846 |
+| risk_off_target | random_forest | 222 | 97 | 0.593 | 0.210 | 0.269 |
+| jump_in_target | logistic | 222 | 97 | 0.518 | 0.326 | 0.341 |
+| jump_in_target | random_forest | 222 | 97 | 0.583 | 0.246 | 0.073 |
 
 ## DCA Backtest
 
@@ -86,7 +92,7 @@ This is a research audit, not investment advice or a live trading recommendation
 |---|---:|---:|---:|---:|---:|---:|
 | Plain DCA 100% QQQ | $1,704,911 | $237,000 | 619.4% | 17.5% | -39.1% | 100.0% |
 | Static 70/30 DCA | $927,741 | $237,000 | 291.5% | 12.5% | -26.1% | 70.1% |
-| ML Regime DCA Cash Reserve | $547,247 | $237,000 | 130.9% | 7.9% | -14.3% | 46.1% |
+| ML Regime DCA Cash Reserve | $527,509 | $237,000 | 122.6% | 7.6% | -12.7% | 46.0% |
 
 ## Files
 
@@ -105,6 +111,11 @@ This is a research audit, not investment advice or a live trading recommendation
 - `dca_backtest_metrics.csv`
 - `dca_equity_curves.csv`
 - `dca_allocations.csv`
+- `analysis_variable_inventory.csv`
+- `analysis_variable_inventory.md`
+- `macro_cycle_daily.csv`
+- `current_market_environment.csv`
+- `current_market_environment.md`
 - `current_signal.json`
 - `plots/`
 
@@ -112,8 +123,10 @@ This is a research audit, not investment advice or a live trading recommendation
 
 - Significance is historical association, not proof of causality.
 - FRED monthly macro data is not true point-in-time ALFRED vintage data; the release lag is a conservative approximation.
+- FRED GDP is quarterly and the timing lag is still an approximation rather than a full point-in-time vintage release history.
 - Shiller CAPE comes from the downloadable Multpl table rather than a point-in-time vintage database.
-- Market cap to GDP comes from the World Bank via FRED and is annual, so it acts as a slow valuation anchor rather than a timely macro release.
+- The Wilshire / GDP valuation feature is a timely proxy for the Buffett indicator, not a direct total-market-cap series.
+- The official market cap to GDP series comes from the World Bank via FRED and is annual, so it is kept as a slow anchor rather than a live timing feature.
 - Gold uses Yahoo Finance front-month futures, which is a liquid proxy but not a perfect spot series.
 - The black-box sentiment proxy is intentionally transparent enough to audit, but it is still a proxy.
 - DCA results depend on contribution timing, cash yield assumption, transaction cost, and thresholds.

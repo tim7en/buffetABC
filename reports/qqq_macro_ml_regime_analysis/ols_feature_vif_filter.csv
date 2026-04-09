@@ -1,4 +1,5 @@
 dropped_feature,vif_at_drop,max_vif_threshold,remaining_feature_count
-qqq_sma65,422.90971401622596,20.0,31
-hy_oas_level,32.66102688438591,20.0,30
-curve_10y2y_level,21.80125275175205,20.0,29
+qqq_sma65,503.2481350914656,20.0,31
+buffett_indicator_proxy_level,119.58315344952857,20.0,30
+hy_oas_level,31.35014235698852,20.0,29
+curve_10y2y_level,23.508116274288728,20.0,28

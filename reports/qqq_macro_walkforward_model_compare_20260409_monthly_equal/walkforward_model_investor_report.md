@@ -24,10 +24,10 @@ These scores come from a purged chronological train/test split on month-end samp
 
 | Target | Model | AUC | Average Precision | Brier | Balanced Accuracy @ 50% |
 |---|---|---:|---:|---:|---:|
-| Jump-in | Logistic | 0.518 | 0.479 | 0.338 | 0.554 |
-| Jump-in | Random Forest | 0.615 | 0.531 | 0.242 | 0.525 |
-| Risk-off | Logistic | 0.541 | 0.282 | 0.522 | 0.569 |
-| Risk-off | Random Forest | 0.603 | 0.376 | 0.205 | 0.564 |
+| Jump-in | Logistic | 0.524 | 0.457 | 0.362 | 0.523 |
+| Jump-in | Random Forest | 0.616 | 0.528 | 0.239 | 0.504 |
+| Risk-off | Logistic | 0.512 | 0.267 | 0.521 | 0.545 |
+| Risk-off | Random Forest | 0.616 | 0.359 | 0.199 | 0.522 |
 
 ## Threshold Check
 
@@ -43,52 +43,53 @@ The logistic model gives direction: a positive coefficient means a higher readin
 
 | Logistic coefficients pushing odds higher | Coef |
 |---|---:|
-| 10Y Treasury yield level | 1.807 |
-| High-yield spread 3-month change | 1.330 |
-| High-yield spread | 1.238 |
-| QQQ 222-day trend level | 1.160 |
-| 10Y-3M curve | 0.868 |
+| 10Y Treasury yield level | 1.788 |
+| High-yield spread | 1.110 |
+| High-yield spread 3-month change | 1.098 |
+| QQQ 222-day trend level | 1.022 |
+| 10Y-3M curve | 0.628 |
 
 | Logistic coefficients pushing odds lower | Coef |
 |---|---:|
-| VIX level | -1.753 |
-| Latent sentiment | -0.961 |
-| QQQ 1-year drawdown | -0.932 |
-| US dollar 3-month return | -0.167 |
-| Inflation 3-month change | -0.039 |
+| VIX level | -1.471 |
+| Market cap to GDP 1-year drift | -0.871 |
+| Latent sentiment | -0.707 |
+| Financial conditions 3-month change | -0.621 |
+| US dollar 3-month return | -0.179 |
 
 | Strongest random forest features | Importance |
 |---|---:|
-| Inflation YoY | 0.0303 |
-| Shiller CAPE | 0.0253 |
-| Inflation 3-month change | 0.0245 |
-| Unemployment rate | 0.0164 |
-| Latent sentiment | 0.0131 |
+| Market cap to GDP 1-year drift | 0.0462 |
+| Shiller CAPE | 0.0296 |
+| Inflation YoY | 0.0260 |
+| Inflation 3-month change | 0.0165 |
+| QQQ 1-month realized volatility | 0.0157 |
 
 ### Jump-in
 
 | Logistic coefficients pushing odds higher | Coef |
 |---|---:|
-| VIX level | 2.220 |
-| QQQ 1-year drawdown | 0.646 |
-| QQQ 65-day trend level | 0.630 |
-| Latent sentiment | 0.214 |
+| VIX level | 2.176 |
+| Market cap to GDP | 1.258 |
+| qqq volume | 0.465 |
+| QQQ 1-year drawdown | 0.345 |
+| High-yield spread | 0.109 |
 
 | Logistic coefficients pushing odds lower | Coef |
 |---|---:|
-| QQQ 222-day trend level | -0.949 |
-| High-yield spread 3-month change | -0.926 |
-| Financial conditions level | -0.625 |
-| Unemployment rate | -0.612 |
-| 10Y Treasury yield level | -0.609 |
+| QQQ 222-day trend level | -1.168 |
+| 10Y Treasury yield level | -0.837 |
+| High-yield spread 3-month change | -0.834 |
+| QQQ feedback | -0.624 |
+| QQQ 1-month realized volatility | -0.447 |
 
 | Strongest random forest features | Importance |
 |---|---:|
-| QQQ vs 200-day trend | 0.0323 |
-| Inflation YoY | 0.0291 |
-| QQQ 1-year drawdown | 0.0194 |
-| VIX level | 0.0164 |
-| QQQ 1-month return | 0.0132 |
+| QQQ vs 200-day trend | 0.0291 |
+| Inflation YoY | 0.0225 |
+| VIX level | 0.0223 |
+| QQQ 1-year drawdown | 0.0159 |
+| Financial conditions level | 0.0151 |
 
 ## Practical Take
 

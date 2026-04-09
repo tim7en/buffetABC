@@ -66,8 +66,12 @@ FEATURE_LABELS = {
     "wti_63d_return": "Oil 3-month return",
     "cape_level": "Shiller CAPE",
     "cape_63d_change": "Shiller CAPE 3-month change",
-    "market_cap_to_gdp_level": "Market cap to GDP",
-    "market_cap_to_gdp_252d_drift": "Market cap to GDP 1-year drift",
+    "buffett_indicator_proxy_level": "Wilshire / GDP valuation proxy",
+    "buffett_indicator_proxy_252d_drift": "Wilshire / GDP 1-year drift",
+    "buffett_indicator_proxy_rolling_z": "Wilshire / GDP rolling z-score",
+    "wilshire_level": "Wilshire total-market index",
+    "nominal_gdp_level": "Nominal GDP",
+    "market_cap_to_gdp_anchor_level": "Official market cap to GDP anchor",
     "cpi_yoy_pct": "Inflation YoY",
     "cpi_yoy_3m_change_pp": "Inflation 3-month change",
     "unemployment_rate_pct": "Unemployment rate",
@@ -82,6 +86,7 @@ FEATURE_LABELS = {
 }
 
 TARGET_LABELS = {
+    "qqq_fwd_63d_return": "63-day QQQ return",
     "risk_off_target": "Risk-off",
     "jump_in_target": "Jump-in",
 }
@@ -323,74 +328,107 @@ def feature_label(feature: str) -> str:
 
 
 def build_feature_importance_table(feature_importance: pd.DataFrame, target: str) -> pd.DataFrame:
+    if target == "qqq_fwd_63d_return":
+        signed_model = "ridge"
+        unsigned_model = "random_forest"
+        signed_col = "ridge_coef"
+        unsigned_col = "random_forest_permutation_importance"
+    else:
+        signed_model = "logistic"
+        unsigned_model = "random_forest"
+        signed_col = "logistic_coef"
+        unsigned_col = "random_forest_permutation_importance"
+
     data = feature_importance[
         feature_importance["target"].eq(target)
-        & feature_importance["model"].isin(["logistic", "random_forest"])
+        & feature_importance["model"].isin([signed_model, unsigned_model])
     ].copy()
     if data.empty:
         return pd.DataFrame()
 
     logistic = (
-        data[data["model"] == "logistic"][["feature", "importance_mean"]]
-        .rename(columns={"importance_mean": "logistic_coef"})
+        data[data["model"] == signed_model][["feature", "importance_mean"]]
+        .rename(columns={"importance_mean": signed_col})
         .copy()
     )
-    logistic["logistic_abs_coef"] = logistic["logistic_coef"].abs()
+    logistic["signed_abs_coef"] = logistic[signed_col].abs()
 
     random_forest = (
-        data[data["model"] == "random_forest"][["feature", "importance_mean", "importance_std"]]
+        data[data["model"] == unsigned_model][["feature", "importance_mean", "importance_std"]]
         .rename(
             columns={
-                "importance_mean": "random_forest_permutation_importance",
+                "importance_mean": unsigned_col,
                 "importance_std": "random_forest_importance_std",
             }
         )
         .copy()
     )
 
-    selected = set(logistic.nlargest(10, "logistic_abs_coef")["feature"])
+    selected = set(logistic.nlargest(10, "signed_abs_coef")["feature"])
     selected.update(
-        random_forest.nlargest(10, "random_forest_permutation_importance")["feature"].tolist()
+        random_forest.nlargest(10, unsigned_col)["feature"].tolist()
     )
 
     table = pd.merge(logistic, random_forest, on="feature", how="outer")
     table = table[table["feature"].isin(selected)].copy()
     table["feature_label"] = table["feature"].map(feature_label)
-    table["logistic_driver"] = np.where(
-        table["logistic_coef"] > 0.0,
+    table["signed_driver"] = np.where(
+        table[signed_col] > 0.0,
         "Higher reading raises event odds",
-        np.where(table["logistic_coef"] < 0.0, "Higher reading lowers event odds", "Neutral"),
+        np.where(
+            table[signed_col] < 0.0,
+            "Higher reading lowers outcome",
+            "Neutral",
+        ),
     )
-    table["rf_rank_score"] = table["random_forest_permutation_importance"].fillna(-np.inf)
+    if target == "qqq_fwd_63d_return":
+        table["signed_driver"] = np.where(
+            table[signed_col] > 0.0,
+            "Higher reading lifts forward return",
+            np.where(table[signed_col] < 0.0, "Higher reading hurts forward return", "Neutral"),
+        )
+    else:
+        table["signed_driver"] = np.where(
+            table[signed_col] > 0.0,
+            "Higher reading raises event odds",
+            np.where(table[signed_col] < 0.0, "Higher reading lowers event odds", "Neutral"),
+        )
+    table["rf_rank_score"] = table[unsigned_col].fillna(-np.inf)
     table["combined_rank"] = (
-        table["logistic_abs_coef"].fillna(0.0).rank(ascending=False, method="dense")
+        table["signed_abs_coef"].fillna(0.0).rank(ascending=False, method="dense")
         + table["rf_rank_score"].rank(ascending=False, method="dense")
     )
     return table.sort_values(
-        ["combined_rank", "logistic_abs_coef", "random_forest_permutation_importance"],
+        ["combined_rank", "signed_abs_coef", unsigned_col],
         ascending=[True, False, False],
     )[
         [
             "feature",
             "feature_label",
-            "logistic_coef",
-            "logistic_abs_coef",
-            "logistic_driver",
-            "random_forest_permutation_importance",
+            signed_col,
+            "signed_abs_coef",
+            "signed_driver",
+            unsigned_col,
             "random_forest_importance_std",
         ]
     ]
 
 
 def plot_feature_importance_compare(feature_importance: pd.DataFrame, target: str, out_path: Path) -> None:
+    if target == "qqq_fwd_63d_return":
+        signed_model = "ridge"
+        left_title = "ridge coefficients"
+    else:
+        signed_model = "logistic"
+        left_title = "logistic coefficients"
     data = feature_importance[
         feature_importance["target"].eq(target)
-        & feature_importance["model"].isin(["logistic", "random_forest"])
+        & feature_importance["model"].isin([signed_model, "random_forest"])
     ].copy()
     if data.empty:
         return
 
-    logistic = data[data["model"] == "logistic"].copy()
+    logistic = data[data["model"] == signed_model].copy()
     logistic["abs_importance"] = logistic["importance_mean"].abs()
     logistic = logistic.nlargest(10, "abs_importance").sort_values("importance_mean")
 
@@ -410,7 +448,7 @@ def plot_feature_importance_compare(feature_importance: pd.DataFrame, target: st
         color=left_colors,
     )
     ax_left.axvline(0.0, color="#111827", linewidth=1.0)
-    ax_left.set_title(f"{TARGET_LABELS.get(target, target)}: logistic coefficients")
+    ax_left.set_title(f"{TARGET_LABELS.get(target, target)}: {left_title}")
     ax_left.set_xlabel("Signed coefficient")
     ax_left.grid(alpha=0.2, axis="x")
 
@@ -522,6 +560,31 @@ def write_investor_report(
         ]
     )
 
+    return_table = build_feature_importance_table(feature_importance, "qqq_fwd_63d_return")
+    if not return_table.empty:
+        top_positive = return_table[return_table["ridge_coef"] > 0.0].nlargest(5, "ridge_coef")
+        top_negative = return_table[return_table["ridge_coef"] < 0.0].nsmallest(5, "ridge_coef")
+        top_rf = return_table.nlargest(5, "random_forest_permutation_importance")
+        lines.extend(
+            [
+                "## What Drives Forward QQQ Returns",
+                "",
+                "| Ridge features linked to stronger returns | Coef |",
+                "|---|---:|",
+            ]
+        )
+        for _, row in top_positive.iterrows():
+            lines.append(f"| {row['feature_label']} | {row['ridge_coef']:.3f} |")
+        lines.extend(["", "| Ridge features linked to weaker returns | Coef |", "|---|---:|"])
+        for _, row in top_negative.iterrows():
+            lines.append(f"| {row['feature_label']} | {row['ridge_coef']:.3f} |")
+        lines.extend(["", "| Strongest random forest return features | Importance |", "|---|---:|"])
+        for _, row in top_rf.iterrows():
+            lines.append(
+                f"| {row['feature_label']} | {row['random_forest_permutation_importance']:.4f} |"
+            )
+        lines.append("")
+
     for target in ["risk_off_target", "jump_in_target"]:
         table = build_feature_importance_table(feature_importance, target)
         if table.empty:
@@ -561,6 +624,7 @@ def write_investor_report(
             "",
             "- `walkforward_model_validation_metrics.csv`: purged validation scores",
             "- `walkforward_model_feature_importance.csv`: raw model feature weights and permutation importance",
+            "- `walkforward_feature_importance_compare_returns.png`: forward-return feature comparison chart",
             "- `walkforward_feature_importance_compare_risk_off.png`: risk-off feature comparison chart",
             "- `walkforward_feature_importance_compare_jump_in.png`: jump-in feature comparison chart",
             "- `walkforward_logistic_regimes_full_common_window.png`: logistic regime chart on QQQ",
@@ -908,17 +972,22 @@ def main() -> None:
     for window in window_starts:
         plot_model_compare_equity(curves, args.out_dir / f"walkforward_model_compare_equity_{window}.png", window)
         plot_model_compare_drawdowns(curves, args.out_dir / f"walkforward_model_compare_drawdown_{window}.png", window)
-    for target in ["risk_off_target", "jump_in_target"]:
+    for target in ["qqq_fwd_63d_return", "risk_off_target", "jump_in_target"]:
         table = build_feature_importance_table(feature_importance, target)
         if not table.empty:
             table.to_csv(
                 args.out_dir / f"walkforward_model_feature_importance_compare_{target}.csv",
                 index=False,
             )
+            plot_name = (
+                "walkforward_feature_importance_compare_returns.png"
+                if target == "qqq_fwd_63d_return"
+                else f"walkforward_feature_importance_compare_{target.replace('_target', '')}.png"
+            )
             plot_feature_importance_compare(
                 feature_importance,
                 target,
-                args.out_dir / f"walkforward_feature_importance_compare_{target.replace('_target', '')}.png",
+                args.out_dir / plot_name,
             )
 
     if "logistic" in model_signals:

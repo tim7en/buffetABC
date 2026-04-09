@@ -1,0 +1,47 @@
+variable,label,role,source,input_frequency,availability_treatment,construction,used_in_supervised_models,used_in_gmm,used_in_cycle_classifier,non_null_observations,first_valid_date,last_valid_date
+market_cap_to_gdp_anchor_level,Official market cap to GDP anchor,base reference series,World Bank / FRED market cap to GDP,annual input aligned to daily,"lagged annual release, then forward-filled on trading days",level,False,False,False,6604,2000-01-03,2026-04-07
+wilshire_level,Wilshire total-market index,base reference series,Yahoo Wilshire total-market proxy + FRED GDP,daily,same-day daily market observation,level,False,False,False,6811,1999-03-10,2026-04-07
+nominal_gdp_level,Nominal GDP,base reference series,FRED GDP,quarterly input aligned to daily,"lagged quarterly GDP release, then forward-filled on trading days",level,False,False,False,6811,1999-03-10,2026-04-07
+qqq_feedback_score,QQQ feedback score,composite model input,QQQ daily parquet,daily,same-day composite from lag-safe inputs,composite score,True,False,False,6497,2000-06-06,2026-04-07
+external_shock_score,External shock score,composite model input,Composite from aligned market and macro features,daily composite,same-day composite from lag-safe inputs,composite score,True,True,False,6539,2000-04-05,2026-04-07
+latent_sentiment_index,Latent sentiment,composite model input,Composite from aligned market and macro features,daily composite,same-day composite from lag-safe inputs,composite index,True,True,True,6435,2000-09-01,2026-04-07
+market_cap_to_gdp_anchor_252d_drift,Market Cap To Gdp Anchor 252D Drift,diagnostic feature,World Bank / FRED market cap to GDP,annual input aligned to daily,"lagged annual release, then forward-filled on trading days",trend / drift over lookback window,False,False,False,6352,2001-01-02,2026-04-07
+dxy_level,Dxy Level,diagnostic feature,Yahoo DXY,daily,same-day daily market observation,level,False,False,False,6811,1999-03-10,2026-04-07
+gold_level,Gold Level,diagnostic feature,Yahoo GC=F gold futures,daily,same-day daily market observation,level,False,False,False,6437,2000-08-30,2026-04-07
+qqq_close,Qqq Close,diagnostic feature,QQQ daily parquet,daily,same-day daily market observation,derived feature,False,False,False,6811,1999-03-10,2026-04-07
+us2y_level,Us2Y Level,diagnostic feature,FRED Treasury yields,daily,same-day daily market observation,level,False,False,False,6811,1999-03-10,2026-04-07
+us30y_level,Us30Y Level,diagnostic feature,FRED Treasury yields,daily,same-day daily market observation,level,False,False,False,6811,1999-03-10,2026-04-07
+wti_level,Wti Level,diagnostic feature,FRED WTI,daily,same-day daily market observation,level,False,False,False,6811,1999-03-10,2026-04-07
+cape_rolling_z,Shiller CAPE rolling z-score,diagnostic feature,Multpl Shiller CAPE,monthly input aligned to daily,market-based monthly observation forward-filled on trading days,rolling z-score,False,False,True,6560,2000-03-07,2026-04-07
+cpi_mom_pct,Cpi Mom Pct,diagnostic feature,FRED CPI,monthly input aligned to daily,"lagged monthly release, then forward-filled on trading days",derived feature,False,False,False,6811,1999-03-10,2026-04-07
+buffett_indicator_proxy_63d_change,Buffett Indicator Proxy 63D Change,diagnostic feature,Yahoo Wilshire total-market proxy + FRED GDP,quarterly input aligned to daily,"lagged quarterly GDP release, then forward-filled on trading days",change over lookback window,False,False,False,6748,1999-06-09,2026-04-07
+buffett_indicator_proxy_rolling_z,Wilshire / GDP rolling z-score,diagnostic feature,Yahoo Wilshire total-market proxy + FRED GDP,quarterly input aligned to daily,"lagged quarterly GDP release, then forward-filled on trading days",rolling z-score,False,False,True,6560,2000-03-07,2026-04-07
+curve_10y2y_level,Yield curve 10Y-2Y,model feature,FRED Treasury yields,daily,same-day daily market observation,level,True,True,True,6811,1999-03-10,2026-04-07
+dxy_63d_return,US dollar 3-month return,model feature,Yahoo DXY,daily,same-day daily market observation,percent return,True,True,False,6748,1999-06-09,2026-04-07
+gold_63d_return,Gold 3-month return,model feature,Yahoo GC=F gold futures,daily,same-day daily market observation,percent return,True,True,False,6374,2000-11-29,2026-04-07
+hy_oas_63d_change_pp,High-yield spread 3-month change,model feature,FRED BAMLH0A0HYM2,daily,same-day daily market observation,change over lookback window,True,False,False,6748,1999-06-09,2026-04-07
+hy_oas_level,High-yield spread,model feature,FRED BAMLH0A0HYM2,daily,same-day daily market observation,level,True,True,True,6811,1999-03-10,2026-04-07
+nfci_63d_change,Financial conditions 3-month change,model feature,FRED NFCI,daily,same-day daily market observation,change over lookback window,True,False,False,6746,1999-06-11,2026-04-07
+nfci_level,Financial conditions level,model feature,FRED NFCI,daily,same-day daily market observation,level,True,True,True,6809,1999-03-12,2026-04-07
+qqq_21d_return,QQQ 1-month return,model feature,QQQ daily parquet,daily,same-day daily market observation,percent return,True,False,False,6790,1999-04-09,2026-04-07
+qqq_63d_return,QQQ 3-month return,model feature,QQQ daily parquet,daily,same-day daily market observation,percent return,True,True,False,6748,1999-06-09,2026-04-07
+qqq_drawdown_252d,QQQ 1-year drawdown,model feature,QQQ daily parquet,daily,same-day daily market observation,drawdown,True,False,True,6749,1999-06-08,2026-04-07
+qqq_realized_vol_21d,QQQ 1-month realized volatility,model feature,QQQ daily parquet,daily,same-day daily market observation,realized volatility,True,True,False,6790,1999-04-09,2026-04-07
+qqq_sma222,QQQ 222-day trend level,model feature,QQQ daily parquet,daily,same-day daily market observation,derived feature,True,True,False,6590,2000-01-24,2026-04-07
+qqq_sma65,QQQ 65-day trend level,model feature,QQQ daily parquet,daily,same-day daily market observation,derived feature,True,True,False,6747,1999-06-10,2026-04-07
+qqq_volume,QQQ volume,model feature,QQQ daily parquet,daily,same-day daily market observation,derived feature,True,True,False,6811,1999-03-10,2026-04-07
+qqq_vs_sma200,QQQ vs 200-day trend,model feature,QQQ daily parquet,daily,same-day daily market observation,derived feature,True,True,True,6612,1999-12-21,2026-04-07
+t10y3m_level,10Y-3M curve,model feature,FRED T10Y3M,daily,same-day daily market observation,level,True,False,False,6811,1999-03-10,2026-04-07
+us10y_63d_change_pp,10Y yield 3-month change,model feature,FRED Treasury yields,daily,same-day daily market observation,change over lookback window,True,True,False,6748,1999-06-09,2026-04-07
+us10y_level,10Y Treasury yield level,model feature,FRED Treasury yields,daily,same-day daily market observation,level,True,False,False,6811,1999-03-10,2026-04-07
+vix_21d_change,VIX 1-month change,model feature,FRED VIXCLS,daily,same-day daily market observation,change over lookback window,True,False,False,6790,1999-04-09,2026-04-07
+vix_level,VIX level,model feature,FRED VIXCLS,daily,same-day daily market observation,level,True,True,True,6811,1999-03-10,2026-04-07
+wti_63d_return,Oil 3-month return,model feature,FRED WTI,daily,same-day daily market observation,percent return,True,True,False,6748,1999-06-09,2026-04-07
+cape_63d_change,Shiller CAPE 3-month change,model feature,Multpl Shiller CAPE,monthly input aligned to daily,market-based monthly observation forward-filled on trading days,change over lookback window,True,False,False,6748,1999-06-09,2026-04-07
+cape_level,Shiller CAPE,model feature,Multpl Shiller CAPE,monthly input aligned to daily,market-based monthly observation forward-filled on trading days,level,True,True,False,6811,1999-03-10,2026-04-07
+cpi_yoy_3m_change_pp,Inflation 3-month change,model feature,FRED CPI,monthly input aligned to daily,"lagged monthly release, then forward-filled on trading days",change over lookback window,True,False,True,6748,1999-06-09,2026-04-07
+cpi_yoy_pct,Inflation YoY,model feature,FRED CPI,monthly input aligned to daily,"lagged monthly release, then forward-filled on trading days",derived feature,True,True,True,6811,1999-03-10,2026-04-07
+unemployment_6m_change_pp,Unemployment 6-month change,model feature,FRED UNRATE,monthly input aligned to daily,"lagged monthly release, then forward-filled on trading days",change over lookback window,True,False,True,6685,1999-09-08,2026-04-07
+unemployment_rate_pct,Unemployment rate,model feature,FRED UNRATE,monthly input aligned to daily,"lagged monthly release, then forward-filled on trading days",derived feature,True,True,True,6811,1999-03-10,2026-04-07
+buffett_indicator_proxy_252d_drift,Wilshire / GDP 1-year drift,model feature,Yahoo Wilshire total-market proxy + FRED GDP,quarterly input aligned to daily,"lagged quarterly GDP release, then forward-filled on trading days",trend / drift over lookback window,True,True,False,6559,2000-03-08,2026-04-07
+buffett_indicator_proxy_level,Wilshire / GDP valuation proxy,model feature,Yahoo Wilshire total-market proxy + FRED GDP,quarterly input aligned to daily,"lagged quarterly GDP release, then forward-filled on trading days",level,True,True,False,6811,1999-03-10,2026-04-07
