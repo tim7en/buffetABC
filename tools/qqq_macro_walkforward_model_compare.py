@@ -29,6 +29,8 @@ MODEL_LABELS = {
     "gmm": "GMM",
     "logistic": "Logistic",
     "random_forest": "Random Forest",
+    "ensemble_blend": "Ensemble Blend",
+    "ensemble_majority": "Ensemble Majority",
 }
 
 MODEL_COLORS = {
@@ -38,6 +40,10 @@ MODEL_COLORS = {
     ("logistic", 3): "#8c564b",
     ("random_forest", 2): "#17becf",
     ("random_forest", 3): "#ff7f0e",
+    ("ensemble_blend", 2): "#0f766e",
+    ("ensemble_blend", 3): "#115e59",
+    ("ensemble_majority", 2): "#2563eb",
+    ("ensemble_majority", 3): "#1d4ed8",
 }
 
 REGIME_FILL_COLORS = {
@@ -242,6 +248,118 @@ def monthly_signal_to_daily(monthly_signal: pd.Series, daily_index: pd.DatetimeI
     return daily.shift(1)
 
 
+def regime_month_end_from_daily(frame: pd.DataFrame, column: str, label: str) -> pd.DataFrame:
+    valid = frame.dropna(subset=[column]).copy()
+    if valid.empty:
+        return pd.DataFrame(columns=["model_name", "regime"])
+    out = valid.groupby(valid.index.to_period("M"), sort=True).tail(1)[[column]].rename(columns={column: "regime"})
+    out["model_name"] = label
+    return out[["model_name", "regime"]]
+
+
+def build_probability_blend_regimes(
+    logistic_monthly: pd.DataFrame,
+    random_forest_monthly: pd.DataFrame,
+    *,
+    risk_off_threshold: float,
+    jump_in_threshold: float,
+) -> pd.DataFrame:
+    logistic = logistic_monthly[
+        ["risk_off_probability", "jump_in_probability", "train_start", "train_end"]
+    ].rename(
+        columns={
+            "risk_off_probability": "logistic_risk_off_probability",
+            "jump_in_probability": "logistic_jump_in_probability",
+            "train_start": "logistic_train_start",
+            "train_end": "logistic_train_end",
+        }
+    )
+    random_forest = random_forest_monthly[
+        ["risk_off_probability", "jump_in_probability", "train_start", "train_end"]
+    ].rename(
+        columns={
+            "risk_off_probability": "random_forest_risk_off_probability",
+            "jump_in_probability": "random_forest_jump_in_probability",
+            "train_start": "random_forest_train_start",
+            "train_end": "random_forest_train_end",
+        }
+    )
+    probability_columns = [
+        "logistic_risk_off_probability",
+        "logistic_jump_in_probability",
+        "random_forest_risk_off_probability",
+        "random_forest_jump_in_probability",
+    ]
+    joined = logistic.join(random_forest, how="inner").dropna(subset=probability_columns)
+    out = pd.DataFrame(index=joined.index)
+    out["model_name"] = "ensemble_blend"
+    out["risk_off_probability"] = joined[
+        ["logistic_risk_off_probability", "random_forest_risk_off_probability"]
+    ].mean(axis=1)
+    out["jump_in_probability"] = joined[
+        ["logistic_jump_in_probability", "random_forest_jump_in_probability"]
+    ].mean(axis=1)
+    out["regime"] = out.apply(
+        lambda row: regime_from_probabilities(
+            float(row["risk_off_probability"]),
+            float(row["jump_in_probability"]),
+            risk_off_threshold,
+            jump_in_threshold,
+        ),
+        axis=1,
+    )
+    out["train_start"] = joined[["logistic_train_start", "random_forest_train_start"]].min(axis=1)
+    out["train_end"] = joined[["logistic_train_end", "random_forest_train_end"]].max(axis=1)
+    out["train_n_risk_off"] = np.nan
+    out["train_n_jump_in"] = np.nan
+    return out[
+        [
+            "model_name",
+            "regime",
+            "risk_off_probability",
+            "jump_in_probability",
+            "train_n_risk_off",
+            "train_n_jump_in",
+            "train_start",
+            "train_end",
+        ]
+    ]
+
+
+def build_majority_vote_regimes(monthly_predictions: dict[str, pd.Series]) -> pd.DataFrame:
+    joined = pd.DataFrame(monthly_predictions)
+    out = pd.DataFrame(index=joined.index)
+    out["model_name"] = "ensemble_majority"
+    out["regime"] = pd.Series(index=joined.index, dtype=object)
+    valid = joined.notna().all(axis=1)
+    for date, row in joined.loc[valid].iterrows():
+        counts = row.astype(str).value_counts()
+        top_count = int(counts.max())
+        winners = counts[counts.eq(top_count)].index.tolist()
+        if top_count >= 2 and len(winners) == 1:
+            out.loc[date, "regime"] = winners[0]
+        else:
+            out.loc[date, "regime"] = "neutral"
+    out["risk_off_probability"] = np.nan
+    out["jump_in_probability"] = np.nan
+    out["train_n_risk_off"] = np.nan
+    out["train_n_jump_in"] = np.nan
+    out["train_start"] = pd.NaT
+    out["train_end"] = pd.NaT
+    return out[
+        [
+            "model_name",
+            "regime",
+            "risk_off_probability",
+            "jump_in_probability",
+            "train_n_risk_off",
+            "train_n_jump_in",
+            "train_start",
+            "train_end",
+        ]
+    ]
+
+
 def update_plot_styles(model_names: list[str]) -> None:
     for model_name in model_names:
         if model_name == "gmm":
@@ -267,13 +385,19 @@ def write_model_report(
     common_start: pd.Timestamp,
 ) -> None:
     comparable = metrics[metrics["window"] == "comparable_2007_05_31"].copy().sort_values("final_value", ascending=False)
+    reported_models = regime_models
+    if not monthly_regimes.empty:
+        reported_models = [
+            MODEL_LABELS.get(model_name, model_name)
+            for model_name in monthly_regimes["model_name"].dropna().drop_duplicates().tolist()
+        ]
     lines = [
         "# Walk-forward Model Comparison",
         "",
         "## Scope",
         "",
         f"- Dataset used: `{dataset_path}`",
-        f"- Regime models compared: `{', '.join(regime_models)}`",
+        f"- Regime models compared: `{', '.join(reported_models)}`",
         f"- Common strategy start: `{common_start.date()}`",
         f"- Contribution cadence: `{contribution_frequency}` at `${periodic_contribution:,.2f}` per event.",
         "",
@@ -498,6 +622,7 @@ def write_investor_report(
         "",
         "- The walk-forward logistic strategy still shows the strongest backtest result in this repo, but it earns that by staying risk-on most of the time and accepting much deeper drawdowns than plain DCA.",
         "- I do not see a direct look-ahead bug in the current logistic path. Training is chronological, overlapping forward windows are purged, and trades use lagged signals only.",
+        "- Ensemble variants in this report are simple combinations of already-generated walk-forward signals; they do not add a second fitting stage.",
         "- I would still treat the result as promising rather than proven because the predictive validation is only modest and the model was selected after comparing several approaches.",
         "",
         "## Backtest Snapshot",
@@ -628,6 +753,8 @@ def write_investor_report(
             "- `walkforward_feature_importance_compare_risk_off.png`: risk-off feature comparison chart",
             "- `walkforward_feature_importance_compare_jump_in.png`: jump-in feature comparison chart",
             "- `walkforward_logistic_regimes_full_common_window.png`: logistic regime chart on QQQ",
+            "- `walkforward_ensemble_blend_regimes_full_common_window.png`: probability-blend ensemble chart on QQQ",
+            "- `walkforward_ensemble_majority_regimes_full_common_window.png`: majority-vote ensemble chart on QQQ",
         ]
     )
 
@@ -848,6 +975,7 @@ def main() -> None:
     gmm_summary = pd.DataFrame()
     walkforward_daily = pd.DataFrame(index=dataset.index)
     monthly_regime_tables: list[pd.DataFrame] = []
+    monthly_model_tables: dict[str, pd.DataFrame] = {}
 
     if "gmm" in args.regime_models:
         walkforward_daily, gmm_refits, gmm_summary = leverage.build_walkforward_daily_regimes(dataset, args.min_train_days)
@@ -883,7 +1011,44 @@ def main() -> None:
             rf_estimators=args.rf_estimators,
         )
         monthly_regime_tables.append(monthly_regimes)
+        monthly_model_tables[model_name] = monthly_regimes
         model_signals[model_name] = monthly_signal_to_daily(monthly_regimes["regime"], close.index)
+
+    if {"logistic", "random_forest"}.issubset(monthly_model_tables):
+        blend_monthly = build_probability_blend_regimes(
+            monthly_model_tables["logistic"],
+            monthly_model_tables["random_forest"],
+            risk_off_threshold=args.risk_off_threshold,
+            jump_in_threshold=args.jump_in_threshold,
+        )
+        monthly_regime_tables.append(blend_monthly)
+        monthly_model_tables["ensemble_blend"] = blend_monthly
+        model_signals["ensemble_blend"] = monthly_signal_to_daily(blend_monthly["regime"], close.index)
+        for leverage_level in [2, 3]:
+            strategy = f"walkforward_ensemble_blend_riskon_{leverage_level}x_prob_regime_dca"
+            leverage.PLOT_STYLE[strategy] = {
+                "label": f"WF {MODEL_LABELS['ensemble_blend']} {leverage_level}x",
+                "color": MODEL_COLORS[('ensemble_blend', leverage_level)],
+            }
+
+    if {"logistic", "random_forest"}.issubset(monthly_model_tables) and "gmm" in model_signals:
+        gmm_monthly = regime_month_end_from_daily(walkforward_daily, "wf_gmm_regime", "gmm")
+        majority_monthly = build_majority_vote_regimes(
+            {
+                "logistic": monthly_model_tables["logistic"]["regime"],
+                "random_forest": monthly_model_tables["random_forest"]["regime"],
+                "gmm": gmm_monthly["regime"],
+            }
+        )
+        monthly_regime_tables.append(majority_monthly)
+        monthly_model_tables["ensemble_majority"] = majority_monthly
+        model_signals["ensemble_majority"] = monthly_signal_to_daily(majority_monthly["regime"], close.index)
+        for leverage_level in [2, 3]:
+            strategy = f"walkforward_ensemble_majority_riskon_{leverage_level}x_prob_regime_dca"
+            leverage.PLOT_STYLE[strategy] = {
+                "label": f"WF {MODEL_LABELS['ensemble_majority']} {leverage_level}x",
+                "color": MODEL_COLORS[('ensemble_majority', leverage_level)],
+            }
 
     first_valid_dates = [signal.dropna().index.min() for signal in model_signals.values() if not signal.dropna().empty]
     if not first_valid_dates:
@@ -903,12 +1068,24 @@ def main() -> None:
     if not monthly_regime_export.empty:
         monthly_regime_export.to_csv(args.out_dir / "walkforward_model_regimes_monthly.csv", index_label="date")
 
+    if "logistic" in model_signals:
+        logistic_daily = pd.DataFrame(index=close.index)
+        logistic_daily["qqq_close"] = close
+        logistic_daily["logistic_signal_lag1"] = model_signals["logistic"].reindex(close.index)
+        logistic_daily.to_csv(args.out_dir / "walkforward_logistic_traded_regimes_daily.csv", index_label="date")
+    if "logistic" in monthly_model_tables:
+        monthly_model_tables["logistic"].to_csv(
+            args.out_dir / "walkforward_logistic_traded_regimes_monthly.csv",
+            index_label="date",
+        )
+
     window_starts = {
         "full_common_window": common_start,
         "comparable_2007_05_31": max(common_start, leverage.COMPARABLE_START),
     }
     strategy_defs = [("plain_dca", None, None)]
-    for model_name in args.regime_models:
+    strategy_model_names = list(model_signals.keys())
+    for model_name in strategy_model_names:
         for leverage_level in [2.0, 3.0]:
             if model_name == "gmm":
                 strategy_name = f"walkforward_gmm_riskon_{int(leverage_level)}x_keep_long_riskoff_reserve_dca"
@@ -996,6 +1173,20 @@ def main() -> None:
             model_signals["logistic"].loc[model_signals["logistic"].index >= common_start],
             args.out_dir / "walkforward_logistic_regimes_full_common_window.png",
             "Walk-forward logistic regimes on QQQ",
+        )
+    if "ensemble_blend" in model_signals:
+        plot_regime_chart(
+            close.loc[close.index >= common_start],
+            model_signals["ensemble_blend"].loc[model_signals["ensemble_blend"].index >= common_start],
+            args.out_dir / "walkforward_ensemble_blend_regimes_full_common_window.png",
+            "Walk-forward ensemble-blend regimes on QQQ",
+        )
+    if "ensemble_majority" in model_signals:
+        plot_regime_chart(
+            close.loc[close.index >= common_start],
+            model_signals["ensemble_majority"].loc[model_signals["ensemble_majority"].index >= common_start],
+            args.out_dir / "walkforward_ensemble_majority_regimes_full_common_window.png",
+            "Walk-forward ensemble-majority regimes on QQQ",
         )
     if "logistic" in args.regime_models:
         logistic_monthly = (
