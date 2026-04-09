@@ -130,6 +130,8 @@ def load_dataset(path: Path) -> pd.DataFrame:
         raise FileNotFoundError(f"Missing aligned dataset: {path}")
     dataset = pd.read_csv(path, parse_dates=["date"]).set_index("date").sort_index()
     dataset.index = dataset.index.tz_localize(None)
+    for column in [name for name in dataset.columns if name.endswith("_end_date")]:
+        dataset[column] = pd.to_datetime(dataset[column], errors="coerce")
     return dataset
 
 
