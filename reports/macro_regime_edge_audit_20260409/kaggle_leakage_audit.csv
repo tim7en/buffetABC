@@ -1,0 +1,6 @@
+check,status,evidence
+Supervised monthly training rows end before prediction dates,PASS,414 monthly predictions audited; min gap 91 days.
+Walk-forward GMM refits train only through the prior trading session,PASS,268 refits audited; min gap 1 day.
+Logistic signals are traded with lagged daily execution,PASS,First prediction 2009-02-27 -> first traded signal 2009-03-02 (3 calendar days later).
+Random Forest signals are traded with lagged daily execution,PASS,First prediction 2009-02-27 -> first traded signal 2009-03-02 (3 calendar days later).
+"Monthly, quarterly, and annual macro releases are lagged before forward-fill",PASS,12 of 46 tracked variables use explicit lagged release treatment.
