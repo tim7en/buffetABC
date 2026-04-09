@@ -1,0 +1,6 @@
+check,status,evidence
+Logistic hedge training ends before each prediction date,PASS,220 predictions audited; min gap 30 days.
+Logistic hedge states are traded with lagged daily execution,PASS,First prediction 2008-01-31 -> first traded daily state 2008-02-01.
+Random Forest hedge training ends before each prediction date,PASS,220 predictions audited; min gap 30 days.
+Random Forest hedge states are traded with lagged daily execution,PASS,First prediction 2008-01-31 -> first traded daily state 2008-02-01.
+Slow macro variables still use lagged release treatment,PASS,12 of 46 tracked variables use explicit lagged treatment.
