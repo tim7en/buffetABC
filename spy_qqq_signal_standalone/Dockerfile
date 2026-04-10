@@ -1,33 +1,31 @@
 # ============================================================
-# SPY-gate × QQQ Ensemble DCA Signal API
-# Build context must be the repository root:
-#   docker build -f production/spy_qqq_signal_api/Dockerfile .
+# SPY-gate × QQQ 2x DCA Signal API  —  standalone build
+# Build context must be this folder:
+#   docker build -t spy-qqq-signal-api .
+# Or via docker-compose:
+#   docker-compose up --build
 # ============================================================
 FROM python:3.11-slim-bookworm
 
 # ---- System dependencies -------------------------------------------- #
-# All Python packages ship as manylinux wheels for this environment,
-# so we can skip apt packages and keep the image lighter for Docker Toolbox.
+# All Python packages ship as manylinux wheels (no gcc needed).
+# scikit-learn bundles its own OpenMP runtime inside the wheel.
+# No apt-get required — skip to keep the image portable across Docker hosts.
 
 WORKDIR /app
 
 # ---- Python dependencies -------------------------------------------- #
-COPY production/spy_qqq_signal_api/requirements.txt /app/requirements.txt
+COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir --progress-bar off -r requirements.txt
 
 # ---- Research tools (imported by pipeline.py) ----------------------- #
-# Copy the tools directory (regime analysis, model compare, leverage)
-COPY tools/qqq_macro_ml_regime_analysis.py   /app/tools/
-COPY tools/qqq_macro_walkforward_model_compare.py /app/tools/
-COPY tools/qqq_macro_walkforward_leverage.py /app/tools/
+COPY tools/ /app/tools/
 
 # ---- Cache / download scripts --------------------------------------- #
-# The macro download script is run as a subprocess during daily refresh
-COPY cache/download_daily_macro_data.py /app/cache_scripts/download_daily_macro_data.py
-COPY cache/download_qqq_daily.py        /app/cache_scripts/download_qqq_daily.py
+COPY cache_scripts/ /app/cache_scripts/
 
 # ---- FastAPI application -------------------------------------------- #
-COPY production/spy_qqq_signal_api/app/ /app/app/
+COPY app/ /app/app/
 
 # ---- Persistent data volume ----------------------------------------- #
 # Mount a named volume here so signal_state.json and parquet caches
@@ -38,7 +36,6 @@ VOLUME ["/data"]
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DATA_DIR=/data \
-    # Override with a real secret in production:
     REFRESH_TOKEN="" \
     MAX_STATE_AGE_H=25 \
     OMP_NUM_THREADS=1 \
@@ -48,7 +45,6 @@ ENV PYTHONUNBUFFERED=1 \
 
 EXPOSE 8000
 
-# ---- Health check --------------------------------------------------- #
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"
 

@@ -687,6 +687,8 @@ def build_feature_importance_table(feature_importance: pd.DataFrame, target: str
 
 
 def plot_feature_importance_compare(feature_importance: pd.DataFrame, target: str, out_path: Path) -> None:
+    if leverage.plt is None:
+        return
     if target == "qqq_fwd_63d_return":
         signed_model = "ridge"
         left_title = "ridge coefficients"
@@ -910,6 +912,8 @@ def write_investor_report(
 
 
 def plot_model_compare_equity(curves: pd.DataFrame, out_path: Path, window: str) -> None:
+    if leverage.plt is None:
+        return
     data = curves[curves["window"] == window].copy()
     if data.empty:
         return
@@ -934,6 +938,8 @@ def plot_model_compare_equity(curves: pd.DataFrame, out_path: Path, window: str)
 
 
 def plot_model_compare_drawdowns(curves: pd.DataFrame, out_path: Path, window: str) -> None:
+    if leverage.plt is None:
+        return
     data = curves[curves["window"] == window].copy()
     if data.empty:
         return
@@ -977,6 +983,8 @@ def regime_spans(signal: pd.Series) -> list[tuple[pd.Timestamp, pd.Timestamp, st
 
 
 def plot_regime_chart(close: pd.Series, regime_signal: pd.Series, out_path: Path, title: str) -> None:
+    if leverage.plt is None:
+        return
     signal = regime_signal.reindex(close.index)
     if signal.dropna().empty:
         return

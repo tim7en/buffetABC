@@ -321,21 +321,22 @@ def _save_models_pkl(spy_models: dict, qqq_models: dict) -> None:
 
 
 def _disable_parallelism(obj) -> None:
-    """Recursively set n_jobs=1 on estimators to avoid thread-pool spawning."""
-    if hasattr(obj, "n_jobs"):
+    """Recursively set n_jobs=1 on all estimators to prevent thread-pool spawning."""
+    if hasattr(obj, 'n_jobs'):
         obj.n_jobs = 1
-    if hasattr(obj, "steps"):
+    if hasattr(obj, 'steps'):           # sklearn Pipeline
         for _, step in obj.steps:
             _disable_parallelism(step)
-    if hasattr(obj, "estimators_"):
+    if hasattr(obj, 'estimators_'):     # Ensemble (RF, voting, etc.)
         for est in obj.estimators_:
             _disable_parallelism(est)
-    if hasattr(obj, "estimator"):
+    if hasattr(obj, 'estimator'):       # Meta-estimators
         _disable_parallelism(obj.estimator)
 
 
 def _load_models_pkl() -> dict:
     payload = joblib.load(MODELS_PKL)
+    # Force single-threaded inference — Docker Toolbox cannot spawn worker threads
     for asset_key in ("spy", "qqq"):
         if asset_key not in payload:
             continue
