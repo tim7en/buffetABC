@@ -133,6 +133,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rf-estimators", type=int, default=300)
     parser.add_argument("--random-state", type=int, default=regime_analysis.RANDOM_STATE)
     parser.add_argument("--test-size", type=float, default=0.30)
+    parser.add_argument(
+        "--extra-model-features",
+        nargs="*",
+        default=[],
+        help="Additional dataset columns to allow in the supervised walk-forward models.",
+    )
     return parser.parse_args()
 
 
@@ -385,12 +391,12 @@ def write_model_report(
     common_start: pd.Timestamp,
 ) -> None:
     comparable = metrics[metrics["window"] == "comparable_2007_05_31"].copy().sort_values("final_value", ascending=False)
-    reported_models = regime_models
+    reported_model_keys = list(dict.fromkeys(regime_models))
     if not monthly_regimes.empty:
-        reported_models = [
-            MODEL_LABELS.get(model_name, model_name)
-            for model_name in monthly_regimes["model_name"].dropna().drop_duplicates().tolist()
-        ]
+        for model_name in monthly_regimes["model_name"].dropna().drop_duplicates().tolist():
+            if model_name not in reported_model_keys:
+                reported_model_keys.append(model_name)
+    reported_models = [MODEL_LABELS.get(model_name, model_name) for model_name in reported_model_keys]
     lines = [
         "# Walk-forward Model Comparison",
         "",
@@ -985,7 +991,8 @@ def main() -> None:
         gmm_summary.to_csv(args.out_dir / "walkforward_gmm_regime_summary.csv", index=False)
 
     sample = regime_analysis.month_end_sample(dataset)
-    sample_features = regime_analysis.available_features(sample, regime_analysis.MODEL_FEATURES, min_non_na=args.min_train_months)
+    model_features = list(dict.fromkeys([*regime_analysis.MODEL_FEATURES, *args.extra_model_features]))
+    sample_features = regime_analysis.available_features(sample, model_features, min_non_na=args.min_train_months)
     if len(sample_features) < 6:
         raise RuntimeError(f"Not enough usable month-end model features. Found: {sample_features}")
     validation_metrics, feature_importance, _ = regime_analysis.evaluate_models(

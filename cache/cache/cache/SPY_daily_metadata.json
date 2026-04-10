@@ -1,0 +1,12 @@
+{
+  "downloaded_at_utc": "2026-04-09T20:19:09.586289+00:00",
+  "ticker": "SPY",
+  "source": "Yahoo Finance chart API",
+  "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/SPY",
+  "start": "1999-03-10",
+  "end": "2026-04-10",
+  "output_parquet": "D:\\buffetABC\\cache\\cache\\cache\\SPY_daily.parquet",
+  "rows": 6813,
+  "first_date": "1999-03-10",
+  "last_date": "2026-04-09"
+}

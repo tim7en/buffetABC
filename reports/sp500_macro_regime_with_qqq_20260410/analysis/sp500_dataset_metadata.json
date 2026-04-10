@@ -1,0 +1,24 @@
+{
+  "target_proxy": "SPY",
+  "sp500_path": "D:\\buffetABC\\cache\\cache\\cache\\SPY_daily.parquet",
+  "qqq_path": "D:\\buffetABC\\cache\\cache\\cache\\QQQ_daily.parquet",
+  "macro_path": "D:\\buffetABC\\cache\\cache\\macro_daily_1999.parquet",
+  "start": "1999-03-10",
+  "end": null,
+  "target_horizon": 63,
+  "rows": 6813,
+  "first_date": "1999-03-10",
+  "last_date": "2026-04-09",
+  "qqq_growth_features": [
+    "growth_qqq_21d_return",
+    "growth_qqq_63d_return",
+    "growth_qqq_126d_return",
+    "growth_qqq_252d_return",
+    "growth_qqq_vs_sma200",
+    "growth_qqq_realized_vol_21d",
+    "growth_qqq_drawdown_252d",
+    "growth_qqq_minus_sp500_63d_return",
+    "growth_qqq_beta_ratio_63d"
+  ],
+  "compatibility_note": "qqq_* target columns represent SP500/SPY in this folder; growth_qqq_* columns represent actual QQQ."
+}

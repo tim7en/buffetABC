@@ -85,6 +85,52 @@ def num(value: float | int | None, decimals: int = 2) -> str:
     return f"{value:.{decimals}f}"
 
 
+def short_strategy_name(strategy: str) -> str:
+    if strategy == "plain_dca":
+        return "plain_dca_1x"
+    text = strategy.removeprefix("walkforward_")
+    text = text.replace("_riskon_", "_")
+    for suffix in ["_prob_regime_dca", "_keep_long_riskoff_reserve_dca"]:
+        text = text.removesuffix(suffix)
+    return text
+
+
+def load_leverage_ladder(audit_dir: Path, compare_dir: Path) -> pd.DataFrame:
+    ladder_path = audit_dir / "leverage_ladder_x2_x3_x5.csv"
+    if ladder_path.exists():
+        return pd.read_csv(ladder_path)
+
+    metrics_path = compare_dir / "walkforward_model_compare_leverage_metrics.csv"
+    metrics = pd.read_csv(metrics_path)
+    ladder = metrics[metrics["window"].eq("full_common_window")].copy()
+    if ladder.empty:
+        raise ValueError(f"No full_common_window rows found in {metrics_path}")
+
+    columns = [
+        "strategy",
+        "final_value",
+        "xirr",
+        "time_weighted_cagr",
+        "max_drawdown",
+        "avg_target_leverage",
+        "risk_on_months",
+        "neutral_months",
+        "risk_off_months",
+        "reserve_contributions",
+        "reserve_deployments",
+        "final_delta_vs_plain_dca",
+    ]
+    missing_columns = [column for column in columns if column not in ladder.columns]
+    if missing_columns:
+        raise ValueError(f"Cannot build leverage ladder; missing columns: {missing_columns}")
+
+    ladder = ladder[columns].copy()
+    ladder["strategy"] = ladder["strategy"].map(short_strategy_name)
+    ladder = ladder.sort_values("final_value", ascending=False)
+    ladder.to_csv(ladder_path, index=False)
+    return ladder
+
+
 def safe_html_table(df: pd.DataFrame, classes: str = "data-table") -> str:
     return df.to_html(index=False, escape=False, border=0, classes=classes)
 
@@ -653,7 +699,7 @@ def main() -> None:
     validation = pd.read_csv(args.compare_dir / "walkforward_model_validation_metrics.csv")
     regime_accuracy = pd.read_csv(args.audit_dir / "regime_accuracy_metrics.csv")
     regime_expected = pd.read_csv(args.audit_dir / "regime_expected_returns.csv")
-    leverage_ladder = pd.read_csv(args.audit_dir / "leverage_ladder_x2_x3_x5.csv")
+    leverage_ladder = load_leverage_ladder(args.audit_dir, args.compare_dir)
     monthly_regimes = pd.read_csv(
         args.compare_dir / "walkforward_model_regimes_monthly.csv",
         parse_dates=["date", "train_start", "train_end"],
