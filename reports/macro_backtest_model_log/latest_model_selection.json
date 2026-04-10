@@ -1,7 +1,16 @@
 {
-  "generated_at_utc": "2026-04-10T03:52:43+00:00",
+  "generated_at_utc": "2026-04-10T07:26:22+00:00",
   "experiments": {
     "qqq_20260410_ensemble_refresh": {
+      "target_asset": "QQQ",
+      "best_final_value_strategy": "ensemble_blend_3x",
+      "best_2x_strategy": "ensemble_blend_2x",
+      "best_xirr_to_drawdown_strategy": "ensemble_blend_2x",
+      "best_final_value": 133062.6092746452,
+      "best_final_xirr": 0.2062000249367201,
+      "best_final_max_drawdown": -0.6276306761023529
+    },
+    "qqq_20260410_x2_kaggle_rerun": {
       "target_asset": "QQQ",
       "best_final_value_strategy": "ensemble_blend_3x",
       "best_2x_strategy": "ensemble_blend_2x",
@@ -18,6 +27,15 @@
       "best_final_value": 130539.53253301088,
       "best_final_xirr": 0.2039025727915185,
       "best_final_max_drawdown": -0.4330305945485121
+    },
+    "spy_gate_qqq_20260410_x2": {
+      "target_asset": "QQQ_with_SPY_gate",
+      "best_final_value_strategy": "spy_gate_qqq_ensemble_blend_3x_vix_accel",
+      "best_2x_strategy": "spy_gate_qqq_ensemble_blend_2x",
+      "best_xirr_to_drawdown_strategy": "spy_gate_qqq_ensemble_blend_2x",
+      "best_final_value": 163803.9881848413,
+      "best_final_xirr": 0.2300733776327825,
+      "best_final_max_drawdown": -0.6268574930381716
     }
   }
 }

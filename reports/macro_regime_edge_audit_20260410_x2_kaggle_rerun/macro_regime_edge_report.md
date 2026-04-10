@@ -85,6 +85,17 @@
 | ensemble_majority_macro_aware_2x_dca | $96,870 | 16.8% | 16.8% | -51.9% | 4.09x |
 | consensus_macro_aware_2x_dca | $94,756 | 16.6% | 16.6% | -51.9% | 4.00x |
 
+## X2 Decision Addendum
+
+- Fresh x2 rerun package: `reports\qqq_macro_walkforward_model_compare_20260410_x2_kaggle_rerun`
+- Standalone QQQ winner remains `ensemble_blend_2x` at `$130,862`, XIRR `20.42%`, max DD `-46.82%`.
+- The combined overlay package `reports\spy_gate_qqq_ensemble_backtest_20260410_x2_kaggle_rerun` improves on that result with `spy_gate_qqq_ensemble_blend_2x` at `$141,648`, XIRR `21.37%`, max DD `-46.81%`.
+- The gate wins with lower average leverage (`1.12x` versus `1.26x`) and fewer risk-on months (`16` versus `35`), so the edge comes from selectivity rather than from running harder leverage.
+- Relative to plain DCA, the gated x2 policy adds about `$33.8k` of terminal value while increasing peak drawdown by about `13` percentage points.
+- Robustness is mixed by era: plain DCA won the 2020-2021 subwindow, while QQQ blend 2x was best in 2014-2019 and 2022-2026; the SPY-gated policy won the full sample by stitching those windows together more efficiently.
+- Production caution remains: the SPY gate uses QQQ-derived information, so this is a strong research candidate for a leverage overlay, not yet a fully clean production autopilot.
+- Dedicated x2 charts and tables were written to `reports\qqq_x2_kaggle_analysis_20260410`.
+
 ## Sensitivity
 
 - Best ex-post logistic threshold in the audited 1x grid: risk-off `0.50`, jump-in `0.50`, final value `$61,379`, max DD `-28.3%`.

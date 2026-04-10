@@ -37,6 +37,39 @@ DEFAULT_EXPERIMENTS: dict[str, dict[str, Any]] = {
         / "macro_regime_edge_report.md",
         "notes": "QQQ is the higher-beta growth expression; useful for traded expression, not necessarily the cleanest macro target.",
     },
+    "qqq_20260410_x2_kaggle_rerun": {
+        "target_asset": "QQQ",
+        "dependent_variable": "QQQ adjusted close",
+        "independent_overlay": "Macro inputs plus QQQ target trend features; fresh x2 rerun used for the Kaggle-style analysis pack",
+        "compare_dir": ROOT / "reports" / "qqq_macro_walkforward_model_compare_20260410_x2_kaggle_rerun",
+        "robustness_path": ROOT
+        / "reports"
+        / "spy_gate_qqq_ensemble_backtest_20260410_x2_kaggle_rerun"
+        / "combined_policy_metrics.csv",
+        "summary_path": ROOT
+        / "reports"
+        / "qqq_x2_kaggle_analysis_20260410"
+        / "x2_strategy_report.md",
+        "notes": "Fresh x2 rerun used for the decision pack; preferred standalone expression is QQQ ensemble_blend_2x.",
+    },
+    "spy_gate_qqq_20260410_x2": {
+        "target_asset": "QQQ_with_SPY_gate",
+        "dependent_variable": "QQQ adjusted close, conditioned on SPY ensemble_blend gate",
+        "independent_overlay": "SPY ensemble_blend broad-market gate plus QQQ ensemble_blend higher-beta expression",
+        "compare_dir": ROOT / "reports" / "spy_gate_qqq_ensemble_backtest_20260410_x2_kaggle_rerun",
+        "metrics_filename": "combined_policy_metrics.csv",
+        "report_filename": "spy_gate_qqq_backtest_summary.md",
+        "validation_filename": "",
+        "robustness_path": ROOT
+        / "reports"
+        / "spy_gate_qqq_ensemble_backtest_20260410_x2_kaggle_rerun"
+        / "combined_policy_metrics.csv",
+        "summary_path": ROOT
+        / "reports"
+        / "qqq_x2_kaggle_analysis_20260410"
+        / "x2_strategy_report.md",
+        "notes": "Research candidate overlay: use SPY ensemble_blend as the gate and QQQ ensemble_blend_2x as the high-beta expression when the gate allows it.",
+    },
     "sp500_with_qqq_20260410": {
         "target_asset": "SP500_SPY",
         "dependent_variable": "SPY adjusted close as S&P 500 proxy",
@@ -81,6 +114,10 @@ def simplify_strategy_name(strategy: str) -> str:
 def model_family(strategy_name: str) -> str:
     if strategy_name.startswith("plain"):
         return "plain"
+    if strategy_name.startswith("spy_gate"):
+        return "spy_gate"
+    if strategy_name.startswith("qqq_ensemble_blend"):
+        return "ensemble_blend"
     if strategy_name.startswith("random_forest"):
         return "random_forest"
     if strategy_name.startswith("ensemble_blend"):
@@ -131,13 +168,15 @@ def robustness_win_counts(path: Path) -> dict[str, int]:
     if not path.exists():
         return {}
     data = pd.read_csv(path)
-    if data.empty or "window" not in data or "strategy" not in data:
+    strategy_col = "strategy" if "strategy" in data.columns else None
+    if data.empty or "window" not in data or strategy_col is None:
         return {}
     counts: dict[str, int] = {}
-    for window, group in data[~data["window"].eq("full_common")].groupby("window"):
+    mask = ~data["window"].astype(str).str.contains("full_common", case=False, na=False)
+    for window, group in data[mask].groupby("window"):
         _ = window
         best = group.sort_values("final_value", ascending=False).iloc[0]
-        strategy = simplify_strategy_name(str(best["strategy"]))
+        strategy = simplify_strategy_name(str(best[strategy_col]))
         counts[strategy] = counts.get(strategy, 0) + 1
     return counts
 
@@ -158,14 +197,15 @@ def caution_flags(row: pd.Series) -> str:
 
 def build_experiment_rows(experiment_id: str, config: dict[str, Any], generated_at: str) -> list[dict[str, Any]]:
     compare_dir = Path(config["compare_dir"])
-    metrics_path = compare_dir / "walkforward_model_compare_leverage_metrics.csv"
-    validation_path = compare_dir / "walkforward_model_validation_metrics.csv"
-    report_path = compare_dir / "walkforward_model_compare_report.md"
+    metrics_path = compare_dir / config.get("metrics_filename", "walkforward_model_compare_leverage_metrics.csv")
+    validation_filename = config.get("validation_filename", "walkforward_model_validation_metrics.csv")
+    validation_path = compare_dir / validation_filename if validation_filename else None
+    report_path = compare_dir / config.get("report_filename", "walkforward_model_compare_report.md")
     if not metrics_path.exists():
         raise FileNotFoundError(f"Missing compare metrics for {experiment_id}: {metrics_path}")
 
     metrics = pd.read_csv(metrics_path)
-    validation = pd.read_csv(validation_path) if validation_path.exists() else pd.DataFrame()
+    validation = pd.read_csv(validation_path) if validation_path is not None and validation_path.exists() else pd.DataFrame()
     validation_by_model = validation_map(validation)
     robustness_wins = robustness_win_counts(Path(config["robustness_path"]))
 
@@ -173,7 +213,9 @@ def build_experiment_rows(experiment_id: str, config: dict[str, Any], generated_
     if full.empty:
         raise ValueError(f"No full_common_window rows found in {metrics_path}")
 
-    plain = full[full["strategy"].eq("plain_dca")]
+    plain = full[full["strategy"].isin(["plain_dca", "plain_dca_1x"])]
+    if plain.empty:
+        plain = full[full["strategy"].astype(str).str.contains("plain_dca", na=False)]
     plain_xirr = clean_number(plain.iloc[0]["xirr"]) if not plain.empty else np.nan
     plain_final = clean_number(plain.iloc[0]["final_value"]) if not plain.empty else np.nan
     full["strategy_short"] = full["strategy"].map(lambda value: simplify_strategy_name(str(value)))
@@ -409,8 +451,9 @@ def main() -> None:
     for experiment_id in selected_experiments(args.experiment):
         config = DEFAULT_EXPERIMENTS[experiment_id]
         rows.extend(build_experiment_rows(experiment_id, config, generated_at))
-        validation_path = Path(config["compare_dir"]) / "walkforward_model_validation_metrics.csv"
-        if validation_path.exists():
+        validation_filename = config.get("validation_filename", "walkforward_model_validation_metrics.csv")
+        validation_path = Path(config["compare_dir"]) / validation_filename if validation_filename else None
+        if validation_path is not None and validation_path.exists():
             validation = pd.read_csv(validation_path)
             validation.insert(0, "experiment_id", experiment_id)
             validation.insert(1, "target_asset", config["target_asset"])
