@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  signal-api:
+    build:
+      context: ../..          # repository root (so COPY tools/ and cache/ work)
+      dockerfile: production/spy_qqq_signal_api/Dockerfile
+    image: spy-qqq-signal-api:latest
+    container_name: spy_qqq_signal_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Named volume — persists signal_state.json, parquet caches, FRED files
+      - signal_data:/data
+    environment:
+      DATA_DIR: /data
+      # Set a real secret in .env or Docker Swarm secrets — never commit it!
+      REFRESH_TOKEN: "${REFRESH_TOKEN:-}"
+      MAX_STATE_AGE_H: "${MAX_STATE_AGE_H:-25}"
+    env_file:
+      - .env                  # optional local overrides — git-ignored
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+volumes:
+  signal_data:
+    driver: local
