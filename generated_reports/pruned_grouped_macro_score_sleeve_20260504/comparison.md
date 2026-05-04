@@ -1,0 +1,8 @@
+# Pruned Grouped Macro Score Sleeve Comparison
+
+| Variant | Final Equity | Return % | CAGR % | Max DD % | PF | Trades | Macro Blocked | Macro Scaled | Weekend Spans | HK Trades | NY Trades |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| baseline | 21750.4488 | 2075.04 | 110.61 | 27.78 | 2.36 | 423 | 0 | 0 | 378 | 35 | 388 |
+| macro_score_sleeve | 21930.8548 | 2093.09 | 111.03 | 28.94 | 3.18 | 448 | 136 | 223 | 399 | 39 | 409 |
+| weekend_flat | 15018.5359 | 1401.85 | 92.56 | 40.07 | 1.5 | 733 | 0 | 0 | 90 | 117 | 616 |
+| macro_score_weekend_flat | 6292.869 | 529.29 | 56.03 | 39.2 | 1.25 | 824 | 237 | 493 | 84 | 117 | 707 |
