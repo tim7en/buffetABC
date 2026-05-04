@@ -10,6 +10,7 @@ from edgar.services.intraday_strategy import _ema
 from edgar.services.local_tiingo_data import get_local_tiingo_time_bounds, load_local_tiingo_klines
 from edgar.services.sentiment_data import get_score_for_date
 from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+from edgar.services.tightening_liquidity_gate import lookup_tightening_liquidity_signal
 
 
 CORE_SESSION_TURTLE_UNIVERSE: tuple[tuple[str, str, str], ...] = (
@@ -151,6 +152,9 @@ class _OpenTrade:
     volatility_persistence_vix_rel: float | None
     volatility_persistence_vixy_rel: float | None
     volatility_persistence_signal_age_min: float | None
+    tightening_liquidity_regime: str | None
+    tightening_liquidity_mult: float
+    tightening_liquidity_score: int | None
     scale: float
     scaled_position_size: float
     scaled_shares: float
@@ -1252,6 +1256,16 @@ def generate_session_turtle_shared_account_report(
     volatility_persistence_short_persistent_stress_mult: float = 1.0,
     volatility_persistence_short_neutral_mult: float = 1.0,
     volatility_persistence_short_fading_stress_mult: float = 0.5,
+    use_tightening_liquidity_gate: bool = False,
+    tightening_liquidity_state: dict | None = None,
+    tightening_liquidity_label: str = "Monthly tightening/liquidity gate",
+    tightening_liquidity_mode: str = "size",
+    tightening_liquidity_lag_days: int = 1,
+    tightening_liquidity_buckets: frozenset[str] | None = frozenset({"crypto", "equity", "etf"}),
+    tightening_liquidity_long_tight_mult: float = 0.5,
+    tightening_liquidity_long_neutral_mult: float = 1.0,
+    tightening_liquidity_short_tight_mult: float = 1.0,
+    tightening_liquidity_short_neutral_mult: float = 1.0,
     use_per_asset_technical_overlay: bool = False,
     per_asset_technical_state: dict | None = None,
     per_asset_ema_lag_days: int = 1,
@@ -1394,6 +1408,27 @@ def generate_session_turtle_shared_account_report(
     ):
         if mult <= 0 or mult > 1.0:
             raise ValueError(f"{label} must be > 0 and <= 1.0")
+    if use_tightening_liquidity_gate and not tightening_liquidity_state:
+        raise ValueError("tightening_liquidity_state is required when use_tightening_liquidity_gate=True")
+    if tightening_liquidity_mode not in {"size", "entry"}:
+        raise ValueError("tightening_liquidity_mode must be one of {'size', 'entry'}")
+    if tightening_liquidity_lag_days < 0:
+        raise ValueError("tightening_liquidity_lag_days must be non-negative")
+    tightening_liquidity_buckets_normalized: frozenset[str] | None = None
+    if tightening_liquidity_buckets:
+        tightening_liquidity_buckets_normalized = frozenset(
+            str(bucket).strip().lower()
+            for bucket in tightening_liquidity_buckets
+            if str(bucket).strip()
+        )
+    for label, mult in (
+        ("tightening_liquidity_long_tight_mult", tightening_liquidity_long_tight_mult),
+        ("tightening_liquidity_long_neutral_mult", tightening_liquidity_long_neutral_mult),
+        ("tightening_liquidity_short_tight_mult", tightening_liquidity_short_tight_mult),
+        ("tightening_liquidity_short_neutral_mult", tightening_liquidity_short_neutral_mult),
+    ):
+        if mult < 0 or mult > 1.0:
+            raise ValueError(f"{label} must be >= 0 and <= 1.0")
     asof_date = _normalize_asof_date(investable_universe_asof)
     if precomputed_candidates is None:
         candidates = build_session_turtle_shared_account_candidates(
@@ -1430,6 +1465,7 @@ def generate_session_turtle_shared_account_report(
     max_drawdown = 0.0
     skipped_same_ticker = 0
     skipped_no_capacity = 0
+    skipped_tightening_liquidity_gate = 0
     open_positions: list[_OpenTrade] = []
     executed_trades: list[dict] = []
     equity_curve: list[dict] = []
@@ -1539,6 +1575,9 @@ def generate_session_turtle_shared_account_report(
                         if position.volatility_persistence_signal_age_min is not None
                         else None
                     ),
+                    "tightening_liquidity_regime": position.tightening_liquidity_regime,
+                    "tightening_liquidity_mult": round(position.tightening_liquidity_mult, 4),
+                    "tightening_liquidity_score": position.tightening_liquidity_score,
                     "scale": round(position.scale, 6),
                     "entry_rel_volume": round(position.entry_rel_volume, 4),
                     "rel_volume_ratio": round(position.rel_volume_ratio, 4),
@@ -1658,6 +1697,10 @@ def generate_session_turtle_shared_account_report(
             volatility_persistence_vix_rel: float | None = None
             volatility_persistence_vixy_rel: float | None = None
             volatility_persistence_signal_age_min: float | None = None
+            tightening_liquidity_regime: str | None = None
+            tightening_liquidity_mult = 1.0
+            tightening_liquidity_score: int | None = None
+            tightening_liquidity_blocked = False
 
             if use_performance_leadership_overlay:
                 eligible_tickers: set[str] | None = None
@@ -1783,6 +1826,26 @@ def generate_session_turtle_shared_account_report(
                 )
 
             # ── per-asset technical overlay (daily EMA + 4H ADX) ─────────
+            if use_tightening_liquidity_gate:
+                (
+                    tightening_liquidity_regime,
+                    tightening_liquidity_mult,
+                    tightening_liquidity_score,
+                    tightening_liquidity_blocked,
+                ) = lookup_tightening_liquidity_signal(
+                    entry_ts=batch_entry_ts,
+                    asset_bucket=asset_bucket,
+                    direction=str(candidate["direction"]),
+                    state=tightening_liquidity_state,
+                    lag_days=tightening_liquidity_lag_days,
+                    gated_buckets=tightening_liquidity_buckets_normalized,
+                    mode=tightening_liquidity_mode,
+                    tight_long_mult=tightening_liquidity_long_tight_mult,
+                    neutral_long_mult=tightening_liquidity_long_neutral_mult,
+                    tight_short_mult=tightening_liquidity_short_tight_mult,
+                    neutral_short_mult=tightening_liquidity_short_neutral_mult,
+                )
+
             technical_ema_regime: str | None = None
             technical_ema_mult = 1.0
             technical_adx_value: float | None = None
@@ -1818,11 +1881,15 @@ def generate_session_turtle_shared_account_report(
                 * intraday_vol_proxy_mult
                 * ext_hours_proxy_mult
                 * volatility_persistence_mult
+                * tightening_liquidity_mult
                 * technical_ema_mult
                 * technical_adx_mult
             )
             if target_position_size <= 1e-9:
-                skipped_no_capacity += 1
+                if tightening_liquidity_blocked:
+                    skipped_tightening_liquidity_gate += 1
+                else:
+                    skipped_no_capacity += 1
                 continue
 
             request_records.append(
@@ -1850,6 +1917,9 @@ def generate_session_turtle_shared_account_report(
                     "volatility_persistence_vix_rel": volatility_persistence_vix_rel,
                     "volatility_persistence_vixy_rel": volatility_persistence_vixy_rel,
                     "volatility_persistence_signal_age_min": volatility_persistence_signal_age_min,
+                    "tightening_liquidity_regime": tightening_liquidity_regime,
+                    "tightening_liquidity_mult": tightening_liquidity_mult,
+                    "tightening_liquidity_score": tightening_liquidity_score,
                     "technical_ema_regime": technical_ema_regime,
                     "technical_ema_mult": technical_ema_mult,
                     "technical_adx_value": technical_adx_value,
@@ -1961,6 +2031,9 @@ def generate_session_turtle_shared_account_report(
                     volatility_persistence_vix_rel=record["volatility_persistence_vix_rel"],
                     volatility_persistence_vixy_rel=record["volatility_persistence_vixy_rel"],
                     volatility_persistence_signal_age_min=record["volatility_persistence_signal_age_min"],
+                    tightening_liquidity_regime=record["tightening_liquidity_regime"],
+                    tightening_liquidity_mult=float(record["tightening_liquidity_mult"]),
+                    tightening_liquidity_score=record["tightening_liquidity_score"],
                     scale=scale,
                     scaled_position_size=scaled_position_size,
                     scaled_shares=float(candidate["shares"]) * scale,
@@ -2051,6 +2124,17 @@ def generate_session_turtle_shared_account_report(
         for trade in executed_trades
         if trade.get("volatility_persistence_regime")
     )
+    tightening_liquidity_mults = [
+        float(trade.get("tightening_liquidity_mult"))
+        if trade.get("tightening_liquidity_mult") is not None
+        else 1.0
+        for trade in executed_trades
+    ]
+    tightening_liquidity_regimes = Counter(
+        str(trade.get("tightening_liquidity_regime"))
+        for trade in executed_trades
+        if trade.get("tightening_liquidity_regime")
+    )
 
     label = f"Session Turtle Trend {basket.capitalize()} x{exposure_mult:g}"
     if asof_date is not None:
@@ -2073,6 +2157,8 @@ def generate_session_turtle_shared_account_report(
         label += " With Extended Hours VIX/FG Proxy"
     if use_volatility_persistence_overlay:
         label += f" With {volatility_persistence_label}"
+    if use_tightening_liquidity_gate:
+        label += f" With {tightening_liquidity_label} ({tightening_liquidity_mode})"
     if use_per_asset_technical_overlay:
         parts = ["daily EMA"]
         if per_asset_use_adx_gate:
@@ -2097,6 +2183,7 @@ def generate_session_turtle_shared_account_report(
         "losing_trades": len(losing_trades),
         "skipped_same_ticker": skipped_same_ticker,
         "skipped_no_capacity": skipped_no_capacity,
+        "skipped_tightening_liquidity_gate": skipped_tightening_liquidity_gate,
         "initial_capital": round(initial_capital, 4),
         "final_equity": round(capital, 4),
         "total_return_pct": round((capital / initial_capital - 1.0) * 100.0, 2) if initial_capital > 0 else 0.0,
@@ -2214,6 +2301,39 @@ def generate_session_turtle_shared_account_report(
         "entries_volatility_persistence_persistent_stress": volatility_persistence_regimes["persistent_stress"],
         "entries_volatility_persistence_neutral": volatility_persistence_regimes["neutral_persistence"],
         "entries_volatility_persistence_fading_stress": volatility_persistence_regimes["fading_stress"],
+        "use_tightening_liquidity_gate": use_tightening_liquidity_gate,
+        "tightening_liquidity_label": tightening_liquidity_label,
+        "tightening_liquidity_mode": tightening_liquidity_mode,
+        "tightening_liquidity_lag_days": tightening_liquidity_lag_days,
+        "tightening_liquidity_ma_days": (
+            tightening_liquidity_state.get("ma_days") if tightening_liquidity_state else None
+        ),
+        "tightening_liquidity_tight_score_threshold": (
+            tightening_liquidity_state.get("tight_score_threshold") if tightening_liquidity_state else None
+        ),
+        "tightening_liquidity_buckets": (
+            sorted(tightening_liquidity_buckets_normalized)
+            if tightening_liquidity_buckets_normalized
+            else None
+        ),
+        "tightening_liquidity_long_tight_mult": tightening_liquidity_long_tight_mult,
+        "tightening_liquidity_long_neutral_mult": tightening_liquidity_long_neutral_mult,
+        "tightening_liquidity_short_tight_mult": tightening_liquidity_short_tight_mult,
+        "tightening_liquidity_short_neutral_mult": tightening_liquidity_short_neutral_mult,
+        "avg_tightening_liquidity_mult": (
+            round(sum(tightening_liquidity_mults) / len(tightening_liquidity_mults), 4)
+            if tightening_liquidity_mults
+            else 1.0
+        ),
+        "entries_tightening_liquidity_scaled": sum(
+            1 for mult in tightening_liquidity_mults if mult < 0.999999
+        ),
+        "entries_tightening_liquidity_tight": (
+            tightening_liquidity_regimes["tightening_liquidity_tight"]
+        ),
+        "entries_tightening_liquidity_neutral": (
+            tightening_liquidity_regimes["tightening_liquidity_neutral"]
+        ),
         "channel_period": channel_period,
         "lookback_years": lookback_years,
         "base_risk_pct": base_risk_pct,

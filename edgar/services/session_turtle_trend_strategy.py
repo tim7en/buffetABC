@@ -268,6 +268,7 @@ def run_session_turtle_trend_backtest(
     trend_fast_period: int = 55,
     trend_slow_period: int = 200,
     use_extended_hours_protective_exits_only: bool = False,
+    close_positions_before_weekend: bool = False,
     use_chandelier_exit: bool = False,
     chandelier_period: int = 22,
     chandelier_atr_period: int = 22,
@@ -433,6 +434,7 @@ def run_session_turtle_trend_backtest(
 
     for i in range(start_idx, len(bars)):
         ts = timestamps[i]
+        next_ts = timestamps[i + 1] if i < len(bars) - 1 else None
         open_i = opens[i]
         high_i = highs[i]
         low_i = lows[i]
@@ -730,6 +732,16 @@ def run_session_turtle_trend_backtest(
                                     4,
                                 )
 
+        if (
+            open_trade is not None
+            and close_positions_before_weekend
+            and next_ts is not None
+            and ts.weekday() == 4
+            and next_ts.weekday() != 4
+        ):
+            _close_trade(open_trade, i, close_i, "weekend_flat")
+            open_trade = None
+
         unrealized = 0.0
         if open_trade is not None:
             if open_trade.direction == "long":
@@ -747,6 +759,13 @@ def run_session_turtle_trend_backtest(
             equity_curve.append({"date": ts.isoformat(), "equity": round(equity, 4), "capital": round(capital, 4)})
 
         if open_trade is not None:
+            continue
+        if (
+            close_positions_before_weekend
+            and next_ts is not None
+            and ts.weekday() == 4
+            and next_ts.weekday() != 4
+        ):
             continue
         if ts < period_start or i >= len(bars) - 1 or minutes_open >= active_entry_window:
             continue
@@ -984,6 +1003,7 @@ def run_session_turtle_trend_backtest(
         "trend_fast_period": trend_fast_period,
         "trend_slow_period": trend_slow_period,
         "use_extended_hours_protective_exits_only": use_extended_hours_protective_exits_only,
+        "close_positions_before_weekend": close_positions_before_weekend,
         "use_volume_risk_scaling": use_volume_risk_scaling,
         "volume_period": volume_period,
         "volume_risk_floor": volume_risk_floor,

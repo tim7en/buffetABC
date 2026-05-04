@@ -778,10 +778,12 @@ class SessionTurtlePortfolioTests(TestCase):
         regime, mult, age_min, close_value = _lookup_intraday_volatility_signal(
             entry_ts=datetime(2024, 1, 3, 10, 0, 0),
             session_open="new_york_equity_open",
+            asset_bucket="equity",
             direction="long",
             proxy_state=proxy_state,
             max_age_minutes=60,
             lag_bars=1,
+            allowed_buckets=None,
             long_risk_on_mult=1.0,
             long_neutral_mult=1.0,
             long_risk_off_mult=0.5,
@@ -1007,6 +1009,280 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertEqual(summary["entries_volatility_persistence_scaled"], 2)
         self.assertEqual(summary["entries_volatility_persistence_persistent_stress"], 1)
         self.assertEqual(summary["entries_volatility_persistence_fading_stress"], 1)
+
+    def test_tightening_liquidity_gate_uses_slow_macro_state_for_long_sizing(self):
+        from edgar.services.tightening_liquidity_gate import (
+            build_tightening_liquidity_state,
+            lookup_tightening_liquidity_signal,
+        )
+
+        state = build_tightening_liquidity_state(
+            curve_series={
+                "2024-01-01": 1.0,
+                "2024-01-02": 0.4,
+                "2024-01-03": -0.1,
+            },
+            credit_spread_series={
+                "2024-01-01": 4.0,
+                "2024-01-02": 4.1,
+                "2024-01-03": 5.5,
+            },
+            nfci_series={
+                "2024-01-01": -0.5,
+                "2024-01-02": -0.4,
+                "2024-01-03": 0.3,
+            },
+            vix_series={
+                "2024-01-01": 15.0,
+                "2024-01-02": 15.5,
+                "2024-01-03": 25.0,
+            },
+            ma_days=2,
+            tight_score_threshold=2,
+        )
+
+        regime, mult, score, blocked = lookup_tightening_liquidity_signal(
+            entry_ts=datetime(2024, 1, 4, 10, 0, 0),
+            asset_bucket="equity",
+            direction="long",
+            state=state,
+            lag_days=1,
+            gated_buckets=frozenset({"equity"}),
+            mode="size",
+            tight_long_mult=0.5,
+            neutral_long_mult=1.0,
+            tight_short_mult=1.0,
+            neutral_short_mult=1.0,
+        )
+
+        self.assertEqual(regime, "tightening_liquidity_tight")
+        self.assertEqual(mult, 0.5)
+        self.assertEqual(score, 4)
+        self.assertFalse(blocked)
+
+    def test_session_turtle_portfolio_supports_tightening_liquidity_size_gate(self):
+        from edgar.services.tightening_liquidity_gate import build_tightening_liquidity_state
+
+        candidates = [
+            {
+                "combo_idx": 0,
+                "trade_idx": 0,
+                "ticker": "AAA",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "long",
+                "entry_ts": datetime(2024, 1, 4, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 5, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 120.0,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": 20.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "equity",
+            },
+            {
+                "combo_idx": 1,
+                "trade_idx": 0,
+                "ticker": "BBB",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "short",
+                "entry_ts": datetime(2024, 1, 4, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 5, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 90.0,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": 10.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "equity",
+            },
+            {
+                "combo_idx": 2,
+                "trade_idx": 0,
+                "ticker": "GLD",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "long",
+                "entry_ts": datetime(2024, 1, 4, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 5, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 110.0,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": 10.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "gold",
+            },
+        ]
+        gate_state = build_tightening_liquidity_state(
+            curve_series={"2024-01-01": 1.0, "2024-01-02": 0.4, "2024-01-03": -0.1},
+            credit_spread_series={"2024-01-01": 4.0, "2024-01-02": 4.1, "2024-01-03": 5.5},
+            nfci_series={"2024-01-01": -0.5, "2024-01-02": -0.4, "2024-01-03": 0.3},
+            vix_series={"2024-01-01": 15.0, "2024-01-02": 15.5, "2024-01-03": 25.0},
+            ma_days=2,
+            tight_score_threshold=2,
+        )
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=1.0,
+            drawdown_exposure_mult_1=1.0,
+            drawdown_exposure_mult_2=1.0,
+            use_tightening_liquidity_gate=True,
+            tightening_liquidity_state=gate_state,
+            tightening_liquidity_mode="size",
+            tightening_liquidity_lag_days=1,
+            tightening_liquidity_buckets=frozenset({"equity"}),
+            tightening_liquidity_long_tight_mult=0.5,
+            tightening_liquidity_short_tight_mult=1.0,
+            precomputed_candidates=candidates,
+        )
+
+        aaa_trade = next(trade for trade in report["trades"] if trade["ticker"] == "AAA")
+        bbb_trade = next(trade for trade in report["trades"] if trade["ticker"] == "BBB")
+        gld_trade = next(trade for trade in report["trades"] if trade["ticker"] == "GLD")
+
+        self.assertEqual(aaa_trade["tightening_liquidity_regime"], "tightening_liquidity_tight")
+        self.assertEqual(aaa_trade["tightening_liquidity_mult"], 0.5)
+        self.assertEqual(aaa_trade["notional"], 50.0)
+        self.assertEqual(bbb_trade["tightening_liquidity_mult"], 1.0)
+        self.assertEqual(bbb_trade["notional"], 100.0)
+        self.assertIsNone(gld_trade["tightening_liquidity_regime"])
+        self.assertEqual(gld_trade["notional"], 100.0)
+
+        summary = report["summary"]
+        self.assertTrue(summary["use_tightening_liquidity_gate"])
+        self.assertEqual(summary["entries_tightening_liquidity_scaled"], 1)
+        self.assertEqual(summary["entries_tightening_liquidity_tight"], 2)
+        self.assertEqual(summary["skipped_tightening_liquidity_gate"], 0)
+
+    def test_session_turtle_portfolio_supports_tightening_liquidity_entry_gate(self):
+        from edgar.services.tightening_liquidity_gate import build_tightening_liquidity_state
+
+        candidates = [
+            {
+                "combo_idx": 0,
+                "trade_idx": 0,
+                "ticker": "AAA",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "long",
+                "entry_ts": datetime(2024, 1, 4, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 5, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 120.0,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": 20.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "equity",
+            },
+            {
+                "combo_idx": 1,
+                "trade_idx": 0,
+                "ticker": "BBB",
+                "source": "tiingo",
+                "session_open": "new_york_equity_open",
+                "direction": "short",
+                "entry_ts": datetime(2024, 1, 4, 10, 0, 0),
+                "exit_ts": datetime(2024, 1, 5, 10, 0, 0),
+                "entry_price": 100.0,
+                "exit_price": 90.0,
+                "shares": 1.0,
+                "position_size": 100.0,
+                "pnl": 10.0,
+                "risk_model": "base",
+                "entry_rel_volume": 1.0,
+                "asset_bucket": "equity",
+            },
+        ]
+        gate_state = build_tightening_liquidity_state(
+            curve_series={"2024-01-01": 1.0, "2024-01-02": 0.4, "2024-01-03": -0.1},
+            credit_spread_series={"2024-01-01": 4.0, "2024-01-02": 4.1, "2024-01-03": 5.5},
+            nfci_series={"2024-01-01": -0.5, "2024-01-02": -0.4, "2024-01-03": 0.3},
+            vix_series={"2024-01-01": 15.0, "2024-01-02": 15.5, "2024-01-03": 25.0},
+            ma_days=2,
+            tight_score_threshold=2,
+        )
+
+        report = generate_session_turtle_shared_account_report(
+            basket="core",
+            initial_capital=1000.0,
+            exposure_mult=1.0,
+            drawdown_exposure_mult_1=1.0,
+            drawdown_exposure_mult_2=1.0,
+            use_tightening_liquidity_gate=True,
+            tightening_liquidity_state=gate_state,
+            tightening_liquidity_mode="entry",
+            tightening_liquidity_lag_days=1,
+            tightening_liquidity_buckets=frozenset({"equity"}),
+            tightening_liquidity_short_tight_mult=1.0,
+            precomputed_candidates=candidates,
+        )
+
+        tickers = {trade["ticker"] for trade in report["trades"]}
+        self.assertEqual(tickers, {"BBB"})
+        self.assertEqual(report["trades"][0]["tightening_liquidity_regime"], "tightening_liquidity_tight")
+
+        summary = report["summary"]
+        self.assertEqual(summary["executed_trades"], 1)
+        self.assertEqual(summary["skipped_tightening_liquidity_gate"], 1)
+        self.assertEqual(summary["entries_tightening_liquidity_tight"], 1)
+
+    def test_macro_regime_score_blocks_risk_asset_longs_when_macro_is_negative(self):
+        from edgar.services.macro_regime_score import lookup_macro_regime_signal
+
+        state = {
+            "dates": [date(2024, 1, 1), date(2024, 1, 2), date(2024, 1, 3)],
+            "scores": [None, 0, -3],
+            "raw_scores": [None, 0, -4],
+            "labels": [None, "macro_neutral", "macro_headwind"],
+            "component_scores": {
+                "dollar": [None, 0, -1],
+                "rates": [None, 0, -1],
+                "stress": [None, 0, -1],
+                "liquidity": [None, 0, -1],
+            },
+        }
+
+        long_signal = lookup_macro_regime_signal(
+            entry_ts=datetime(2024, 1, 4, 10, 0, 0),
+            asset_bucket="equity",
+            direction="long",
+            state=state,
+            lag_days=1,
+            gated_buckets=frozenset({"equity"}),
+            long_half_mult=0.5,
+            negative_long_mult=0.0,
+            short_half_mult=0.5,
+            positive_short_mult=0.0,
+        )
+        short_signal = lookup_macro_regime_signal(
+            entry_ts=datetime(2024, 1, 4, 10, 0, 0),
+            asset_bucket="equity",
+            direction="short",
+            state=state,
+            lag_days=1,
+            gated_buckets=frozenset({"equity"}),
+            long_half_mult=0.5,
+            negative_long_mult=0.0,
+            short_half_mult=0.5,
+            positive_short_mult=0.0,
+        )
+
+        self.assertEqual(long_signal["score"], -3)
+        self.assertTrue(long_signal["blocked"])
+        self.assertEqual(long_signal["action"], "blocked_long")
+        self.assertEqual(short_signal["score"], -3)
+        self.assertFalse(short_signal["blocked"])
+        self.assertEqual(short_signal["action"], "full_short")
 
     def test_session_turtle_portfolio_recomputes_position_size_from_live_capital(self):
         candidates = [
@@ -3113,6 +3389,93 @@ class BinanceDataTests(TestCase):
         self.assertTrue(extended["use_extended_hours_protective_exits_only"])
         self.assertGreater(
             datetime.fromisoformat(extended_trade["exit_date"]),
+            datetime.fromisoformat(baseline_trade["exit_date"]),
+        )
+
+    @patch("edgar.services.session_turtle_trend_strategy._load_local_bars")
+    def test_session_turtle_trend_can_flatten_before_weekend(self, mock_load_bars):
+        from edgar.services.session_turtle_trend_strategy import run_session_turtle_trend_backtest
+
+        start = datetime(2024, 1, 1, 14, 30)
+        session_days: list[datetime] = []
+        cursor = start
+        while len(session_days) < 27:
+            if cursor.weekday() < 5:
+                session_days.append(cursor)
+            cursor += timedelta(days=1)
+
+        bars: list[dict] = []
+        bars_per_session = 96
+        breakout_session = 24  # Friday with enough completed lookback sessions
+        for session_idx, session_start in enumerate(session_days):
+            for step in range(bars_per_session):
+                ts = session_start + timedelta(minutes=15 * step)
+                open_price = 100.0
+                high_price = 100.2
+                low_price = 99.8
+                close_price = 100.0
+                if session_idx == breakout_session:
+                    if step == 2:
+                        high_price = 101.0
+                        close_price = 101.0
+                    elif step > 2:
+                        open_price = 101.0
+                        high_price = 101.2
+                        low_price = 100.8
+                        close_price = 101.0
+                elif session_idx > breakout_session:
+                    open_price = 101.0
+                    high_price = 101.2
+                    low_price = 100.8
+                    close_price = 101.0
+                bars.append(
+                    {
+                        "timestamp": ts,
+                        "open": open_price,
+                        "high": high_price,
+                        "low": low_price,
+                        "close": close_price,
+                        "volume": 1000.0,
+                    }
+                )
+
+        mock_load_bars.return_value = (bars, "TOKEQ", "local_tiingo_cache", "synthetic")
+
+        baseline = run_session_turtle_trend_backtest(
+            ticker="TOKEQ",
+            interval="15m",
+            lookback_years=1.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            channel_period=20,
+            fixed_stop_pct=0.05,
+            entry_window_minutes=390,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+        weekend_flat = run_session_turtle_trend_backtest(
+            ticker="TOKEQ",
+            interval="15m",
+            lookback_years=1.0,
+            market_data_source="tiingo",
+            session_open="new_york_equity_open",
+            channel_period=20,
+            fixed_stop_pct=0.05,
+            entry_window_minutes=390,
+            close_positions_before_weekend=True,
+            use_break_even_stop=False,
+            use_chandelier_exit=False,
+        )
+
+        self.assertGreater(baseline["total_trades"], 0)
+        self.assertGreater(weekend_flat["total_trades"], 0)
+        baseline_trade = baseline["trades"][0]
+        weekend_trade = weekend_flat["trades"][0]
+        self.assertEqual(baseline_trade["exit_reason"], "end_of_data")
+        self.assertEqual(weekend_trade["exit_reason"], "weekend_flat")
+        self.assertTrue(weekend_flat["close_positions_before_weekend"])
+        self.assertLess(
+            datetime.fromisoformat(weekend_trade["exit_date"]),
             datetime.fromisoformat(baseline_trade["exit_date"]),
         )
 
