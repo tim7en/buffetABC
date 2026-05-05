@@ -59,13 +59,37 @@ def _lookback_return(values: list[float | None], lookback: int) -> list[float | 
     return out
 
 
+def _series_spread(
+    lhs: list[float | None],
+    rhs: list[float | None],
+) -> list[float | None]:
+    out: list[float | None] = [None] * min(len(lhs), len(rhs))
+    for idx, (left, right) in enumerate(zip(lhs, rhs)):
+        if left is None or right is None:
+            continue
+        out[idx] = float(left) - float(right)
+    return out
+
+
+def _series_ratio(
+    numerator: list[float | None],
+    denominator: list[float | None],
+) -> list[float | None]:
+    out: list[float | None] = [None] * min(len(numerator), len(denominator))
+    for idx, (top, bottom) in enumerate(zip(numerator, denominator)):
+        if top is None or bottom is None or abs(float(bottom)) <= 1e-9:
+            continue
+        out[idx] = float(top) / float(bottom)
+    return out
+
+
 def _load_combined_macro_series(
     csv_path: str | Path = _DEFAULT_COMBINED_MACRO_PATH,
 ) -> dict[str, dict[str, float]]:
     path = Path(csv_path)
     if not path.exists():
         raise FileNotFoundError(f"Combined macro dataset not found: {path}")
-    wanted = {"dxy_close", "us_10y_yield"}
+    wanted = {"dxy_close", "us_2y_yield", "us_10y_yield", "vix3m_level"}
     series_map = {column: {} for column in wanted}
 
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -114,26 +138,42 @@ def build_macro_regime_score_state(
     *,
     combined_macro_path: str | Path = _DEFAULT_COMBINED_MACRO_PATH,
     fred_dir: str | Path = _DEFAULT_FRED_DIR,
+    version: str = "v1",
     dxy_fast_ma_days: int = 100,
     dxy_slow_ma_days: int = 200,
     rates_ma_days: int = 60,
     stress_ma_days: int = 60,
     lookback_days: int = 21,
     rates_change_threshold_bps: float = 20.0,
+    front_end_rates_change_threshold_bps: float = 15.0,
+    vix_term_contango_ratio: float = 0.98,
+    vix_term_backwardation_ratio: float = 1.02,
     score_cap: int = 3,
 ) -> dict:
+    if version not in {"v1", "v2_front_end"}:
+        raise ValueError("version must be 'v1' or 'v2_front_end'")
     if dxy_fast_ma_days <= 0 or dxy_slow_ma_days <= 0 or rates_ma_days <= 0 or stress_ma_days <= 0:
         raise ValueError("MA windows must be positive")
     if lookback_days <= 0:
         raise ValueError("lookback_days must be positive")
     if score_cap <= 0:
         raise ValueError("score_cap must be positive")
+    if front_end_rates_change_threshold_bps < 0.0:
+        raise ValueError("front_end_rates_change_threshold_bps must be non-negative")
+    if (
+        vix_term_contango_ratio <= 0.0
+        or vix_term_backwardation_ratio <= 0.0
+        or vix_term_contango_ratio >= vix_term_backwardation_ratio
+    ):
+        raise ValueError("VIX term ratios must be positive and ordered contango < backwardation")
 
     combined = _load_combined_macro_series(csv_path=combined_macro_path)
     fred_base = Path(fred_dir)
     series_map = {
         "dxy": combined["dxy_close"],
+        "us2y": combined["us_2y_yield"],
         "us10y": combined["us_10y_yield"],
+        "vix3m": combined["vix3m_level"],
         "curve": load_local_macro_series(fred_base / "T10Y3M.csv"),
         "hy": load_local_macro_series(fred_base / "BAMLH0A0HYM2.csv"),
         "nfci": load_local_macro_series(fred_base / "NFCI.csv"),
@@ -142,7 +182,9 @@ def build_macro_regime_score_state(
     dates, aligned = _align_series(series_map)
 
     dxy_vals = aligned["dxy"]
+    us2y_vals = aligned["us2y"]
     us10y_vals = aligned["us10y"]
+    vix3m_vals = aligned["vix3m"]
     curve_vals = aligned["curve"]
     hy_vals = aligned["hy"]
     nfci_vals = aligned["nfci"]
@@ -151,8 +193,13 @@ def build_macro_regime_score_state(
     dxy_ma_fast = _simple_moving_average(dxy_vals, dxy_fast_ma_days)
     dxy_ma_slow = _simple_moving_average(dxy_vals, dxy_slow_ma_days)
     dxy_return = _lookback_return(dxy_vals, lookback_days)
+    us2y_ma = _simple_moving_average(us2y_vals, rates_ma_days)
+    us2y_change = _lookback_delta(us2y_vals, lookback_days)
     us10y_ma = _simple_moving_average(us10y_vals, rates_ma_days)
     us10y_change = _lookback_delta(us10y_vals, lookback_days)
+    two_ten_vals = _series_spread(us10y_vals, us2y_vals)
+    two_ten_ma = _simple_moving_average(two_ten_vals, stress_ma_days)
+    two_ten_change = _lookback_delta(two_ten_vals, lookback_days)
     curve_ma = _simple_moving_average(curve_vals, stress_ma_days)
     curve_change = _lookback_delta(curve_vals, lookback_days)
     hy_ma = _simple_moving_average(hy_vals, stress_ma_days)
@@ -161,6 +208,7 @@ def build_macro_regime_score_state(
     nfci_change = _lookback_delta(nfci_vals, lookback_days)
     vix_ma = _simple_moving_average(vix_vals, stress_ma_days)
     vix_change = _lookback_delta(vix_vals, lookback_days)
+    vix_term_ratio = _series_ratio(vix_vals, vix3m_vals)
 
     component_scores: dict[str, list[int | None]] = {
         "dollar": [None] * len(dates),
@@ -173,6 +221,7 @@ def build_macro_regime_score_state(
     labels: list[str | None] = [None] * len(dates)
 
     rates_threshold = float(rates_change_threshold_bps) / 100.0
+    front_end_rates_threshold = float(front_end_rates_change_threshold_bps) / 100.0
     for idx in range(len(dates)):
         dxy_score: int | None = None
         if (
@@ -194,26 +243,108 @@ def build_macro_regime_score_state(
         component_scores["dollar"][idx] = dxy_score
 
         rates_score: int | None = None
-        if us10y_vals[idx] is not None and us10y_change[idx] is not None:
-            if (
-                float(us10y_change[idx]) <= -rates_threshold
-                or (
-                    us10y_ma[idx] is not None
-                    and float(us10y_vals[idx]) < float(us10y_ma[idx])
-                    and float(us10y_change[idx]) < 0.0
+        if version == "v1":
+            if us10y_vals[idx] is not None and us10y_change[idx] is not None:
+                if (
+                    float(us10y_change[idx]) <= -rates_threshold
+                    or (
+                        us10y_ma[idx] is not None
+                        and float(us10y_vals[idx]) < float(us10y_ma[idx])
+                        and float(us10y_change[idx]) < 0.0
+                    )
+                ):
+                    rates_score = 1
+                elif (
+                    float(us10y_change[idx]) >= rates_threshold
+                    or (
+                        us10y_ma[idx] is not None
+                        and float(us10y_vals[idx]) > float(us10y_ma[idx])
+                        and float(us10y_change[idx]) > 0.0
+                    )
+                ):
+                    rates_score = -1
+                else:
+                    rates_score = 0
+        else:
+            two_y_supportive = False
+            two_y_hostile = False
+            ten_y_supportive = False
+            ten_y_hostile = False
+            curve_supportive = False
+            curve_hostile = False
+
+            if us2y_vals[idx] is not None and us2y_change[idx] is not None:
+                two_y_supportive = (
+                    float(us2y_change[idx]) <= -front_end_rates_threshold
+                    or (
+                        us2y_ma[idx] is not None
+                        and float(us2y_vals[idx]) < float(us2y_ma[idx])
+                        and float(us2y_change[idx]) < 0.0
+                    )
                 )
-            ):
+                two_y_hostile = (
+                    float(us2y_change[idx]) >= front_end_rates_threshold
+                    or (
+                        us2y_ma[idx] is not None
+                        and float(us2y_vals[idx]) > float(us2y_ma[idx])
+                        and float(us2y_change[idx]) > 0.0
+                    )
+                )
+            if us10y_vals[idx] is not None and us10y_change[idx] is not None:
+                ten_y_supportive = (
+                    float(us10y_change[idx]) <= -rates_threshold
+                    or (
+                        us10y_ma[idx] is not None
+                        and float(us10y_vals[idx]) < float(us10y_ma[idx])
+                        and float(us10y_change[idx]) < 0.0
+                    )
+                )
+                ten_y_hostile = (
+                    float(us10y_change[idx]) >= rates_threshold
+                    or (
+                        us10y_ma[idx] is not None
+                        and float(us10y_vals[idx]) > float(us10y_ma[idx])
+                        and float(us10y_change[idx]) > 0.0
+                    )
+                )
+            if two_ten_vals[idx] is not None and two_ten_change[idx] is not None:
+                curve_supportive = (
+                    (
+                        two_ten_ma[idx] is not None
+                        and float(two_ten_vals[idx]) > float(two_ten_ma[idx])
+                        and float(two_ten_change[idx]) >= 0.0
+                    )
+                    or (
+                        float(two_ten_vals[idx]) >= 0.0
+                        and float(two_ten_change[idx]) > 0.0
+                    )
+                )
+                curve_hostile = (
+                    (
+                        two_ten_ma[idx] is not None
+                        and float(two_ten_vals[idx]) < float(two_ten_ma[idx])
+                        and float(two_ten_change[idx]) < 0.0
+                    )
+                    or (
+                        float(two_ten_vals[idx]) < 0.0
+                        and float(two_ten_change[idx]) < 0.0
+                    )
+                )
+
+            if two_y_supportive and not curve_hostile and (ten_y_supportive or curve_supportive):
                 rates_score = 1
-            elif (
-                float(us10y_change[idx]) >= rates_threshold
-                or (
-                    us10y_ma[idx] is not None
-                    and float(us10y_vals[idx]) > float(us10y_ma[idx])
-                    and float(us10y_change[idx]) > 0.0
-                )
-            ):
+            elif two_y_hostile and (ten_y_hostile or curve_hostile or (two_ten_vals[idx] is not None and float(two_ten_vals[idx]) < 0.0)):
                 rates_score = -1
-            else:
+            elif two_y_supportive and not curve_hostile:
+                rates_score = 0
+            elif two_y_hostile:
+                rates_score = 0
+            elif (
+                us2y_vals[idx] is not None
+                and us2y_change[idx] is not None
+                and us10y_vals[idx] is not None
+                and us10y_change[idx] is not None
+            ):
                 rates_score = 0
         component_scores["rates"][idx] = rates_score
 
@@ -235,6 +366,12 @@ def build_macro_regime_score_state(
                 easing_votes += 1
             elif value > ma_value and delta_value > 0.0:
                 stress_votes += 1
+        if version == "v2_front_end" and vix_term_ratio[idx] is not None:
+            available_votes += 1
+            if float(vix_term_ratio[idx]) <= float(vix_term_contango_ratio):
+                easing_votes += 1
+            elif float(vix_term_ratio[idx]) >= float(vix_term_backwardation_ratio):
+                stress_votes += 1
         stress_score: int | None = None
         if available_votes >= 2:
             if easing_votes >= 2:
@@ -246,22 +383,78 @@ def build_macro_regime_score_state(
         component_scores["stress"][idx] = stress_score
 
         liquidity_score: int | None = None
-        if (
-            curve_vals[idx] is not None
-            and curve_ma[idx] is not None
-            and curve_change[idx] is not None
-            and nfci_change[idx] is not None
-        ):
-            curve_value = float(curve_vals[idx])
-            curve_ma_value = float(curve_ma[idx])
-            curve_delta = float(curve_change[idx])
-            nfci_delta = float(nfci_change[idx])
-            if curve_value > curve_ma_value and curve_delta > 0.0 and nfci_delta <= 0.0:
-                liquidity_score = 1
-            elif curve_value < 0.0 and curve_delta < 0.0 and nfci_delta > 0.0:
-                liquidity_score = -1
-            else:
-                liquidity_score = 0
+        if version == "v1":
+            if (
+                curve_vals[idx] is not None
+                and curve_ma[idx] is not None
+                and curve_change[idx] is not None
+                and nfci_change[idx] is not None
+            ):
+                curve_value = float(curve_vals[idx])
+                curve_ma_value = float(curve_ma[idx])
+                curve_delta = float(curve_change[idx])
+                nfci_delta = float(nfci_change[idx])
+                if curve_value > curve_ma_value and curve_delta > 0.0 and nfci_delta <= 0.0:
+                    liquidity_score = 1
+                elif curve_value < 0.0 and curve_delta < 0.0 and nfci_delta > 0.0:
+                    liquidity_score = -1
+                else:
+                    liquidity_score = 0
+        else:
+            supportive_votes = 0
+            restrictive_votes = 0
+            liquidity_votes = 0
+
+            if curve_vals[idx] is not None and curve_change[idx] is not None:
+                liquidity_votes += 1
+                if (
+                    curve_ma[idx] is not None
+                    and float(curve_vals[idx]) > float(curve_ma[idx])
+                    and float(curve_change[idx]) > 0.0
+                ):
+                    supportive_votes += 1
+                elif float(curve_vals[idx]) < 0.0 and float(curve_change[idx]) < 0.0:
+                    restrictive_votes += 1
+
+            if two_ten_vals[idx] is not None and two_ten_change[idx] is not None:
+                liquidity_votes += 1
+                if (
+                    (
+                        two_ten_ma[idx] is not None
+                        and float(two_ten_vals[idx]) > float(two_ten_ma[idx])
+                        and float(two_ten_change[idx]) >= 0.0
+                    )
+                    or (
+                        float(two_ten_vals[idx]) >= 0.0
+                        and float(two_ten_change[idx]) > 0.0
+                    )
+                ):
+                    supportive_votes += 1
+                elif float(two_ten_vals[idx]) < 0.0 and float(two_ten_change[idx]) < 0.0:
+                    restrictive_votes += 1
+
+            if nfci_vals[idx] is not None and nfci_change[idx] is not None:
+                liquidity_votes += 1
+                if (
+                    nfci_ma[idx] is not None
+                    and float(nfci_vals[idx]) < float(nfci_ma[idx])
+                    and float(nfci_change[idx]) <= 0.0
+                ):
+                    supportive_votes += 1
+                elif (
+                    nfci_ma[idx] is not None
+                    and float(nfci_vals[idx]) > float(nfci_ma[idx])
+                    and float(nfci_change[idx]) > 0.0
+                ):
+                    restrictive_votes += 1
+
+            if liquidity_votes >= 2:
+                if supportive_votes >= 2:
+                    liquidity_score = 1
+                elif restrictive_votes >= 2:
+                    liquidity_score = -1
+                else:
+                    liquidity_score = 0
         component_scores["liquidity"][idx] = liquidity_score
 
         row_components = [component_scores[name][idx] for name in ("dollar", "rates", "stress", "liquidity")]
@@ -285,12 +478,16 @@ def build_macro_regime_score_state(
         "scores": scores,
         "raw_scores": raw_scores,
         "labels": labels,
+        "version": version,
         "lookback_days": lookback_days,
         "dxy_fast_ma_days": dxy_fast_ma_days,
         "dxy_slow_ma_days": dxy_slow_ma_days,
         "rates_ma_days": rates_ma_days,
         "stress_ma_days": stress_ma_days,
         "rates_change_threshold_bps": rates_change_threshold_bps,
+        "front_end_rates_change_threshold_bps": front_end_rates_change_threshold_bps,
+        "vix_term_contango_ratio": vix_term_contango_ratio,
+        "vix_term_backwardation_ratio": vix_term_backwardation_ratio,
         "score_cap": score_cap,
         "component_scores": component_scores,
     }

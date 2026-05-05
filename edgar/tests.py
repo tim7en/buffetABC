@@ -1284,6 +1284,94 @@ class SessionTurtlePortfolioTests(TestCase):
         self.assertFalse(short_signal["blocked"])
         self.assertEqual(short_signal["action"], "full_short")
 
+    def test_macro_regime_score_v2_front_end_uses_two_year_curve_and_vix_term(self):
+        from edgar.services.macro_regime_score import build_macro_regime_score_state
+
+        with TemporaryDirectory() as temp_dir:
+            base_dir = Path(temp_dir)
+            combined_path = base_dir / "macro.csv"
+            fred_dir = base_dir / "fred"
+            fred_dir.mkdir()
+
+            combined_path.write_text(
+                "\n".join(
+                    [
+                        "date,dxy_close,us_2y_yield,us_10y_yield,vix3m_level",
+                        "2024-01-01,100,5.0,4.7,20",
+                        "2024-01-02,99,4.9,4.7,21",
+                        "2024-01-03,98,4.6,4.8,23",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (fred_dir / "T10Y3M.csv").write_text(
+                "\n".join(
+                    [
+                        "observation_date,T10Y3M",
+                        "2024-01-01,-0.3",
+                        "2024-01-02,0.0",
+                        "2024-01-03,0.2",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (fred_dir / "BAMLH0A0HYM2.csv").write_text(
+                "\n".join(
+                    [
+                        "observation_date,BAMLH0A0HYM2",
+                        "2024-01-01,4.0",
+                        "2024-01-02,3.9",
+                        "2024-01-03,3.8",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (fred_dir / "NFCI.csv").write_text(
+                "\n".join(
+                    [
+                        "observation_date,NFCI",
+                        "2024-01-01,0.5",
+                        "2024-01-02,0.4",
+                        "2024-01-03,0.2",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            (fred_dir / "VIXCLS.csv").write_text(
+                "\n".join(
+                    [
+                        "observation_date,VIXCLS",
+                        "2024-01-01,18",
+                        "2024-01-02,17",
+                        "2024-01-03,16",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            state = build_macro_regime_score_state(
+                combined_macro_path=combined_path,
+                fred_dir=fred_dir,
+                version="v2_front_end",
+                dxy_fast_ma_days=2,
+                dxy_slow_ma_days=3,
+                rates_ma_days=2,
+                stress_ma_days=2,
+                lookback_days=1,
+                rates_change_threshold_bps=5.0,
+                front_end_rates_change_threshold_bps=10.0,
+                score_cap=3,
+            )
+
+        self.assertEqual(state["version"], "v2_front_end")
+        self.assertEqual(state["component_scores"]["dollar"][-1], 1)
+        self.assertEqual(state["component_scores"]["rates"][-1], 1)
+        self.assertEqual(state["component_scores"]["stress"][-1], 1)
+        self.assertEqual(state["component_scores"]["liquidity"][-1], 1)
+        self.assertEqual(state["raw_scores"][-1], 4)
+        self.assertEqual(state["scores"][-1], 3)
+        self.assertEqual(state["labels"][-1], "macro_tailwind")
+
     def test_session_turtle_portfolio_recomputes_position_size_from_live_capital(self):
         candidates = [
             {

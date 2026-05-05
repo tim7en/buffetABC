@@ -46,6 +46,11 @@ class Command(BaseCommand):
             help="Calendar-day lag for macro score lookup (default: 1).",
         )
         parser.add_argument(
+            "--macro-version",
+            default="v1",
+            help="Macro regime model version: v1 or v2_front_end (default: v1).",
+        )
+        parser.add_argument(
             "--macro-gated-buckets",
             default="crypto,equity,etf",
             help="Comma-separated buckets gated by the macro sleeve.",
@@ -91,7 +96,8 @@ class Command(BaseCommand):
             ema_period=200,
             adx_period=14,
         )
-        macro_state = build_macro_regime_score_state()
+        macro_version = str(options["macro_version"]).strip() or "v1"
+        macro_state = build_macro_regime_score_state(version=macro_version)
         self.stdout.write(self.style.SUCCESS("  overlay state ready"))
 
         self.stdout.write("Building grouped/timed baseline candidates ...")
@@ -142,6 +148,7 @@ class Command(BaseCommand):
             if bucket.strip()
         ) or None
         macro_kwargs = {
+            "version": macro_version,
             "lag_days": int(options["macro_lag_days"]),
             "gated_buckets": gated_buckets,
             "long_half_mult": float(options["long_half_mult"]),
